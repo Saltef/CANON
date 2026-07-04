@@ -1,0 +1,8 @@
+[topic]
+id = "institutions"
+name = "International institutions and state behavior"
+query = "international institutions state behavior cooperation realism liberal institutionalism"
+
+[openalex]
+search = "international institutions state behavior cooperation"
+concepts = ["political science", "international relations"]

@@ -1,0 +1,52 @@
+services:
+  canon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      CANON_SETTINGS: /app/conf/settings.toml
+      CANON_DATA_DIR: /app/data
+      CANON_REPORTS_DIR: /app/reports
+      DATABASE_URL: postgresql://canon:canon@postgres:5432/canon
+      GROBID_URL: http://grobid:8070
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      COHERE_API_KEY: ${COHERE_API_KEY:-}
+      OPENALEX_API_KEY: ${OPENALEX_API_KEY:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+      - ./conf:/app/conf:ro
+      - ./gold:/app/gold:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: canon
+      POSTGRES_PASSWORD: canon
+      POSTGRES_DB: canon
+    ports:
+      - "5432:5432"
+    volumes:
+      - canon_postgres:/var/lib/postgresql/data
+      - ./canon/db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      - ./canon/db:/app/canon/db:ro
+      - ./data:/app/data:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canon -d canon"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  grobid:
+    image: lfoppiano/grobid:0.8.0
+    profiles: ["fulltext"]
+    ports:
+      - "8070:8070"
+
+volumes:
+  canon_postgres:

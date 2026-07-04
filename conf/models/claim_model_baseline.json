@@ -1,0 +1,84 @@
+{
+  "model_id": "claim-model-baseline-v1",
+  "model_type": "transparent_linear_marker_model",
+  "description": "Deterministic baseline claim model for scholarly abstracts. Scores claim-likeness and stance using versioned lexical features. This is a replaceable baseline, not a final scientific claim classifier.",
+  "claim_threshold": 0.42,
+  "confidence_intercept": 0.18,
+  "feature_weights": {
+    "claim_marker_count": 0.14,
+    "finding_marker_count": 0.18,
+    "evidence_marker_count": 0.16,
+    "method_marker_count": 0.06,
+    "hedge_marker_count": -0.04,
+    "sentence_token_count": 0.01
+  },
+  "positive_markers": [
+    "associated",
+    "effective",
+    "improve",
+    "improves",
+    "increase",
+    "increases",
+    "lower",
+    "reduce",
+    "reduces",
+    "robust",
+    "significant",
+    "support",
+    "supports"
+  ],
+  "negative_markers": [
+    "caveat",
+    "contradict",
+    "contradicts",
+    "critics",
+    "critique",
+    "critiques",
+    "fails",
+    "failure",
+    "insignificant",
+    "mixed",
+    "not",
+    "rarely",
+    "weak"
+  ],
+  "finding_markers": [
+    "find",
+    "finds",
+    "found",
+    "show",
+    "shows",
+    "suggest",
+    "suggests"
+  ],
+  "evidence_markers": [
+    "association",
+    "associations",
+    "effect",
+    "effects",
+    "evidence",
+    "estimate",
+    "estimates",
+    "result",
+    "results"
+  ],
+  "method_markers": [
+    "experiment",
+    "experiments",
+    "model",
+    "models",
+    "specification",
+    "specifications",
+    "statistical",
+    "test",
+    "tests"
+  ],
+  "hedge_markers": [
+    "may",
+    "might",
+    "could",
+    "perhaps",
+    "possible",
+    "possibly"
+  ]
+}

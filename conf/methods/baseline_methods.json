@@ -1,0 +1,89 @@
+{
+  "method_set_id": "baseline_methods_v1",
+  "description": "First controlled method set for importance-aware scholarly RAG.",
+  "methods": [
+    {
+      "id": "lexical_k5_template",
+      "label": "Lexical BM25, k=5",
+      "policy": "lexical",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    },
+    {
+      "id": "balanced_k5_template",
+      "label": "Balanced importance, k=5",
+      "policy": "balanced",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    },
+    {
+      "id": "semantic_k5_template",
+      "label": "Semantic-heavy, k=5",
+      "policy": "semantic",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    },
+    {
+      "id": "rag_k5_template",
+      "label": "Hybrid RAG, k=5",
+      "policy": "rag",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    },
+    {
+      "id": "rag_k8_template",
+      "label": "Hybrid RAG, k=8",
+      "policy": "rag",
+      "top_k": 8,
+      "generator": "template",
+      "generator_model": null
+    },
+    {
+      "id": "diverse_k5_template",
+      "label": "Diversity-first, k=5",
+      "policy": "diverse",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    },
+    {
+      "id": "conflict_aware_k5_template",
+      "label": "Conflict-aware, k=5",
+      "policy": "conflict_aware",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    },
+    {
+      "id": "source_quality_k5_template",
+      "label": "Source-quality-heavy, k=5",
+      "role": "diagnostic_baseline",
+      "policy": "source_quality_heavy",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    },
+    {
+      "id": "recency_k5_template",
+      "label": "Recency-heavy, k=5",
+      "policy": "recency_heavy",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    }
+  ],
+  "score_weights": {
+    "claim_coverage": 0.24,
+    "cluster_diversity": 0.2,
+    "source_diversity": 0.12,
+    "context_relevance": 0.16,
+    "semantic_alignment": 0.1,
+    "citation_support": 0.1,
+    "conflict_awareness": 0.08,
+    "support_confidence": 0.08
+  }
+}

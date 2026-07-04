@@ -1,0 +1,11 @@
+{
+  "pack_id": "social_science_ir",
+  "name": "Social Science IR Starter Pack",
+  "topics": [
+    "conf/topics/political_science_ir.toml",
+    "conf/topics/sanctions.toml",
+    "conf/topics/institutions.toml",
+    "conf/topics/civil_war.toml",
+    "conf/topics/human_rights.toml"
+  ]
+}

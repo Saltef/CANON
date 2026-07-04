@@ -1,0 +1,22 @@
+{
+  "benchmark_id": "public_beir_scifact_smoke",
+  "benchmark_kind": "public_qrels_smoke",
+  "description": "Tiny BEIR/SciFact-style public-qrels smoke fixture for validating external qrels plumbing. This fixture is for parser and workflow validation only; it is not a CANON benchmark score.",
+  "queries": [
+    {
+      "id": "scifact-smoke-q1",
+      "query": "Do epigenetic changes affect gene expression?",
+      "relevant": {
+        "scifact-doc-1": 1,
+        "scifact-doc-2": 1
+      }
+    },
+    {
+      "id": "scifact-smoke-q2",
+      "query": "Can a biomedical claim be supported by cited scientific abstracts?",
+      "relevant": {
+        "scifact-doc-3": 1
+      }
+    }
+  ]
+}

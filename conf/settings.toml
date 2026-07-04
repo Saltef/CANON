@@ -1,0 +1,164 @@
+[project]
+name = "CANON"
+version = "0.1.0"
+discipline = "Political Science / International Relations"
+contact_email = "replace-me@example.com"
+
+[paths]
+data_dir = "data"
+raw_dir = "data/raw"
+processed_dir = "data/processed"
+reports_dir = "reports"
+fixtures_dir = "data/fixtures"
+
+[openalex]
+base_url = "https://api.openalex.org"
+topic_file = "conf/topics/political_science_ir.toml"
+from_publication_year = 2010
+to_publication_year = 2026
+language = "en"
+per_page = 100
+max_results = 500
+api_key_env = "OPENALEX_API_KEY"
+
+[ingest]
+chunk_tokens = 420
+chunk_overlap_tokens = 70
+min_abstract_chars = 120
+
+[importance_weights.default]
+relevance = 1.0
+semantic_similarity = 0.5
+source_quality = 0.4
+citation_centrality = 0.3
+author_score = 0.15
+section_role = 0.2
+claim_density = 0.2
+diversity = 0.2
+recency = 0.1
+
+[retrieval]
+default_policy = "balanced"
+top_k = 5
+preview_chars = 280
+
+[retrieval.policies.lexical]
+relevance = 1.0
+semantic_similarity = 0.0
+source_quality = 0.0
+citation_centrality = 0.0
+author_score = 0.0
+section_role = 0.0
+claim_density = 0.0
+recency = 0.0
+
+[retrieval.policies.importance]
+relevance = 0.25
+semantic_similarity = 0.15
+source_quality = 0.45
+citation_centrality = 0.25
+author_score = 0.15
+section_role = 0.25
+claim_density = 0.25
+recency = 0.05
+
+[retrieval.policies.balanced]
+relevance = 1.0
+semantic_similarity = 0.45
+source_quality = 0.35
+citation_centrality = 0.25
+author_score = 0.1
+section_role = 0.2
+claim_density = 0.2
+recency = 0.1
+
+[retrieval.policies.recency]
+relevance = 0.8
+semantic_similarity = 0.25
+source_quality = 0.15
+citation_centrality = 0.0
+author_score = 0.05
+section_role = 0.1
+claim_density = 0.1
+recency = 0.45
+
+[retrieval.policies.diverse]
+relevance = 0.85
+semantic_similarity = 0.35
+source_quality = 0.25
+citation_centrality = 0.2
+author_score = 0.1
+section_role = 0.15
+claim_density = 0.15
+recency = 0.05
+diversity = 0.35
+relevance_floor = 0.35
+low_relevance_penalty = 0.35
+
+[retrieval.policies.semantic]
+relevance = 0.1
+semantic_similarity = 1.0
+source_quality = 0.15
+citation_centrality = 0.05
+author_score = 0.05
+section_role = 0.1
+claim_density = 0.1
+recency = 0.05
+
+[retrieval.policies.rag]
+relevance = 0.75
+semantic_similarity = 0.75
+source_quality = 0.25
+citation_centrality = 0.2
+author_score = 0.1
+section_role = 0.2
+claim_density = 0.25
+recency = 0.05
+diversity = 0.25
+relevance_floor = 0.35
+low_relevance_penalty = 0.22
+
+[retrieval.policies.conflict_aware]
+relevance = 0.75
+semantic_similarity = 0.65
+source_quality = 0.25
+citation_centrality = 0.2
+author_score = 0.1
+section_role = 0.2
+claim_density = 0.35
+recency = 0.05
+diversity = 0.35
+
+[retrieval.policies.source_quality_heavy]
+relevance = 0.55
+semantic_similarity = 0.4
+source_quality = 0.75
+citation_centrality = 0.35
+author_score = 0.25
+section_role = 0.2
+claim_density = 0.2
+recency = 0.05
+diversity = 0.05
+relevance_floor = 0.35
+low_relevance_penalty = 0.3
+
+[retrieval.policies.recency_heavy]
+relevance = 0.65
+semantic_similarity = 0.45
+source_quality = 0.2
+citation_centrality = 0.1
+author_score = 0.05
+section_role = 0.15
+claim_density = 0.15
+recency = 0.8
+diversity = 0.15
+relevance_floor = 0.35
+low_relevance_penalty = 0.22
+
+[quality_weights.default]
+venue = 1.0
+retraction = 1.0
+citation_impact = 1.0
+centrality = 1.0
+open_science = 0.5
+publisher_legitimacy = 0.75

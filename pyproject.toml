@@ -1,0 +1,13 @@
+[project]
+name = "canon-rag"
+version = "0.1.0"
+description = "Importance-aware scholarly RAG ingestion and evaluation workbench"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

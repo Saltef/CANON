@@ -1,0 +1,8 @@
+[topic]
+id = "human_rights"
+name = "Human rights treaties and practices"
+query = "human rights treaties state practices compliance effectiveness"
+
+[openalex]
+search = "human rights treaties compliance state practices"
+concepts = ["political science", "human rights"]

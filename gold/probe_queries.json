@@ -1,0 +1,67 @@
+[
+  {
+    "id": "probe_disagreement_001",
+    "category": "disagreement",
+    "query": "Where does democratic peace evidence conflict with covert intervention findings?",
+    "rationale": "Checks whether a method retrieves evidence that surfaces disagreement rather than only high-similarity support.",
+    "expectations": {
+      "min_conflict_awareness": 1.0,
+      "min_cluster_diversity": 0.4,
+      "min_context_relevance": 0.25
+    }
+  },
+  {
+    "id": "probe_relevance_trap_001",
+    "category": "relevance_trap",
+    "query": "How effective are economic sanctions compared with military intervention, excluding democratic peace theory?",
+    "rationale": "Checks whether retrieval can stay on the sanctions/intervention frame without being pulled into a nearby democratic-peace attractor.",
+    "expectations": {
+      "min_context_relevance": 0.3,
+      "min_semantic_alignment": 0.1,
+      "min_source_diversity": 0.4
+    }
+  },
+  {
+    "id": "probe_diversity_pressure_001",
+    "category": "diversity_pressure",
+    "query": "Compare mechanisms across democratic peace, institutions, and civil war research.",
+    "rationale": "Checks whether the method broadens context across clusters when the query asks for a cross-literature comparison.",
+    "expectations": {
+      "min_cluster_diversity": 0.6,
+      "min_source_diversity": 0.6,
+      "min_claim_coverage": 0.4
+    }
+  },
+  {
+    "id": "probe_recency_pressure_001",
+    "category": "recency_pressure",
+    "query": "What newer evidence after 2020 changes conclusions about human rights treaties?",
+    "rationale": "Checks whether recency-sensitive retrieval still preserves relevance and citation support.",
+    "expectations": {
+      "min_context_relevance": 0.25,
+      "min_citation_support": 0.8,
+      "min_source_diversity": 0.4
+    }
+  },
+  {
+    "id": "probe_off_topic_001",
+    "category": "off_topic",
+    "query": "What does this social science corpus say about quantum computing hardware error correction?",
+    "rationale": "Checks whether a method exposes weak support on an out-of-domain query instead of treating any retrieved chunk as strong context.",
+    "expectations": {
+      "max_support_confidence": 0.35,
+      "min_weak_support_flag": 1.0
+    }
+  },
+  {
+    "id": "probe_method_focus_001",
+    "category": "method_focus",
+    "query": "Which methods or research designs matter most for identifying causal effects in civil war studies?",
+    "rationale": "Checks whether method-focused questions retrieve claim-bearing and relevant methodological evidence.",
+    "expectations": {
+      "min_claim_coverage": 0.4,
+      "min_context_relevance": 0.25,
+      "min_citation_support": 0.8
+    }
+  }
+]

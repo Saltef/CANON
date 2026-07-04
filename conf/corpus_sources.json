@@ -1,0 +1,79 @@
+{
+  "profile_id": "social_science_product_v1",
+  "primary_index": "openalex",
+  "target_work_count": 10000,
+  "minimum_topic_count": 5,
+  "minimum_author_index_coverage": 0.8,
+  "minimum_reference_coverage": 0.8,
+  "minimum_abstract_coverage": 0.85,
+  "sources": [
+    {
+      "source_id": "openalex",
+      "name": "OpenAlex Works and Authors",
+      "role": "primary_scholarly_index",
+      "status": "implemented",
+      "metadata": [
+        "works",
+        "authors",
+        "citations",
+        "references",
+        "open_access_locations",
+        "venues",
+        "concepts"
+      ],
+      "product_use": "Primary discovery, deduplication, author-score, citation/reference graph, OA URL discovery."
+    },
+    {
+      "source_id": "crossref",
+      "name": "Crossref",
+      "role": "doi_metadata_verification",
+      "status": "planned",
+      "metadata": [
+        "doi",
+        "publisher",
+        "issued_date",
+        "license",
+        "references"
+      ],
+      "product_use": "DOI normalization and publisher metadata checks for records discovered through OpenAlex."
+    },
+    {
+      "source_id": "semantic_scholar",
+      "name": "Semantic Scholar Academic Graph",
+      "role": "citation_context_and_influence_check",
+      "status": "planned",
+      "metadata": [
+        "citation_count",
+        "influential_citation_count",
+        "fields_of_study",
+        "abstract"
+      ],
+      "product_use": "Independent citation and field metadata cross-check where license and API limits allow."
+    },
+    {
+      "source_id": "unpaywall",
+      "name": "Unpaywall",
+      "role": "open_access_fulltext_discovery",
+      "status": "planned",
+      "metadata": [
+        "oa_status",
+        "best_oa_location",
+        "license",
+        "repository"
+      ],
+      "product_use": "Full-text URL validation for DOI-bearing works."
+    },
+    {
+      "source_id": "doaj_core",
+      "name": "DOAJ / CORE",
+      "role": "open_access_repository_backfill",
+      "status": "planned",
+      "metadata": [
+        "journal_oa_status",
+        "repository_record",
+        "full_text_url"
+      ],
+      "product_use": "Backfill open-access availability and venue provenance."
+    }
+  ]
+}

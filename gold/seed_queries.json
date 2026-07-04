@@ -1,0 +1,152 @@
+[
+  {
+    "id": "ir-democratic-peace-001",
+    "type": "synthesis",
+    "query": "What does the literature say about whether democracies are less likely to go to war with each other?",
+    "importance_expectation": "Should retrieve classic theory, empirical tests, and critiques rather than only recent summaries."
+  },
+  {
+    "id": "ir-sanctions-001",
+    "type": "synthesis",
+    "query": "How effective are economic sanctions at changing state behavior?",
+    "importance_expectation": "Should balance highly cited skeptical work, newer causal designs, and policy-focused evidence."
+  },
+  {
+    "id": "ir-institutions-001",
+    "type": "debate_mapping",
+    "query": "Map the main disagreements about whether international institutions independently affect state behavior.",
+    "importance_expectation": "Should surface realist, liberal institutionalist, and constructivist framings without assuming graph clusters equal paradigms."
+  },
+  {
+    "id": "ir-civil-war-001",
+    "type": "methodological",
+    "query": "What methods dominate research on civil war onset, and what are their main critiques?",
+    "importance_expectation": "Should prioritize methods/results sections and review-style papers."
+  },
+  {
+    "id": "ir-human-rights-001",
+    "type": "synthesis",
+    "query": "Do international human rights treaties improve state human rights practices?",
+    "importance_expectation": "Should retrieve empirical disagreement and scope conditions."
+  },
+  {
+    "id": "ir-democratic-peace-002",
+    "type": "debate_mapping",
+    "query": "What are the strongest critiques of democratic peace findings?",
+    "importance_expectation": "Should emphasize critical and mixed claims rather than only supportive canonical studies."
+  },
+  {
+    "id": "ir-democratic-peace-003",
+    "type": "conflict",
+    "query": "How do public opinion accounts of democratic peace differ from covert intervention evidence?",
+    "importance_expectation": "Should surface both public-opinion mechanisms and covert-war caveats."
+  },
+  {
+    "id": "ir-sanctions-002",
+    "type": "methodological",
+    "query": "Which research designs are used to estimate the effects of economic sanctions?",
+    "importance_expectation": "Should prefer method-bearing chunks and newer empirical reviews."
+  },
+  {
+    "id": "ir-sanctions-003",
+    "type": "synthesis",
+    "query": "What are the humanitarian or distributional consequences of economic sanctions?",
+    "importance_expectation": "Should retrieve sanctions work about life expectancy, inequality, and policy externalities."
+  },
+  {
+    "id": "ir-institutions-002",
+    "type": "synthesis",
+    "query": "How do institutional voids affect social entrepreneurship and international business?",
+    "importance_expectation": "Should retrieve institution-focused evidence without drifting into unrelated political institutions."
+  },
+  {
+    "id": "ir-institutions-003",
+    "type": "source_quality",
+    "query": "Which highly cited or high-quality sources discuss institutions and cooperation?",
+    "importance_expectation": "Should expose source quality and citation-centrality tradeoffs."
+  },
+  {
+    "id": "ir-civil-war-002",
+    "type": "synthesis",
+    "query": "How do ethnic exclusion and transborder kin affect civil war dynamics?",
+    "importance_expectation": "Should retrieve civil-war ethnic-exclusion and transborder-kin claims together."
+  },
+  {
+    "id": "ir-civil-war-003",
+    "type": "conflict",
+    "query": "Where do civil war studies disagree about grievances, resources, and recurrence?",
+    "importance_expectation": "Should retrieve conflicting or mixed claims across civil-war clusters."
+  },
+  {
+    "id": "ir-human-rights-002",
+    "type": "recency",
+    "query": "What newer research changes conclusions about UN treaty bodies and human rights compliance?",
+    "importance_expectation": "Should favor newer human-rights treaty-body evidence while keeping older context visible."
+  },
+  {
+    "id": "ir-human-rights-003",
+    "type": "synthesis",
+    "query": "How do naming and shaming mechanisms affect human rights practices?",
+    "importance_expectation": "Should retrieve NGO and UN treaty-body evidence with mechanism-level claims."
+  },
+  {
+    "id": "ir-climate-conflict-001",
+    "type": "relevance_trap",
+    "query": "What does the corpus say about climate change and the Syrian civil war?",
+    "importance_expectation": "Should retrieve climate-conflict evidence without overgeneralizing to all civil wars."
+  },
+  {
+    "id": "ir-cross-topic-001",
+    "type": "comparison",
+    "query": "Compare causal mechanisms in sanctions, institutions, and human rights treaty research.",
+    "importance_expectation": "Should retrieve across at least three topical clusters."
+  },
+  {
+    "id": "ir-cross-topic-002",
+    "type": "comparison",
+    "query": "Which areas of the corpus rely most on observational causal inference?",
+    "importance_expectation": "Should surface method-heavy civil war, sanctions, and treaty evidence."
+  },
+  {
+    "id": "ir-author-score-001",
+    "type": "importance_signal",
+    "query": "How does author prominence change retrieval for democratic peace and civil war evidence?",
+    "importance_expectation": "Should make author-score and citation-centrality effects inspectable."
+  },
+  {
+    "id": "ir-source-quality-001",
+    "type": "importance_signal",
+    "query": "Which answers change most when source quality is weighted heavily?",
+    "importance_expectation": "Should expose source-quality-heavy retrieval differences."
+  },
+  {
+    "id": "ir-recency-001",
+    "type": "recency",
+    "query": "Which post-2020 works in the corpus should affect conclusions most?",
+    "importance_expectation": "Should retrieve recent works while noting topic relevance."
+  },
+  {
+    "id": "ir-off-topic-001",
+    "type": "off_topic",
+    "query": "What does this corpus say about quantum computing hardware?",
+    "importance_expectation": "Should trigger weak support rather than confident synthesis."
+  },
+  {
+    "id": "ir-off-topic-002",
+    "type": "off_topic",
+    "query": "What does this corpus say about randomized cancer drug trials?",
+    "importance_expectation": "Should trigger weak support or retrieve only clearly relevant medical outliers with caution."
+  },
+  {
+    "id": "ir-rag-failure-001",
+    "type": "diagnostic",
+    "query": "Which retrieved claims are least relevant to the question even when they have high importance scores?",
+    "importance_expectation": "Should help diagnose importance-relevance tradeoffs and irrelevant high-quality sources."
+  },
+  {
+    "id": "ir-rag-failure-002",
+    "type": "diagnostic",
+    "query": "Where does diversity-first retrieval add useful breadth, and where does it add noise?",
+    "importance_expectation": "Should separate beneficial cluster diversity from off-topic diversity."
+  }
+]

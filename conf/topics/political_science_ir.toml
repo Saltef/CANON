@@ -1,0 +1,31 @@
+[scope]
+label = "Political Science / International Relations"
+rationale = """
+This domain has visible debates over theory, evidence, methods, and policy
+interpretation. It is citation-rich enough for graph diagnostics while still
+exposing the risk that citation clusters are topical rather than paradigmatic.
+"""
+
+openalex_concept_ids = [
+  "C17744445", # Political science
+  "C95457728"  # International relations
+]
+
+seed_terms = [
+  "democratic peace",
+  "civil war onset",
+  "sanctions effectiveness",
+  "deterrence theory",
+  "international institutions",
+  "constructivism international relations",
+  "realism international relations",
+  "human rights compliance",
+  "political violence",
+  "foreign aid and development"
+]
+
+[phase0]
+initial_corpus_target = 1000
+fixture_corpus_target = 25
+gold_query_target = 30
+first_build_query_target = 20

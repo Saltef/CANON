@@ -1,0 +1,8 @@
+[topic]
+id = "civil_war"
+name = "Civil war onset methods"
+query = "civil war onset methods causes political violence"
+
+[openalex]
+search = "civil war onset causes methods"
+concepts = ["political science", "conflict studies"]

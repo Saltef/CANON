@@ -1,0 +1,129 @@
+[
+  {
+    "id": "https://openalex.org/W1",
+    "doi": "https://doi.org/10.0000/demo.1",
+    "title": "Democratic Peace Theory and Its Critics",
+    "publication_year": 2018,
+    "language": "en",
+    "abstract_inverted_index": {
+      "Democratic": [0],
+      "peace": [1, 12],
+      "research": [2],
+      "finds": [3],
+      "that": [4],
+      "regime": [5],
+      "type": [6],
+      "is": [7],
+      "associated": [8],
+      "with": [9],
+      "lower": [10],
+      "interstate": [11],
+      "conflict": [13],
+      "while": [14],
+      "critics": [15],
+      "argue": [16],
+      "selection": [17],
+      "effects": [18],
+      "and": [19],
+      "measurement": [20],
+      "matter": [21]
+    },
+    "primary_location": {
+      "pdf_url": "https://example.org/demo1.pdf",
+      "landing_page_url": "https://example.org/demo1",
+      "source": {"display_name": "International Studies Demo"}
+    },
+    "best_oa_location": null,
+    "open_access": {"is_oa": true, "oa_url": "https://example.org/demo1.pdf"},
+    "is_retracted": false,
+    "cited_by_count": 220,
+    "referenced_works": ["https://openalex.org/W10", "https://openalex.org/W11"],
+    "authorships": [
+      {
+        "author": {
+          "display_name": "Jane Demo",
+          "cited_by_count": 4200,
+          "works_count": 55
+        }
+      },
+      {
+        "author": {
+          "display_name": "Alex Example",
+          "cited_by_count": 900,
+          "works_count": 18
+        }
+      }
+    ]
+  },
+  {
+    "id": "https://openalex.org/W2",
+    "doi": "https://doi.org/10.0000/demo.2",
+    "title": "Economic Sanctions and Policy Change",
+    "publication_year": 2021,
+    "language": "en",
+    "abstract_inverted_index": {
+      "We": [0],
+      "show": [1],
+      "that": [2],
+      "economic": [3],
+      "sanctions": [4],
+      "have": [5],
+      "mixed": [6],
+      "effects": [7],
+      "on": [8],
+      "policy": [9],
+      "change": [10],
+      "depending": [11],
+      "on": [12],
+      "target": [13],
+      "institutions": [14],
+      "coalition": [15],
+      "costs": [16],
+      "and": [17],
+      "sender": [18],
+      "coordination": [19]
+    },
+    "primary_location": {
+      "pdf_url": null,
+      "landing_page_url": "https://example.org/demo2",
+      "source": {"display_name": "Journal of Policy Studies Demo"}
+    },
+    "best_oa_location": {
+      "pdf_url": "https://example.org/demo2.pdf",
+      "landing_page_url": "https://example.org/demo2-oa",
+      "source": {"display_name": "Repository Demo"}
+    },
+    "open_access": {"is_oa": true, "oa_url": "https://example.org/demo2-oa"},
+    "is_retracted": false,
+    "cited_by_count": 75,
+    "referenced_works": ["https://openalex.org/W12"],
+    "authorships": [
+      {
+        "author": {
+          "display_name": "Sam Sanction",
+          "cited_by_count": 1300,
+          "works_count": 22
+        }
+      }
+    ]
+  },
+  {
+    "id": "https://openalex.org/W3",
+    "doi": null,
+    "title": "A Retracted Demonstration Article",
+    "publication_year": 2014,
+    "language": "en",
+    "abstract_inverted_index": null,
+    "primary_location": {
+      "pdf_url": null,
+      "landing_page_url": "https://example.org/demo3",
+      "source": {"display_name": "Unknown Demo Source"}
+    },
+    "best_oa_location": null,
+    "open_access": {"is_oa": false, "oa_url": null},
+    "is_retracted": true,
+    "cited_by_count": 5,
+    "referenced_works": [],
+    "authorships": []
+  }
+]

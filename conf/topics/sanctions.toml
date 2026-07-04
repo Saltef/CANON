@@ -1,0 +1,8 @@
+[topic]
+id = "sanctions"
+name = "Economic sanctions effectiveness"
+query = "economic sanctions effectiveness state behavior international relations"
+
+[openalex]
+search = "economic sanctions effectiveness state behavior"
+concepts = ["political science", "international relations"]

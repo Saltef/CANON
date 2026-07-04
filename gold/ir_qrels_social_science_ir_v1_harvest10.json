@@ -1,0 +1,58 @@
+{
+  "benchmark_id": "internal_social_science_ir_qrels_v1",
+  "benchmark_kind": "internal_qrels",
+  "description": "Small technical qrels set for exercising BEIR/TREC-style retrieval metrics before external benchmark import. Relevance judgments are weak labels from known corpus topics and should not be treated as expert annotations.",
+  "queries": [
+    {
+      "id": "qrels-democratic-peace-001",
+      "query": "What does the literature say about whether democracies are less likely to go to war with each other?",
+      "relevant": {
+        "chunk:3f981229d2f15afd": 3,
+        "chunk:9b8b99aa26529dc5": 2,
+        "chunk:0b040e2d9bcf12f6": 2,
+        "chunk:1f805ecbd6ba6565": 2,
+        "chunk:b725a54218eada94": 2,
+        "chunk:1f8f2349733f9d41": 1
+      }
+    },
+    {
+      "id": "qrels-sanctions-001",
+      "query": "How effective are economic sanctions at changing state behavior?",
+      "relevant": {
+        "chunk:421c2d5faa0acf57": 3,
+        "chunk:45e8c35f1da374c6": 2,
+        "chunk:77ffa35c1f995623": 2,
+        "chunk:ef197e130dbedc08": 1
+      }
+    },
+    {
+      "id": "qrels-sanctions-002",
+      "query": "What are the humanitarian or distributional consequences of economic sanctions?",
+      "relevant": {
+        "chunk:45e8c35f1da374c6": 3,
+        "chunk:77ffa35c1f995623": 3,
+        "chunk:421c2d5faa0acf57": 1
+      }
+    },
+    {
+      "id": "qrels-civil-war-001",
+      "query": "How do ethnic exclusion and transborder kin affect civil war dynamics?",
+      "relevant": {
+        "chunk:e1e062d2bdbed6fb": 2,
+        "chunk:db6ddfb3756fe5ff": 3,
+        "chunk:9b4b848b9711c82d": 3,
+        "chunk:a63771f24f242b6c": 1,
+        "chunk:76c9b2506eeb3cad": 1
+      }
+    },
+    {
+      "id": "qrels-human-rights-001",
+      "query": "How do naming and shaming mechanisms affect human rights practices?",
+      "relevant": {
+        "chunk:2bc9ad1cff909b93": 3,
+        "chunk:ef197e130dbedc08": 2,
+        "chunk:c00072bd11cb1585": 1
+      }
+    }
+  ]
+}
