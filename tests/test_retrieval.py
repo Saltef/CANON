@@ -5,8 +5,10 @@ from canon.retrieval.corpus import RetrievalDocument
 from canon.retrieval.engine import (
     DISAGREEMENT_MIN_DIVERSITY,
     apply_query_controls,
+    diversity_eligible,
     excluded_query_terms,
     has_disagreement_intent,
+    query_focus_coverage,
     retrieve,
     select_with_diversity,
     weights_with_query_intent,
@@ -121,6 +123,89 @@ class RetrievalTests(unittest.TestCase):
         )
         self.assertEqual([row[2].chunk_id for row in selected], ["c1", "c3"])
 
+    def test_focus_gated_diversity_skips_off_focus_cluster(self):
+        documents = [
+            RetrievalDocument(
+                "c1",
+                "w1",
+                "Democratic Peace",
+                2020,
+                "J",
+                "abstract",
+                "democratic peace war",
+                {},
+                {},
+                cluster_id=1,
+            ),
+            RetrievalDocument(
+                "c2",
+                "w2",
+                "Cloud Computing",
+                2020,
+                "J",
+                "abstract",
+                "cloud storage hardware",
+                {},
+                {},
+                cluster_id=2,
+            ),
+            RetrievalDocument(
+                "c3",
+                "w3",
+                "Democratic Institutions",
+                2020,
+                "J",
+                "abstract",
+                "democratic peace institutions",
+                {},
+                {},
+                cluster_id=1,
+            ),
+        ]
+        selected = select_with_diversity(
+            [
+                (0.9, 0.9, documents[0], object_with_relevance(0.9)),
+                (0.83, 0.83, documents[1], object_with_relevance(0.9)),
+                (0.84, 0.84, documents[2], object_with_relevance(0.9)),
+            ],
+            top_k=2,
+            diversity_weight=0.35,
+            query="democratic peace",
+            weights={"diversity_focus_floor": 0.25, "diversity_relevance_floor": 0.45},
+        )
+        self.assertEqual([row[2].chunk_id for row in selected], ["c1", "c3"])
+
+    def test_diversity_eligible_uses_focus_and_relevance_floors(self):
+        document = RetrievalDocument(
+            "c1",
+            "w1",
+            "Democratic Peace",
+            2020,
+            "J",
+            "abstract",
+            "democratic peace war",
+            {},
+            {},
+            cluster_id=1,
+        )
+        self.assertEqual(query_focus_coverage("democratic peace institutions", document), 2 / 3)
+        self.assertTrue(
+            diversity_eligible(
+                "democratic peace institutions",
+                document,
+                object_with_relevance(0.6),
+                {"diversity_focus_floor": 0.25, "diversity_relevance_floor": 0.45},
+            )
+        )
+        self.assertFalse(
+            diversity_eligible(
+                "democratic peace institutions",
+                document,
+                object_with_relevance(0.3),
+                {"diversity_focus_floor": 0.25, "diversity_relevance_floor": 0.45},
+            )
+        )
+
     def test_disagreement_intent_lifts_diversity_weight(self):
         weights = weights_with_query_intent(
             "Where does democratic peace evidence conflict with covert intervention findings?",
@@ -177,6 +262,10 @@ class RetrievalTests(unittest.TestCase):
             }
         )
         self.assertEqual(weights, {"relevance": 1.0})
+
+
+def object_with_relevance(value):
+    return type("Components", (), {"relevance": value})()
 
 
 if __name__ == "__main__":

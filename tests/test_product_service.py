@@ -80,6 +80,11 @@ class ProductServiceTests(unittest.TestCase):
             report = service.report("diversity-gate", "social_science_ir_10k")
         self.assertEqual(report["status"], "pass")
 
+    def test_diversity_diagnostics_report_is_allowed(self):
+        with patch("canon.product.service.load_report", return_value={"headline": {"finding": "conditional"}}):
+            report = service.report("diversity-diagnostics", "social_science_ir_10k")
+        self.assertEqual(report["headline"]["finding"], "conditional")
+
     def test_compare_retrieval_preserves_result_explanations(self):
         with patch("canon.product.service.compare") as compare:
             compare.return_value = {

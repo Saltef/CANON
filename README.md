@@ -64,6 +64,9 @@ docker compose run --rm --no-deps canon python -m canon.corpus.build --corpus-id
 docker compose run --rm --no-deps canon python -m canon.eval.methods --mode social_science_ir_v1_harvest10
 docker compose run --rm --no-deps canon python -m canon.eval.pipeline --mode social_science_ir_v1_harvest10
 docker compose run --rm --no-deps canon python -m canon.eval.diversity --mode social_science_ir_10k
+docker compose run --rm --no-deps canon python -m canon.eval.diversity_diagnostics --mode social_science_ir_10k
+docker compose run --rm --no-deps canon python -m canon.eval.diversity --mode social_science_ir_10k --diverse-method-id focus_diverse_k5_template --baseline-method-id lexical_k5_template
+docker compose run --rm --no-deps canon python -m canon.eval.diversity_diagnostics --mode social_science_ir_10k --diverse-method-id focus_diverse_k5_template --baseline-method-id lexical_k5_template
 docker compose run --rm --no-deps canon python -m canon.eval.diversity_gate --mode social_science_ir_10k
 docker compose run --rm --no-deps canon python -m canon.eval.batches --mode social_science_ir_v1_harvest10 --batch-sizes 1,3,5
 docker compose run --rm --no-deps canon python -m canon.eval.slices --mode social_science_ir_v1_harvest10 --method-ids diverse_k5_template,rag_k5_template
@@ -92,7 +95,9 @@ Product API diversity endpoints:
 
 ```powershell
 Invoke-RestMethod http://localhost:8000/v1/reports/diversity?mode=social_science_ir_10k
+Invoke-RestMethod http://localhost:8000/v1/reports/diversity-diagnostics?mode=social_science_ir_10k
 Invoke-RestMethod http://localhost:8000/v1/reports/diversity-gate?mode=social_science_ir_10k
+Invoke-RestMethod "http://localhost:8000/v1/reports/diversity-diagnostics?mode=social_science_ir_10k&diverse_method_id=focus_diverse_k5_template"
 Invoke-RestMethod "http://localhost:8000/v1/diversity/queries?mode=social_science_ir_10k&verdict=useful_breadth"
 Invoke-RestMethod http://localhost:8000/v1/diversity/queries/ir-off-topic-001?mode=social_science_ir_10k
 Invoke-RestMethod -Method Post http://localhost:8000/v1/diversity-audit -ContentType "application/json" -Body '{"mode":"social_science_ir_10k"}'

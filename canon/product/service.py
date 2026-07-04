@@ -161,6 +161,11 @@ def report(name: str, mode: str = DEFAULT_MODE, params: dict[str, Any] | None = 
             diverse_method_id=diverse_method_id,
             baseline_method_id=baseline_method_id,
         ),
+        "diversity-diagnostics": diversity_diagnostics_report_path(
+            mode=mode,
+            diverse_method_id=diverse_method_id,
+            baseline_method_id=baseline_method_id,
+        ),
         "diversity-gate": diversity_gate_report_path(
             mode=mode,
             diverse_method_id=diverse_method_id,
@@ -262,6 +267,18 @@ def diversity_gate_report_path(mode: str, diverse_method_id: str, baseline_metho
     return (
         settings.reports_dir
         / f"diversity_gate_{mode}_baseline_methods_v1_{diverse_method_id}_vs_{baseline_method_id}.json"
+    )
+
+
+def diversity_diagnostics_report_path(
+    mode: str,
+    diverse_method_id: str,
+    baseline_method_id: str,
+) -> Path:
+    settings = load_settings()
+    return (
+        settings.reports_dir
+        / f"diversity_diagnostics_{mode}_baseline_methods_v1_{diverse_method_id}_vs_{baseline_method_id}.json"
     )
 
 

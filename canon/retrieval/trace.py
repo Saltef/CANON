@@ -8,6 +8,8 @@ from canon.retrieval.policies import ScoreComponents
 
 CONTROL_WEIGHT_KEYS = {
     "diversity",
+    "diversity_focus_floor",
+    "diversity_relevance_floor",
     "exclusion_penalty",
     "low_relevance_penalty",
     "relevance_floor",

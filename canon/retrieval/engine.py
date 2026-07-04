@@ -37,9 +37,25 @@ EXCLUSION_STOP_TERMS = {"and", "but", "compared", "rather", "than", "versus", "v
 DEFAULT_EXCLUSION_PENALTY = 0.6
 CONTROL_WEIGHT_KEYS = {
     "diversity",
+    "diversity_focus_floor",
+    "diversity_relevance_floor",
     "exclusion_penalty",
     "low_relevance_penalty",
     "relevance_floor",
+}
+GENERIC_QUERY_TERMS = {
+    "about",
+    "answer",
+    "corpus",
+    "does",
+    "evidence",
+    "literature",
+    "research",
+    "says",
+    "this",
+    "what",
+    "where",
+    "which",
 }
 
 _BM25_INDEX_CACHE: dict[tuple[tuple[str, int, int], ...], BM25Index] = {}
@@ -70,7 +86,13 @@ def retrieve(
         base_score = weighted_score(components, weights_without_diversity(effective_weights))
         base_score = apply_query_controls(query, document, relevance, base_score, effective_weights)
         scored.append((base_score, base_score, document, components))
-    scored = select_with_diversity(scored, top_k, float(effective_weights.get("diversity", 0.0)))
+    scored = select_with_diversity(
+        scored,
+        top_k,
+        float(effective_weights.get("diversity", 0.0)),
+        query=query,
+        weights=effective_weights,
+    )
     return [
         make_trace_item(rank, document, final, components, effective_weights, preview_chars, base_score=base)
         for rank, (final, base, document, components) in enumerate(scored, start=1)
@@ -169,10 +191,13 @@ def select_with_diversity(
     scored: list[tuple[float, float, RetrievalDocument, object]],
     top_k: int,
     diversity_weight: float,
+    query: str = "",
+    weights: dict[str, float] | None = None,
 ) -> list[tuple[float, float, RetrievalDocument, object]]:
     remaining = sorted(scored, key=lambda row: (row[0], row[2].year or 0, row[2].title), reverse=True)
     if diversity_weight <= 0:
         return remaining[:top_k]
+    weights = weights or {}
     selected: list[tuple[float, float, RetrievalDocument, object]] = []
     used_clusters: set[int] = set()
     while remaining and len(selected) < top_k:
@@ -180,7 +205,11 @@ def select_with_diversity(
         best_score = -1.0
         for index, (final_score, base_score, document, components) in enumerate(remaining):
             cluster_bonus = 0.0
-            if document.cluster_id is not None and document.cluster_id not in used_clusters:
+            if (
+                document.cluster_id is not None
+                and document.cluster_id not in used_clusters
+                and diversity_eligible(query, document, components, weights)
+            ):
                 cluster_bonus = diversity_weight
             adjusted = base_score + cluster_bonus
             if adjusted > best_score:
@@ -191,3 +220,32 @@ def select_with_diversity(
             used_clusters.add(document.cluster_id)
         selected.append((best_score, base_score, document, components))
     return selected
+
+
+def diversity_eligible(
+    query: str,
+    document: RetrievalDocument,
+    components: object,
+    weights: dict[str, float],
+) -> bool:
+    relevance_floor = float(weights.get("diversity_relevance_floor", 0.0))
+    if relevance_floor > 0:
+        relevance = float(getattr(components, "relevance", 0.0))
+        if relevance < relevance_floor:
+            return False
+    focus_floor = float(weights.get("diversity_focus_floor", 0.0))
+    if focus_floor > 0 and query_focus_coverage(query, document) < focus_floor:
+        return False
+    return True
+
+
+def query_focus_coverage(query: str, document: RetrievalDocument) -> float:
+    query_terms = [
+        token
+        for token in sorted(set(tokenize(query)))
+        if len(token) >= 4 and token not in GENERIC_QUERY_TERMS
+    ]
+    if not query_terms:
+        return 0.0
+    document_tokens = set(tokenize(" ".join([document.title, document.text])))
+    return len([term for term in query_terms if term in document_tokens]) / len(query_terms)

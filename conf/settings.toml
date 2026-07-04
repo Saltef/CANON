@@ -95,6 +95,21 @@ diversity = 0.35
 relevance_floor = 0.35
 low_relevance_penalty = 0.35
 
+[retrieval.policies.focus_diverse]
+relevance = 0.85
+semantic_similarity = 0.35
+source_quality = 0.25
+citation_centrality = 0.2
+author_score = 0.1
+section_role = 0.15
+claim_density = 0.15
+recency = 0.05
+diversity = 0.35
+relevance_floor = 0.35
+low_relevance_penalty = 0.35
+diversity_relevance_floor = 0.45
+diversity_focus_floor = 0.25
+
 [retrieval.policies.semantic]
 relevance = 0.1
 semantic_similarity = 1.0

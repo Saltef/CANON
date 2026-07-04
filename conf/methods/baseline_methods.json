@@ -51,6 +51,14 @@
       "generator_model": null
     },
     {
+      "id": "focus_diverse_k5_template",
+      "label": "Focus-gated diversity, k=5",
+      "policy": "focus_diverse",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    },
+    {
       "id": "conflict_aware_k5_template",
       "label": "Conflict-aware, k=5",
       "policy": "conflict_aware",

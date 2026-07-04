@@ -1,4 +1,4 @@
-.PHONY: build product-api product-readiness dry-run test live diagnostics eval graph claims conflicts claim-model embeddings synthesize rag-eval topic-pack corpus-expansion harvest-v2 harvest-10k workbench phase16 methods eval-pipeline eval-diversity diversity-gate eval-batches eval-slices eval-probes eval-batches-large qrels-validate public-qrels-validate external-ir bootstrap-ir paired-significance faithfulness perturbations data-card claim-decision regression-gate provider-compare pgvector-plan grobid-plan tune-weights dashboard manifest scientific-audit full-eval
+.PHONY: build product-api product-readiness dry-run test live diagnostics eval graph claims conflicts claim-model embeddings synthesize rag-eval topic-pack corpus-expansion harvest-v2 harvest-10k workbench phase16 methods eval-pipeline eval-diversity diversity-diagnostics diversity-gate eval-batches eval-slices eval-probes eval-batches-large qrels-validate public-qrels-validate external-ir bootstrap-ir paired-significance faithfulness perturbations data-card claim-decision regression-gate provider-compare pgvector-plan grobid-plan tune-weights dashboard manifest scientific-audit full-eval
 
 build:
 	docker compose build canon
@@ -71,6 +71,9 @@ eval-pipeline:
 
 eval-diversity:
 	docker compose run --rm --no-deps canon python -m canon.eval.diversity --mode social_science_ir_10k
+
+diversity-diagnostics:
+	docker compose run --rm --no-deps canon python -m canon.eval.diversity_diagnostics --mode social_science_ir_10k
 
 diversity-gate:
 	docker compose run --rm --no-deps canon python -m canon.eval.diversity_gate --mode social_science_ir_10k
