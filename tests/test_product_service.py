@@ -29,6 +29,29 @@ class ProductServiceTests(unittest.TestCase):
             report = service.report("diversity-gate", "social_science_ir_10k")
         self.assertEqual(report["status"], "pass")
 
+    def test_compare_retrieval_preserves_result_explanations(self):
+        with patch("canon.product.service.compare") as compare:
+            compare.return_value = {
+                "query": "democratic peace",
+                "mode": "m",
+                "policies": ["rag"],
+                "rank_table": [],
+                "runs": [
+                    {
+                        "policy": "rag",
+                        "top_k": 1,
+                        "results": [
+                            {
+                                "chunk_id": "c1",
+                                "explanation": {"reasons": ["high_lexical_relevance"]},
+                            }
+                        ],
+                    }
+                ],
+            }
+            report = service.compare_retrieval({"query": "democratic peace", "mode": "m", "policies": ["rag"]})
+        self.assertEqual(report["runs"][0]["results"][0]["explanation"]["reasons"], ["high_lexical_relevance"])
+
     def test_compact_diversity_report_keeps_product_fields(self):
         compact = service.compact_diversity_report(
             {

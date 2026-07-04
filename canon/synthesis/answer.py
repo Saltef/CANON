@@ -111,6 +111,7 @@ def build_evidence(results: list[dict], claims_by_chunk: dict[str, list[dict]]) 
                 "cluster_id": result["cluster_id"],
                 "final_score": result["final_score"],
                 "components": result["components"],
+                "explanation": result.get("explanation", {}),
                 "conflict_injected": bool(result.get("conflict_injected")),
                 "claim": selected_claim,
                 "preview": result["preview"],

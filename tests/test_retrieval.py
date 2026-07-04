@@ -13,6 +13,7 @@ from canon.retrieval.engine import (
     weights_without_diversity,
 )
 from canon.retrieval.policies import normalize
+from canon.retrieval.trace import component_contributions, explain_trace_item
 
 
 class RetrievalTests(unittest.TestCase):
@@ -73,6 +74,35 @@ class RetrievalTests(unittest.TestCase):
         self.assertIn("relevance", trace[0].components)
         self.assertIn("semantic_similarity", trace[0].components)
         self.assertEqual(trace[0].cluster_id, 1)
+        explanation = trace[0].to_dict()["explanation"]
+        self.assertIn("summary", explanation)
+        self.assertEqual(explanation["top_contributors"][0]["component"], "relevance")
+        self.assertIn("high_lexical_relevance", explanation["reasons"])
+
+    def test_component_contributions_ignore_control_weights(self):
+        contributions = component_contributions(
+            {"relevance": 0.8, "source_quality": 1.0},
+            {
+                "relevance": 2.0,
+                "source_quality": 1.0,
+                "diversity": 0.5,
+                "relevance_floor": 0.2,
+            },
+        )
+        self.assertEqual([item["component"] for item in contributions], ["relevance", "source_quality"])
+        self.assertEqual(contributions[0]["score_share"], 0.533333)
+
+    def test_explanation_notes_diversity_bonus(self):
+        explanation = explain_trace_item(
+            rank=2,
+            final_score=0.9,
+            base_score=0.65,
+            diversity_bonus=0.25,
+            components={"relevance": 0.9, "semantic_similarity": 0.2},
+            weights={"relevance": 1.0, "semantic_similarity": 1.0, "diversity": 0.25},
+        )
+        self.assertIn("cluster_diversity_bonus", explanation["reasons"])
+        self.assertEqual(explanation["score_adjustments"]["diversity_bonus"], 0.25)
 
     def test_diversity_selection_prefers_new_cluster_when_close(self):
         documents = [

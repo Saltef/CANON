@@ -37,12 +37,14 @@ class SynthesisTests(unittest.TestCase):
                 "cluster_id": 1,
                 "final_score": 0.7,
                 "components": {"relevance": 1.0},
+                "explanation": {"reasons": ["high_lexical_relevance"]},
                 "preview": "preview",
             }
         ]
         evidence = build_evidence(results, {"c1": [{"id": "claim-a"}]})
         self.assertEqual(evidence[0]["citation_id"], "C1")
         self.assertEqual(evidence[0]["claim"]["id"], "claim-a")
+        self.assertEqual(evidence[0]["explanation"]["reasons"], ["high_lexical_relevance"])
 
     def test_compose_answer_uses_claim_text(self):
         answer = compose_answer(
