@@ -17,6 +17,12 @@ def build_workbench(mode: str = "live") -> dict:
         "quality": settings.reports_dir / f"quality_diagnostics_{mode}.json",
         "diversity": settings.reports_dir
         / f"diversity_audit_{mode}_baseline_methods_v1_diverse_k5_template_vs_lexical_k5_template.json",
+        "diversity_diagnostics": settings.reports_dir
+        / f"diversity_diagnostics_{mode}_baseline_methods_v1_diverse_k5_template_vs_lexical_k5_template.json",
+        "focus_diversity": settings.reports_dir
+        / f"diversity_audit_{mode}_baseline_methods_v1_focus_diverse_k5_template_vs_lexical_k5_template.json",
+        "focus_diversity_diagnostics": settings.reports_dir
+        / f"diversity_diagnostics_{mode}_baseline_methods_v1_focus_diverse_k5_template_vs_lexical_k5_template.json",
     }
     loaded = {name: load_json(path) for name, path in report_files.items()}
     html_text = render_workbench(mode, loaded)
@@ -46,6 +52,9 @@ def render_workbench(mode: str, reports: dict[str, dict | None]) -> str:
     conflicts = reports.get("conflicts") or {}
     quality = reports.get("quality") or {}
     diversity = reports.get("diversity") or {}
+    diversity_diagnostics = reports.get("diversity_diagnostics") or {}
+    focus_diversity = reports.get("focus_diversity") or {}
+    focus_diversity_diagnostics = reports.get("focus_diversity_diagnostics") or {}
     policy_summary = rag.get("policy_summary", {})
     rows = "\n".join(
         f"<tr><td>{html.escape(policy)}</td><td>{summary.get('average_citation_count', '')}</td>"
@@ -55,7 +64,12 @@ def render_workbench(mode: str, reports: dict[str, dict | None]) -> str:
         for policy, summary in policy_summary.items()
     )
     query_sections = "\n".join(render_query(query) for query in rag.get("queries", []))
-    diversity_section = render_diversity_section(diversity)
+    diversity_section = render_diversity_section(
+        diversity,
+        diversity_diagnostics,
+        focus_diversity,
+        focus_diversity_diagnostics,
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -120,7 +134,12 @@ def render_query(query: dict) -> str:
 </section>"""
 
 
-def render_diversity_section(report: dict) -> str:
+def render_diversity_section(
+    report: dict,
+    diagnostics: dict | None = None,
+    focus_report: dict | None = None,
+    focus_diagnostics: dict | None = None,
+) -> str:
     if not report:
         return """<section>
   <h2>Diversity-First Audit</h2>
@@ -137,6 +156,8 @@ def render_diversity_section(report: dict) -> str:
         for query in report.get("queries", [])
         if query.get("verdict") in {"useful_breadth", "mixed_breadth", "off_topic_breadth_risk", "noisy_breadth"}
     )
+    diagnostic_panel = render_diagnostics_panel("Original Diversity Diagnosis", diagnostics or {})
+    focus_panel = render_focus_diversity_panel(focus_report or {}, focus_diagnostics or {})
     return f"""<section>
   <h2>Diversity-First Audit</h2>
   <div class="grid">
@@ -151,9 +172,64 @@ def render_diversity_section(report: dict) -> str:
     <thead><tr><th>Verdict</th><th>Queries</th></tr></thead>
     <tbody>{verdict_rows}</tbody>
   </table>
+  {diagnostic_panel}
+  {focus_panel}
   <h3>Query Examples</h3>
   {query_cards}
 </section>"""
+
+
+def render_focus_diversity_panel(report: dict, diagnostics: dict) -> str:
+    if not report:
+        return ""
+    aggregate = report.get("aggregate", {})
+    verdict_counts = aggregate.get("verdict_counts", {})
+    useful = verdict_counts.get("useful_breadth", 0)
+    mixed = verdict_counts.get("mixed_breadth", 0)
+    risk = verdict_counts.get("off_topic_breadth_risk", 0)
+    no_gain = verdict_counts.get("no_diversity_gain", 0)
+    next_actions = render_next_actions(diagnostics)
+    return f"""<h3>Focus-Gated Diversity Test</h3>
+  <div class="grid">
+    <div class="metric"><strong>Useful breadth</strong><br>{useful}</div>
+    <div class="metric"><strong>Mixed breadth</strong><br>{mixed}</div>
+    <div class="metric"><strong>Off-topic risk</strong><br>{risk}</div>
+    <div class="metric"><strong>No gain</strong><br>{no_gain}</div>
+    <div class="metric"><strong>Breadth precision</strong><br>{aggregate.get('average_breadth_precision', '')}</div>
+    <div class="metric"><strong>Noise rate</strong><br>{aggregate.get('average_noise_rate', '')}</div>
+  </div>
+  <p>{html.escape((diagnostics.get('headline') or {}).get('claim_language', ''))}</p>
+  {next_actions}"""
+
+
+def render_diagnostics_panel(title: str, diagnostics: dict) -> str:
+    if not diagnostics:
+        return ""
+    headline = diagnostics.get("headline", {})
+    aggregate = diagnostics.get("aggregate", {})
+    failure_counts = (aggregate.get("failure_mode_counts") or {})
+    rows = "\n".join(
+        f"<tr><td>{html.escape(key)}</td><td>{value}</td></tr>"
+        for key, value in sorted(failure_counts.items())
+    )
+    return f"""<h3>{html.escape(title)}</h3>
+  <p>{html.escape(headline.get('finding', ''))}</p>
+  <table>
+    <thead><tr><th>Failure mode</th><th>Queries</th></tr></thead>
+    <tbody>{rows}</tbody>
+  </table>
+  {render_next_actions(diagnostics)}"""
+
+
+def render_next_actions(diagnostics: dict) -> str:
+    actions = diagnostics.get("next_actions") or []
+    if not actions:
+        return ""
+    items = "".join(
+        f"<li><strong>{html.escape(action.get('priority', ''))}</strong>: {html.escape(action.get('action', ''))}</li>"
+        for action in actions
+    )
+    return f"<ul>{items}</ul>"
 
 
 def render_diversity_query(query: dict) -> str:

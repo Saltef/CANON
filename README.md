@@ -3,6 +3,28 @@
 Importance-aware scholarly RAG for testing how source and text importance signals
 change retrieval, citation selection, answer quality, and disagreement handling.
 
+## Portfolio Result
+
+CANON's current finished demo shows that diversity-aware retrieval is not
+uniformly better. On a 10k OpenAlex-derived social-science corpus, ungated
+diversity increased graph-cluster breadth but produced mixed gains on low-focus
+queries. A focus-gated diversity variant improved useful breadth from 10 to 12
+queries, reduced mixed breadth from 10 to 8 queries, and reduced measured noise
+from 0.013 to 0.0 while retaining a passing diversity gate. The defensible claim
+is therefore conditional: diversity is useful as a focus-gated breadth mechanism,
+not as a global retrieval winner.
+
+Finished artifacts:
+
+```powershell
+docker compose run --rm --no-deps canon python -m canon.reports.portfolio --mode social_science_ir_10k
+docker compose run --rm --no-deps canon python -m canon.workbench.build --mode social_science_ir_10k
+```
+
+Outputs are written to `reports/portfolio_social_science_ir_10k.md`,
+`reports/portfolio_social_science_ir_10k.json`, and
+`reports/workbench_social_science_ir_10k.html`.
+
 The current build covers Phases 0 through 21:
 
 - Phase 0: domain scope, seed topics, seed gold queries, and build hypotheses.
@@ -89,6 +111,7 @@ docker compose run --rm --no-deps canon python -m canon.reports.claim_decision -
 docker compose run --rm --no-deps canon python -m canon.eval.regression_gate --mode social_science_ir_v1_harvest10
 docker compose run --rm --no-deps canon python -m canon.experiments.manifest --mode social_science_ir_v1_harvest10 --experiment-id social_science_ir_v1_harvest10_full
 docker compose run --rm --no-deps canon python -m canon.reports.scientific_audit --mode social_science_ir_v1_harvest10
+docker compose run --rm --no-deps canon python -m canon.reports.portfolio --mode social_science_ir_10k
 ```
 
 Product API diversity endpoints:

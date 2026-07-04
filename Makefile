@@ -1,4 +1,4 @@
-.PHONY: build product-api product-readiness dry-run test live diagnostics eval graph claims conflicts claim-model embeddings synthesize rag-eval topic-pack corpus-expansion harvest-v2 harvest-10k workbench phase16 methods eval-pipeline eval-diversity diversity-diagnostics diversity-gate eval-batches eval-slices eval-probes eval-batches-large qrels-validate public-qrels-validate external-ir bootstrap-ir paired-significance faithfulness perturbations data-card claim-decision regression-gate provider-compare pgvector-plan grobid-plan tune-weights dashboard manifest scientific-audit full-eval
+.PHONY: build product-api product-readiness dry-run test live diagnostics eval graph claims conflicts claim-model embeddings synthesize rag-eval topic-pack corpus-expansion harvest-v2 harvest-10k workbench phase16 methods eval-pipeline eval-diversity diversity-diagnostics diversity-gate eval-batches eval-slices eval-probes eval-batches-large qrels-validate public-qrels-validate external-ir bootstrap-ir paired-significance faithfulness perturbations data-card claim-decision regression-gate provider-compare pgvector-plan grobid-plan tune-weights dashboard manifest scientific-audit portfolio finished-demo full-eval
 
 build:
 	docker compose build canon
@@ -59,6 +59,18 @@ harvest-10k:
 
 workbench:
 	docker compose run --rm --no-deps canon python -m canon.workbench.build --mode live
+
+portfolio:
+	docker compose run --rm --no-deps canon python -m canon.reports.portfolio --mode social_science_ir_10k
+
+finished-demo:
+	docker compose run --rm --no-deps canon python -m canon.eval.diversity --mode social_science_ir_10k
+	docker compose run --rm --no-deps canon python -m canon.eval.diversity_diagnostics --mode social_science_ir_10k
+	docker compose run --rm --no-deps canon python -m canon.eval.diversity --mode social_science_ir_10k --diverse-method-id focus_diverse_k5_template --baseline-method-id lexical_k5_template
+	docker compose run --rm --no-deps canon python -m canon.eval.diversity_diagnostics --mode social_science_ir_10k --diverse-method-id focus_diverse_k5_template --baseline-method-id lexical_k5_template
+	docker compose run --rm --no-deps canon python -m canon.eval.diversity_gate --mode social_science_ir_10k --diverse-method-id focus_diverse_k5_template --baseline-method-id lexical_k5_template
+	docker compose run --rm --no-deps canon python -m canon.workbench.build --mode social_science_ir_10k
+	docker compose run --rm --no-deps canon python -m canon.reports.portfolio --mode social_science_ir_10k
 
 phase16:
 	docker compose run --rm --no-deps canon python -m canon.corpus.build --corpus-id social_science_ir_v1 --from-modes live --top-k 5

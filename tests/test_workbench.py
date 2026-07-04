@@ -53,12 +53,46 @@ class WorkbenchTests(unittest.TestCase):
                         }
                     ],
                 },
+                "diversity_diagnostics": {
+                    "headline": {
+                        "finding": "Diversity-first is conditional.",
+                        "claim_language": "Report as conditional breadth.",
+                    },
+                    "aggregate": {
+                        "failure_mode_counts": {"low_focus_coverage": 1},
+                    },
+                    "next_actions": [
+                        {"priority": "high", "action": "Add focus gating."},
+                    ],
+                },
+                "focus_diversity": {
+                    "aggregate": {
+                        "average_breadth_precision": 0.6,
+                        "average_noise_rate": 0.0,
+                        "verdict_counts": {
+                            "useful_breadth": 2,
+                            "mixed_breadth": 0,
+                            "off_topic_breadth_risk": 0,
+                            "no_diversity_gain": 0,
+                        },
+                    },
+                },
+                "focus_diversity_diagnostics": {
+                    "headline": {"claim_language": "Focus gating improves precision."},
+                    "next_actions": [
+                        {"priority": "high", "action": "Validate gates."},
+                    ],
+                },
             },
         )
         self.assertIn("Diversity-First Audit", html)
         self.assertIn("useful_breadth", html)
         self.assertIn("Diversity-first added useful breadth.", html)
         self.assertIn("Sanctions evidence", html)
+        self.assertIn("Original Diversity Diagnosis", html)
+        self.assertIn("low_focus_coverage", html)
+        self.assertIn("Focus-Gated Diversity Test", html)
+        self.assertIn("Focus gating improves precision.", html)
 
 
 if __name__ == "__main__":
