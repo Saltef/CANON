@@ -14,6 +14,57 @@ class ProductServiceTests(unittest.TestCase):
         with self.assertRaises(service.ProductError):
             service.require_text({"query": " "}, "query")
 
+    def test_answer_returns_compact_evidence_with_explanations(self):
+        with patch("canon.product.service.safe_claim_decision", return_value={"global_winner_claim": {}}):
+            with patch("canon.product.service.synthesize") as synthesize:
+                synthesize.return_value = {
+                    "query": "democratic peace",
+                    "mode": "m",
+                    "policy": "rag",
+                    "answer": "Answer.",
+                    "citations": [{"citation_id": "C1"}],
+                    "evidence": [
+                        {
+                            "citation_id": "C1",
+                            "chunk_id": "c1",
+                            "work_id": "w1",
+                            "title": "A",
+                            "source_name": "J",
+                            "year": 2020,
+                            "rank": 1,
+                            "cluster_id": 1,
+                            "final_score": 0.7,
+                            "claim": {"id": "claim-a"},
+                            "preview": "preview",
+                            "explanation": {"reasons": ["high_lexical_relevance"]},
+                        }
+                    ],
+                    "support_assessment": {"support_level": "strong"},
+                    "limitations": [],
+                    "conflict_notes": [],
+                }
+                report = service.answer({"query": "democratic peace", "mode": "m", "policy": "rag"})
+        self.assertEqual(report["evidence"][0]["explanation"]["reasons"], ["high_lexical_relevance"])
+        self.assertEqual(report["evidence"][0]["claim"]["id"], "claim-a")
+
+    def test_compact_answer_evidence_caps_long_lists(self):
+        evidence = [
+            {
+                "citation_id": f"C{index}",
+                "chunk_id": f"c{index}",
+                "work_id": f"w{index}",
+                "title": "A",
+                "source_name": "J",
+                "year": 2020,
+                "rank": index,
+                "cluster_id": 1,
+                "final_score": 0.7,
+                "explanation": {"reasons": ["reason"]},
+            }
+            for index in range(12)
+        ]
+        self.assertEqual(len(service.compact_answer_evidence(evidence)), 10)
+
     def test_product_summary_has_claim_boundaries(self):
         summary = service.product_summary("social_science_ir_v1_harvest10")
         self.assertEqual(summary["product"], "CANON Evidence Workbench")

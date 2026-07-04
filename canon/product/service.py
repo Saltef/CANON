@@ -75,11 +75,33 @@ def answer(payload: dict[str, Any]) -> dict:
         "policy": report["policy"],
         "answer": report["answer"],
         "citations": report["citations"],
+        "evidence": compact_answer_evidence(report["evidence"]),
         "support_assessment": report["support_assessment"],
         "limitations": report["limitations"],
         "conflict_notes": report["conflict_notes"],
         "claim_boundaries": decision.get("global_winner_claim", {}),
     }
+
+
+def compact_answer_evidence(evidence: list[dict[str, Any]], limit: int = 10) -> list[dict[str, Any]]:
+    return [
+        {
+            "citation_id": item["citation_id"],
+            "chunk_id": item["chunk_id"],
+            "work_id": item["work_id"],
+            "title": item["title"],
+            "source_name": item["source_name"],
+            "year": item["year"],
+            "rank": item["rank"],
+            "cluster_id": item["cluster_id"],
+            "final_score": item["final_score"],
+            "claim": item.get("claim"),
+            "preview": item.get("preview"),
+            "explanation": item.get("explanation", {}),
+            "conflict_injected": bool(item.get("conflict_injected")),
+        }
+        for item in evidence[:limit]
+    ]
 
 
 def compare_retrieval(payload: dict[str, Any]) -> dict:

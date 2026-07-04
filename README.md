@@ -103,7 +103,15 @@ The product API runs at `http://localhost:8000`:
 ```powershell
 Invoke-WebRequest http://localhost:8000/health
 Invoke-WebRequest http://localhost:8000/v1/summary
+Invoke-RestMethod -Method Post http://localhost:8000/v1/answer -ContentType "application/json" -Body '{"query":"What does the literature say about democratic peace?","mode":"social_science_ir_v1_harvest10","policy":"rag","top_k":5}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/compare -ContentType "application/json" -Body '{"query":"democratic peace conflict","mode":"social_science_ir_v1_harvest10","policies":["lexical","rag","diverse"],"top_k":5}'
 ```
+
+`/v1/answer` returns compact cited evidence with `explanation` metadata for
+each result. `/v1/compare` returns the same retrieval-result explanations under
+each policy run. Explanations report top weighted score contributors,
+score-adjustments such as diversity bonuses, and reason tags such as
+`high_lexical_relevance`, `author_score_signal`, and `cluster_diversity_bonus`.
 
 The dry run uses `data/fixtures/openalex_sample.json` and writes diagnostics under
 `reports/`. Live harvesting is available with:
