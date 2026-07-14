@@ -10,8 +10,20 @@ from canon.config import load_settings
 
 
 def load_raw_works(data_dir: Path, mode: str) -> list[dict[str, Any]]:
-    path = data_dir / "raw" / f"openalex_{mode}.json"
+    path = raw_mode_path(data_dir, mode)
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def raw_mode_path(data_dir: Path, mode: str) -> Path:
+    candidates = [
+        data_dir / "raw" / f"openalex_{mode}.json",
+        data_dir / "raw" / f"unstructured_{mode}.json",
+        data_dir / "raw" / f"raw_{mode}.json",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
 
 
 def build_edges(raw_works: list[dict[str, Any]]) -> list[tuple[str, str]]:
@@ -83,11 +95,13 @@ def graph_report(mode: str) -> dict:
                 "top_sources": dict(
                     Counter(
                         ((work.get("primary_location") or {}).get("source") or {}).get("display_name")
+                        or work.get("source_name")
+                        or work.get("source")
                         or "UNKNOWN"
                         for work in works
                     ).most_common(5)
                 ),
-                "years": dict(Counter(str(work.get("publication_year")) for work in works)),
+                "years": dict(Counter(str(work.get("publication_year") or work.get("year")) for work in works)),
             }
         )
     report = {

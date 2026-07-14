@@ -46,6 +46,33 @@ class SynthesisTests(unittest.TestCase):
         self.assertEqual(evidence[0]["claim"]["id"], "claim-a")
         self.assertEqual(evidence[0]["explanation"]["reasons"], ["high_lexical_relevance"])
 
+    def test_build_evidence_can_attach_safe_parent_context(self):
+        chunks = [
+            chunk("c1", "The sample uses records.", 0, 4),
+            chunk("c2", "A limitation is selection bias.", 4, 9),
+        ]
+        results = [
+            {
+                "chunk_id": "c1",
+                "work_id": "w1",
+                "title": "A",
+                "source_name": "J",
+                "year": 2020,
+                "rank": 1,
+                "cluster_id": 1,
+                "final_score": 0.7,
+                "components": {"relevance": 1.0},
+                "decision": {"safety_decision": "allow", "stage": {"signals": {"provenance": {"provenance": "academic"}}}},
+                "explanation": {},
+                "preview": "The sample uses records.",
+            }
+        ]
+
+        evidence = build_evidence(results, {"c1": []}, chunks=chunks)
+
+        self.assertTrue(evidence[0]["parent_context"]["included"])
+        self.assertIn("selection bias", evidence[0]["parent_context"]["text"])
+
     def test_compose_answer_uses_claim_text(self):
         answer = compose_answer(
             "democratic peace",
@@ -194,6 +221,25 @@ class SynthesisTests(unittest.TestCase):
     def test_grounded_answer_with_support_prepends_abstention(self):
         answer = grounded_answer_with_support("A normal answer.", {"support_level": "weak"})
         self.assertIn("abstention", answer)
+
+
+def chunk(chunk_id, text, token_start, token_end):
+    return {
+        "id": chunk_id,
+        "work_id": "w1",
+        "section": "methods",
+        "text": text,
+        "token_start": token_start,
+        "token_end": token_end,
+        "importance": {
+            "parent_context_id": "parent:w1-methods",
+            "parent_context_available": 1.0,
+            "parent_context_mode": "section",
+            "parent_context_recommended": 1.0,
+            "context_expansion_policy": "safe_parent_expansion_allowed",
+            "generation_context_role": "evidence_context",
+        },
+    }
 
 
 if __name__ == "__main__":

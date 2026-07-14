@@ -29,11 +29,15 @@ min_abstract_chars = 120
 [importance_weights.default]
 relevance = 1.0
 semantic_similarity = 0.5
+syntax_relevance = 0.15
 source_quality = 0.4
 citation_centrality = 0.3
 author_score = 0.15
 section_role = 0.2
 claim_density = 0.2
+method_signal = 0.1
+limitation_signal = 0.05
+evidence_specificity = 0.1
 diversity = 0.2
 recency = 0.1
 
@@ -45,6 +49,7 @@ preview_chars = 280
 [retrieval.policies.lexical]
 relevance = 1.0
 semantic_similarity = 0.0
+syntax_relevance = 0.0
 source_quality = 0.0
 citation_centrality = 0.0
 author_score = 0.0
@@ -55,41 +60,57 @@ recency = 0.0
 [retrieval.policies.importance]
 relevance = 0.25
 semantic_similarity = 0.15
+syntax_relevance = 0.2
 source_quality = 0.45
 citation_centrality = 0.25
 author_score = 0.15
 section_role = 0.25
 claim_density = 0.25
+method_signal = 0.15
+limitation_signal = 0.1
+evidence_specificity = 0.15
 recency = 0.05
 
 [retrieval.policies.balanced]
 relevance = 1.0
 semantic_similarity = 0.45
+syntax_relevance = 0.15
 source_quality = 0.35
 citation_centrality = 0.25
 author_score = 0.1
 section_role = 0.2
 claim_density = 0.2
+method_signal = 0.1
+limitation_signal = 0.05
+evidence_specificity = 0.1
 recency = 0.1
 
 [retrieval.policies.recency]
 relevance = 0.8
 semantic_similarity = 0.25
+syntax_relevance = 0.1
 source_quality = 0.15
 citation_centrality = 0.0
 author_score = 0.05
 section_role = 0.1
 claim_density = 0.1
+method_signal = 0.1
+limitation_signal = 0.05
+evidence_specificity = 0.1
 recency = 0.45
 
 [retrieval.policies.diverse]
 relevance = 0.85
 semantic_similarity = 0.35
+syntax_relevance = 0.15
 source_quality = 0.25
 citation_centrality = 0.2
 author_score = 0.1
 section_role = 0.15
 claim_density = 0.15
+method_signal = 0.1
+limitation_signal = 0.05
+evidence_specificity = 0.1
 recency = 0.05
 diversity = 0.35
 relevance_floor = 0.35
@@ -98,11 +119,15 @@ low_relevance_penalty = 0.35
 [retrieval.policies.focus_diverse]
 relevance = 0.85
 semantic_similarity = 0.35
+syntax_relevance = 0.15
 source_quality = 0.25
 citation_centrality = 0.2
 author_score = 0.1
 section_role = 0.15
 claim_density = 0.15
+method_signal = 0.1
+limitation_signal = 0.05
+evidence_specificity = 0.1
 recency = 0.05
 diversity = 0.35
 relevance_floor = 0.35
@@ -113,45 +138,86 @@ diversity_focus_floor = 0.25
 [retrieval.policies.semantic]
 relevance = 0.1
 semantic_similarity = 1.0
+syntax_relevance = 0.2
 source_quality = 0.15
 citation_centrality = 0.05
 author_score = 0.05
 section_role = 0.1
 claim_density = 0.1
+method_signal = 0.1
+limitation_signal = 0.05
+evidence_specificity = 0.1
 recency = 0.05
 
 [retrieval.policies.rag]
 relevance = 0.75
 semantic_similarity = 0.75
+syntax_relevance = 0.2
 source_quality = 0.25
 citation_centrality = 0.2
 author_score = 0.1
 section_role = 0.2
 claim_density = 0.25
+method_signal = 0.15
+limitation_signal = 0.1
+evidence_specificity = 0.15
 recency = 0.05
 diversity = 0.25
 relevance_floor = 0.35
 low_relevance_penalty = 0.22
+method_signal_bonus = 0.08
+limitation_signal_bonus = 0.06
+evidence_specificity_bonus = 0.08
+
+[retrieval.policies.committee_rag]
+relevance = 0.75
+semantic_similarity = 0.75
+syntax_relevance = 0.2
+source_quality = 0.25
+citation_centrality = 0.2
+author_score = 0.1
+section_role = 0.2
+claim_density = 0.25
+method_signal = 0.15
+limitation_signal = 0.1
+evidence_specificity = 0.15
+recency = 0.05
+diversity = 0.25
+relevance_floor = 0.35
+low_relevance_penalty = 0.22
+method_signal_bonus = 0.08
+limitation_signal_bonus = 0.06
+evidence_specificity_bonus = 0.08
+candidate_k = 50
+committee_gate = 1.0
 
 [retrieval.policies.conflict_aware]
 relevance = 0.75
 semantic_similarity = 0.65
+syntax_relevance = 0.2
 source_quality = 0.25
 citation_centrality = 0.2
 author_score = 0.1
 section_role = 0.2
 claim_density = 0.35
+method_signal = 0.15
+limitation_signal = 0.15
+evidence_specificity = 0.15
 recency = 0.05
 diversity = 0.35
 
 [retrieval.policies.source_quality_heavy]
 relevance = 0.55
 semantic_similarity = 0.4
+syntax_relevance = 0.15
 source_quality = 0.75
 citation_centrality = 0.35
 author_score = 0.25
 section_role = 0.2
 claim_density = 0.2
+method_signal = 0.12
+limitation_signal = 0.08
+evidence_specificity = 0.12
 recency = 0.05
 diversity = 0.05
 relevance_floor = 0.35
@@ -160,11 +226,15 @@ low_relevance_penalty = 0.3
 [retrieval.policies.recency_heavy]
 relevance = 0.65
 semantic_similarity = 0.45
+syntax_relevance = 0.15
 source_quality = 0.2
 citation_centrality = 0.1
 author_score = 0.05
 section_role = 0.15
 claim_density = 0.15
+method_signal = 0.1
+limitation_signal = 0.08
+evidence_specificity = 0.12
 recency = 0.8
 diversity = 0.15
 relevance_floor = 0.35

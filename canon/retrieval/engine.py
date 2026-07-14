@@ -2,10 +2,20 @@ from __future__ import annotations
 
 from typing import Sequence
 
+from canon.evidence.committee import committee_candidate_row, corroboration_item, generator_context_allowed
+from canon.evidence.corroboration import assess_corroboration
 from canon.retrieval.bm25 import BM25Index
 from canon.retrieval.corpus import RetrievalDocument
+from canon.retrieval.decisions import apply_evidence_decision
 from canon.retrieval.policies import components_for_document, normalize, weighted_score
 from canon.retrieval.semantic import semantic_scores
+from canon.retrieval.stages import (
+    apply_safety_gate,
+    candidate_pool_size,
+    enrich_candidates,
+    retrieval_stage_summary,
+    retrieve_candidates,
+)
 from canon.retrieval.trace import RetrievalTraceItem, make_trace_item
 from canon.retrieval.tokenize import tokenize
 
@@ -41,6 +51,12 @@ CONTROL_WEIGHT_KEYS = {
     "diversity_relevance_floor",
     "exclusion_penalty",
     "low_relevance_penalty",
+    "method_signal_bonus",
+    "limitation_signal_bonus",
+    "evidence_specificity_bonus",
+    "candidate_k",
+    "committee_gate",
+    "candidate_syntax_weight",
     "relevance_floor",
 }
 GENERIC_QUERY_TERMS = {
@@ -70,22 +86,98 @@ def retrieve(
     top_k: int,
     preview_chars: int,
 ) -> list[RetrievalTraceItem]:
+    return retrieve_with_stages(query, documents, weights, top_k, preview_chars)["trace"]
+
+
+def retrieve_with_stages(
+    query: str,
+    documents: Sequence[RetrievalDocument],
+    weights: dict[str, float],
+    top_k: int,
+    preview_chars: int,
+) -> dict:
     effective_weights = weights_with_query_intent(query, weights)
-    texts = [document.text for document in documents]
-    signature = corpus_signature(documents)
-    relevance_scores = normalize(cached_bm25_scores(query, texts, signature))
-    semantic_similarity_scores = normalize(cached_semantic_scores(query, texts, signature))
-    scored = []
-    for document, relevance, semantic_similarity in zip(
+    requested_candidate_k = int(effective_weights["candidate_k"]) if "candidate_k" in effective_weights else None
+    candidates = retrieve_candidates(
+        query,
         documents,
-        relevance_scores,
-        semantic_similarity_scores,
-        strict=True,
-    ):
-        components = components_for_document(document, relevance, semantic_similarity)
+        candidate_pool_size(top_k, len(documents), requested_candidate_k),
+        candidate_syntax_weight=float(effective_weights.get("candidate_syntax_weight", 0.1) or 0.0),
+    )
+    enriched = enrich_candidates(query, candidates)
+    gated = apply_safety_gate(enriched)
+    committee_gate = committee_gate_enabled(effective_weights)
+    committee_rows = committee_rows_by_chunk(query, gated, preview_chars) if committee_gate else {}
+    scored = []
+    decisions = {}
+    rejected_candidates = []
+    committee_excluded_candidates = []
+    for gate_result in gated:
+        document = gate_result.enriched.candidate.document
+        components = gate_result.enriched.components
+        committee_row = committee_rows.get(document.chunk_id)
+        stage = {
+            "candidate": gate_result.enriched.signals["query_text_relevance"],
+            "signals": gate_result.enriched.signals,
+            "safety_gate": gate_result.as_dict(),
+        }
+        if committee_row:
+            stage["committee_gate"] = committee_row
+        if gate_result.decision != "allow":
+            rejected_candidates.append(
+                {
+                    "chunk_id": document.chunk_id,
+                    "work_id": document.work_id,
+                    "title": document.title,
+                    "stage": stage,
+                }
+            )
+            continue
+        if committee_gate and committee_row and not generator_context_allowed(committee_row):
+            rejected_row = {
+                "chunk_id": document.chunk_id,
+                "work_id": document.work_id,
+                "title": document.title,
+                "committee_decision": committee_row["committee_decision"],
+                "allowed_uses": committee_row["allowed_uses"],
+                "conflict_tags": committee_row["conflict_tags"],
+                "stage": stage,
+            }
+            rejected_candidates.append(rejected_row)
+            committee_excluded_candidates.append(rejected_row)
+            continue
         base_score = weighted_score(components, weights_without_diversity(effective_weights))
-        base_score = apply_query_controls(query, document, relevance, base_score, effective_weights)
-        scored.append((base_score, base_score, document, components))
+        base_score = apply_query_controls(
+            query,
+            document,
+            components.relevance,
+            base_score,
+            effective_weights,
+        )
+        decision = apply_evidence_decision(
+            query,
+            document,
+            components,
+            base_score,
+            effective_weights,
+            safety=gate_result.safety,
+            stage=stage,
+        )
+        decisions[document.chunk_id] = decision
+        if decision.decision == "allow" and decision.score > 0.0:
+            scored.append((decision.score, base_score, document, components))
+    if not scored:
+        return {
+            "trace": [],
+            "stage_summary": retrieval_stage_summary_with_committee(
+                candidates,
+                enriched,
+                gated,
+                committee_rows,
+                committee_excluded_candidates,
+            ),
+            "rejected_candidates": rejected_candidates,
+        }
     scored = select_with_diversity(
         scored,
         top_k,
@@ -93,10 +185,78 @@ def retrieve(
         query=query,
         weights=effective_weights,
     )
-    return [
-        make_trace_item(rank, document, final, components, effective_weights, preview_chars, base_score=base)
+    trace = [
+        make_trace_item(
+            rank,
+            document,
+            final,
+            components,
+            effective_weights,
+            preview_chars,
+            base_score=base,
+            decision=decisions.get(document.chunk_id).to_dict() if document.chunk_id in decisions else {},
+        )
         for rank, (final, base, document, components) in enumerate(scored, start=1)
     ]
+    return {
+        "trace": trace,
+        "stage_summary": retrieval_stage_summary_with_committee(
+            candidates,
+            enriched,
+            gated,
+            committee_rows,
+            committee_excluded_candidates,
+        ),
+        "rejected_candidates": rejected_candidates,
+    }
+
+
+def committee_gate_enabled(weights: dict[str, float]) -> bool:
+    return float(weights.get("committee_gate", 0.0) or 0.0) > 0.0
+
+
+def committee_rows_by_chunk(
+    query: str,
+    gated: list,
+    preview_chars: int,
+) -> dict[str, dict]:
+    if not gated:
+        return {}
+    corroboration = assess_corroboration([corroboration_item(result) for result in gated])
+    rows = [
+        committee_candidate_row(result, query=query, corroboration=corroboration, preview_chars=preview_chars)
+        for result in gated
+    ]
+    return {row["chunk_id"]: row for row in rows}
+
+
+def retrieval_stage_summary_with_committee(
+    candidates: list,
+    enriched: list,
+    gated: list,
+    committee_rows: dict[str, dict],
+    committee_excluded_candidates: list[dict],
+) -> dict:
+    summary = retrieval_stage_summary(candidates, enriched, gated)
+    if not committee_rows:
+        return summary
+    decision_counts: dict[str, int] = {}
+    conflict_counts: dict[str, int] = {}
+    for row in committee_rows.values():
+        decision = str(row.get("committee_decision", "unknown"))
+        decision_counts[decision] = decision_counts.get(decision, 0) + 1
+        for tag in row.get("conflict_tags") or []:
+            conflict_counts[tag] = conflict_counts.get(tag, 0) + 1
+    summary.update(
+        {
+            "committee_gate_enabled": True,
+            "committee_evaluated_count": len(committee_rows),
+            "committee_excluded_from_context_count": len(committee_excluded_candidates),
+            "committee_decision_counts": dict(sorted(decision_counts.items())),
+            "committee_conflict_tag_counts": dict(sorted(conflict_counts.items())),
+        }
+    )
+    return summary
 
 
 def corpus_signature(documents: Sequence[RetrievalDocument]) -> tuple[tuple[str, int, int], ...]:
@@ -211,7 +371,7 @@ def select_with_diversity(
                 and diversity_eligible(query, document, components, weights)
             ):
                 cluster_bonus = diversity_weight
-            adjusted = base_score + cluster_bonus
+            adjusted = final_score + cluster_bonus
             if adjusted > best_score:
                 best_index = index
                 best_score = adjusted

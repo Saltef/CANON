@@ -1,7 +1,133 @@
 # CANON
 
-Importance-aware scholarly RAG for testing how source and text importance signals
-change retrieval, citation selection, answer quality, and disagreement handling.
+CANON is a human-in-the-loop evidence briefing workbench for teams that need
+cited, cautious answers from controlled literature and source corpora.
+
+It helps reviewers find candidate evidence, understand why sources were
+selected, draft a cited answer, and see where support is weak or contested. It
+does not determine truth or replace expert review.
+
+## Use Case
+
+CANON is best framed as an evidence briefing copilot for literature-backed
+decisions.
+
+A policy analyst, research assistant, strategy researcher, or product team can
+ask a focused question, inspect ranked evidence, review conflict notes, revise
+the cited draft, and decide what is safe to use.
+
+CANON is designed to do a few things well:
+
+- evidence triage over a named corpus
+- cited first-draft answers
+- weak-support and disagreement surfacing
+- source-quality and retrieval-explanation visibility
+- reproducible audit artifacts for human reviewers
+
+Human review is required for final conclusions, citation validity, domain
+interpretation, corpus representativeness, and any high-stakes use.
+
+See `docs/use_case.md` for the product framing and human-in-the-loop boundary.
+See `docs/industry_release_goal.md` for the industry pilot finish line and pass
+criteria.
+See `docs/test_own_documents.md` for testing CANON on your own documents and
+topics.
+See `docs/integration_ingest_model_eval_plan.md` for the MCP/API integration,
+shape-flexible ingestion, and semantic-model evaluation plan.
+See `docs/retrieval_model_selection.md` for the protocol for choosing a
+production retrieval model.
+See `docs/source_diversity_and_sna.md` for the source-diversity and social
+network analysis plan.
+See `docs/research_skill_template.md` for a reusable research-frame template
+that connects topics, subdomains, evidence standards, and query strategy.
+See `docs/product_journey.md` for the end-to-end user journey and how the
+research skill calibrates CANON's workflow.
+See `docs/research_ai_multi_agent_finalization_plan.md` for the integration
+roadmap connecting CANON to the Multi-Agent Researcher system.
+
+Flexible local ingest:
+
+```powershell
+python -m canon.ingest.flexible --input data/my_docs --mode my_topic_v1 --profile-only
+python -m canon.ingest.flexible --input data/my_docs --mode my_topic_v1
+python -m canon.corpus.build --corpus-id my_topic_v1_corpus --from-modes my_topic_v1 --corpus-only
+```
+
+Semantic model evaluation:
+
+```powershell
+python -m canon.eval.qrels_review prepare --mode my_topic_v1_corpus --top-k 10
+python -m canon.eval.qrels_review import-csv --csv reports/qrels_review_tasks_my_topic_v1_corpus.csv --benchmark-id my_topic_qrels --output gold/my_topic_qrels.json
+python -m canon.eval.model_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --providers local,openai,cohere --k 10
+```
+
+LLM-assisted review triage:
+
+```powershell
+python -m canon.eval.llm_judge qrels --csv reports/qrels_review_tasks_my_topic_v1_corpus.csv --output reports/qrels_review_tasks_my_topic_v1_corpus.judged.csv --provider heuristic
+python -m canon.eval.llm_judge answers --records reports/human_review_tasks_v1.json --output reports/human_review_tasks_v1.judge_suggestions.csv --provider heuristic
+python -m canon.eval.llm_judge qrels --csv reports/qrels_review_tasks_my_topic_v1_corpus.csv --output reports/qrels_review_tasks_my_topic_v1_corpus.openai_judged.csv --provider openai --model gpt-4.1-mini
+```
+
+Rerank evaluation:
+
+```powershell
+python -m canon.eval.rerank_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --rerankers heuristic,cohere --base-policy rag --candidate-k 25 --k 10
+```
+
+Source diversity evaluation:
+
+```powershell
+python -m canon.eval.source_diversity --mode my_topic_v1_corpus --policy rag --top-k 10
+```
+
+Researcher-lens calibration:
+
+```powershell
+python -m canon.eval.research_lens "What terms does this archive use for X?" --mode my_topic_v1_corpus --top-k 10
+```
+
+Evidence packet API for downstream agent systems:
+
+```powershell
+curl -X POST http://localhost:8000/v1/evidence-packets -H "Content-Type: application/json" -d "{\"request_id\":\"req_001\",\"project_id\":\"ai_infra_geo_risk\",\"question\":\"What are the emerging geopolitical risks around AI data center expansion in Latin America?\",\"mode\":\"my_topic_v1_corpus\",\"evidence_requirements\":{\"top_k\":10,\"include_conflicts\":true,\"include_source_diversity\":true,\"include_query_diagnostics\":true}}"
+```
+
+Industry pilot workflow:
+
+```powershell
+python -m canon.product.industry_pilot --mode social_science_ir_v1_harvest10 --prepare-review
+python -m canon.product.industry_pilot --mode social_science_ir_v1_harvest10 --records reports/human_review_tasks_v1.json --export-review-csv --output reports/human_review_tasks_v1.review.csv
+python -m canon.product.industry_pilot --mode social_science_ir_v1_harvest10 --records reports/human_review_tasks_v1.json --import-review-csv reports/human_review_tasks_v1.review.csv
+python -m canon.product.industry_pilot --mode social_science_ir_v1_harvest10 --records reports/human_review_tasks_v1.json --review-status
+python -m canon.product.industry_pilot --mode social_science_ir_v1_harvest10 --records reports/human_review_tasks_v1.json --no-fail
+python -m canon.product.smoke --mode social_science_ir_v1_harvest10
+python -m canon.product.readiness --mode social_science_ir_v1_harvest10
+python -m canon.product.release_audit --mode social_science_ir_v1_harvest10
+python -m canon.product.final_check --mode social_science_ir_v1_harvest10 --records reports/human_review_tasks_v1.json --no-fail
+```
+
+The first command creates the 30-question human review packet. The CSV commands
+let reviewers work in a spreadsheet and import labels back into the authoritative
+JSON packet. The review-status command shows which labels are still missing. The
+pilot gate must remain failed until the reviewer fields are completed; that
+fail-closed behavior is intentional.
+
+CSV import validates labels before writing. Duplicate ids, unknown ids, invalid
+labels, or malformed numeric counts are reported and the JSON packet is left
+unchanged.
+
+Use `docs/human_review_rubric.md` as the labeling standard when completing the
+review fields.
+
+Re-running `--prepare-review` preserves existing labels by question id. Use
+`--reset-review-labels` only when intentionally starting the review over.
+
+The release audit command produces a single report that separates automated
+readiness from the human-reviewed industry pilot claim. The final-check command
+runs the product gates in release order and writes `reports/product_final_check_<mode>.json/.md`.
+For CI or a real release gate, omit `--no-fail`; incomplete human review exits
+nonzero.
 
 ## Portfolio Result
 
@@ -131,6 +257,10 @@ The product API runs at `http://localhost:8000`:
 ```powershell
 Invoke-WebRequest http://localhost:8000/health
 Invoke-WebRequest http://localhost:8000/v1/summary
+Invoke-RestMethod -Method Post http://localhost:8000/v1/sources/profile -ContentType "application/json" -Body '{"input_path":"data/my_docs","sample_size":25}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/sources/ingest -ContentType "application/json" -Body '{"input_path":"data/my_docs","mode":"my_topic_v1"}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/corpora/build -ContentType "application/json" -Body '{"corpus_id":"my_topic_v1_corpus","from_modes":["my_topic_v1"],"corpus_only":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/model-evaluation -ContentType "application/json" -Body '{"mode":"my_topic_v1_corpus","qrels_path":"gold/my_topic_qrels.json","providers":["local","openai","cohere"],"k":10}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/answer -ContentType "application/json" -Body '{"query":"What does the literature say about democratic peace?","mode":"social_science_ir_v1_harvest10","policy":"rag","top_k":5}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/compare -ContentType "application/json" -Body '{"query":"democratic peace conflict","mode":"social_science_ir_v1_harvest10","policies":["lexical","rag","diverse"],"top_k":5}'
 ```

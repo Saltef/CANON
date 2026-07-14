@@ -8,9 +8,19 @@ from pathlib import Path
 from canon.claims.conflict import load_or_detect_conflicts
 from canon.claims.extract import load_or_extract_claims
 from canon.config import load_settings
+from canon.eval.contracts import CONTRACT_VERSION, validate_report
+from canon.evidence.chunk_context import expand_evidence_with_parent_context
+from canon.evidence.context import assemble_context_packet
+from canon.evidence.corroboration import assess_corroboration
 from canon.generation.providers import get_generation_provider
 from canon.retrieval.experiment import run as run_retrieval
 from canon.retrieval.tokenize import tokenize
+from canon.synthesis.prompting import (
+    build_generation_payload,
+    compose_cited_template_answer,
+    compose_disciplined_prompt,
+)
+from canon.synthesis.verification import verify_generation
 
 
 GENERIC_QUERY_TERMS = {
@@ -56,27 +66,52 @@ def synthesize(
             conflicts=conflicts_report["conflicts"],
         )
     claims_by_chunk = claims_for_chunks(claims_report["claims"], retrieval["results"])
-    evidence = build_evidence(retrieval["results"], claims_by_chunk)
-    prompt = compose_answer_prompt(query, evidence)
+    processed_chunks = load_processed_chunks(settings.data_dir, mode)
+    candidate_evidence = build_evidence(
+        retrieval["results"],
+        claims_by_chunk,
+        chunks=processed_chunks or None,
+    )
+    corroboration = assess_corroboration(candidate_evidence)
+    conflict_note_rows = conflict_notes(conflicts_report["conflicts"], claims_by_chunk, query)
+    context_packet = assemble_context_packet(
+        query=query,
+        evidence=candidate_evidence,
+        corroboration=corroboration,
+        conflicts=conflict_note_rows,
+        max_items=top_k or retrieval["top_k"],
+    )
+    evidence = [item["evidence"] for item in context_packet["items"]]
+    generation_payload = build_generation_payload(query, context_packet)
+    prompt = compose_answer_prompt(query, context_packet, generation_payload, generator_name)
     generator = get_generation_provider(generator_name, generator_model)
     generated = generator.generate(prompt)
-    support = support_assessment(query, evidence, retrieval["results"])
+    support = support_assessment(query, evidence, retrieval["results"], corroboration)
     answer = grounded_answer_with_support(generated.text, support)
+    citations = build_citations(evidence)
+    verification = verify_generation(answer, citations, evidence, context_packet)
     report = {
+        "contract_version": CONTRACT_VERSION,
         "query": query,
         "policy": policy,
         "mode": mode,
         "generator": {"provider": generated.provider, "model": generated.model},
         "top_k": retrieval["top_k"],
         "answer": answer,
-        "citations": build_citations(evidence),
+        "citations": citations,
         "evidence": evidence,
+        "candidate_evidence": candidate_evidence,
+        "context_packet": context_packet,
+        "generation_payload": generation_payload,
+        "post_generation_verification": verification,
         "importance_summary": summarize_importance(retrieval["results"]),
         "support_assessment": support,
-        "conflict_notes": conflict_notes(conflicts_report["conflicts"], claims_by_chunk, query),
-        "limitations": limitations(evidence, support),
+        "corroboration_assessment": corroboration,
+        "conflict_notes": conflict_note_rows,
+        "limitations": limitations(evidence, support, corroboration),
         "retrieval": retrieval,
     }
+    report["contract_validation"] = validate_report(report, "synthesis")
     slug = "".join(character if character.isalnum() else "-" for character in query.lower())[:60].strip("-")
     write_json(settings.reports_dir / f"synthesis_{mode}_{policy}_{slug}.json", report)
     return report
@@ -94,7 +129,7 @@ def claims_for_chunks(claims: list[dict], results: list[dict]) -> dict[str, list
     return grouped
 
 
-def build_evidence(results: list[dict], claims_by_chunk: dict[str, list[dict]]) -> list[dict]:
+def build_evidence(results: list[dict], claims_by_chunk: dict[str, list[dict]], chunks: list[dict] | None = None) -> list[dict]:
     evidence = []
     for result in results:
         claims = claims_by_chunk.get(result["chunk_id"], [])
@@ -111,13 +146,23 @@ def build_evidence(results: list[dict], claims_by_chunk: dict[str, list[dict]]) 
                 "cluster_id": result["cluster_id"],
                 "final_score": result["final_score"],
                 "components": result["components"],
+                "decision": result.get("decision", {}),
                 "explanation": result.get("explanation", {}),
                 "conflict_injected": bool(result.get("conflict_injected")),
                 "claim": selected_claim,
                 "preview": result["preview"],
             }
         )
-    return evidence
+    if chunks is None:
+        return evidence
+    return expand_evidence_with_parent_context(evidence, chunks)
+
+
+def load_processed_chunks(data_dir: Path, mode: str) -> list[dict]:
+    path = data_dir / "processed" / f"chunks_{mode}.json"
+    if not path.exists():
+        return []
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def augment_retrieval_with_conflicts(
@@ -266,8 +311,17 @@ def compose_answer(query: str, evidence: list[dict]) -> str:
     return " ".join(sentences)
 
 
-def compose_answer_prompt(query: str, evidence: list[dict]) -> str:
-    return compose_answer(query, evidence)
+def compose_answer_prompt(
+    query: str,
+    context_or_evidence: dict | list[dict],
+    generation_payload: dict | None = None,
+    generator_name: str = "template",
+) -> str:
+    if isinstance(context_or_evidence, list):
+        return compose_answer(query, context_or_evidence)
+    if generator_name in {"template", "local"}:
+        return compose_cited_template_answer(query, context_or_evidence)
+    return compose_disciplined_prompt(generation_payload or build_generation_payload(query, context_or_evidence))
 
 
 def grounded_answer_with_support(answer: str, support: dict) -> str:
@@ -320,7 +374,12 @@ def summarize_importance(results: list[dict]) -> dict:
     }
 
 
-def support_assessment(query: str, evidence: list[dict], results: list[dict]) -> dict:
+def support_assessment(
+    query: str,
+    evidence: list[dict],
+    results: list[dict],
+    corroboration: dict | None = None,
+) -> dict:
     focus_terms = [
         token
         for token in sorted(set(tokenize(query)))
@@ -334,6 +393,7 @@ def support_assessment(query: str, evidence: list[dict], results: list[dict]) ->
             "covered_focus_terms": [],
             "missing_focus_terms": focus_terms,
             "focus_terms": focus_terms,
+            "corroboration": (corroboration or {}).get("summary", {}),
         }
     evidence_tokens = set()
     for item in evidence:
@@ -348,6 +408,17 @@ def support_assessment(query: str, evidence: list[dict], results: list[dict]) ->
     context_relevance = float(components.get("relevance", 0.0))
     semantic_alignment = float(components.get("semantic_similarity", 0.0))
     confidence = round((term_coverage * 0.65) + (context_relevance * 0.2) + (semantic_alignment * 0.15), 6)
+    corroboration_summary = (corroboration or {}).get("summary", {})
+    max_independent_support = int(corroboration_summary.get("max_independent_support") or 0)
+    max_echo_risk = float(corroboration_summary.get("max_echo_risk") or 0.0)
+    if max_independent_support >= 2:
+        confidence = min(1.0, round(confidence + 0.08, 6))
+    elif evidence and max_independent_support <= 1:
+        confidence = min(confidence, 0.62)
+    if max_echo_risk >= 0.45:
+        confidence = min(confidence, 0.42)
+    if int(corroboration_summary.get("total_contradictions") or 0) > 0:
+        confidence = min(confidence, 0.58)
     if focus_terms and term_coverage == 0.0:
         confidence = min(confidence, 0.3)
     elif focus_terms and term_coverage < 0.25:
@@ -369,6 +440,7 @@ def support_assessment(query: str, evidence: list[dict], results: list[dict]) ->
         "focus_terms": focus_terms,
         "context_relevance": round(context_relevance, 6),
         "semantic_alignment": round(semantic_alignment, 6),
+        "corroboration": corroboration_summary,
     }
 
 
@@ -423,7 +495,11 @@ def conflict_topic_overlap(conflict: dict, query_tokens: set[str]) -> int:
     return len(query_tokens & set(conflict.get("shared_topic_tokens") or []))
 
 
-def limitations(evidence: list[dict], support: dict | None = None) -> list[str]:
+def limitations(
+    evidence: list[dict],
+    support: dict | None = None,
+    corroboration: dict | None = None,
+) -> list[str]:
     limits = []
     if len(evidence) < 3:
         limits.append("The answer is based on fewer than three retrieved evidence items.")
@@ -433,6 +509,13 @@ def limitations(evidence: list[dict], support: dict | None = None) -> list[str]:
         limits.append("The retrieved evidence has limited graph-cluster diversity.")
     if support and support.get("support_level") == "weak":
         limits.append("The retrieved evidence weakly covers the query focus terms.")
+    summary = (corroboration or {}).get("summary", {})
+    if summary.get("overall_verdict") == "adversarial_echo_risk":
+        limits.append("Corroboration is vulnerable to dependent repetition or adversarial echo.")
+    elif summary.get("overall_verdict") == "single_source_or_dependent":
+        limits.append("The retrieved support appears to come from a single source or dependent source chain.")
+    if summary.get("overall_verdict") == "conflicted":
+        limits.append("The retrieved evidence contains conflicting claims.")
     return limits
 
 

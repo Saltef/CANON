@@ -16,36 +16,182 @@ class ProductServiceTests(unittest.TestCase):
 
     def test_answer_returns_compact_evidence_with_explanations(self):
         with patch("canon.product.service.safe_claim_decision", return_value={"global_winner_claim": {}}):
+            with patch("canon.product.service.build_query_diagnostics", return_value={"stability": {"status": "stable"}}):
+                with patch("canon.product.service.synthesize") as synthesize:
+                    synthesize.return_value = {
+                        "query": "democratic peace",
+                        "mode": "m",
+                        "policy": "rag",
+                        "top_k": 5,
+                        "answer": "Answer.",
+                        "citations": [{"citation_id": "C1"}],
+                        "evidence": [
+                            {
+                                "citation_id": "C1",
+                                "chunk_id": "c1",
+                                "work_id": "w1",
+                                "title": "A",
+                                "source_name": "J",
+                                "year": 2020,
+                                "rank": 1,
+                                "cluster_id": 1,
+                                "final_score": 0.7,
+                                "claim": {"id": "claim-a"},
+                                "preview": "preview",
+                                "explanation": {"reasons": ["high_lexical_relevance"]},
+                            }
+                        ],
+                        "support_assessment": {"support_level": "strong"},
+                        "limitations": [],
+                        "conflict_notes": [],
+                    }
+                    report = service.answer({"query": "democratic peace", "mode": "m", "policy": "rag"})
+        self.assertEqual(report["evidence"][0]["explanation"]["reasons"], ["high_lexical_relevance"])
+        self.assertEqual(report["evidence"][0]["claim"]["id"], "claim-a")
+        self.assertEqual(report["query_diagnostics"]["stability"]["status"], "stable")
+
+    def test_query_diagnostics_endpoint_validates_and_returns_report(self):
+        with patch("canon.product.service.build_query_diagnostics", return_value={"original_query": "q"}):
+            report = service.query_diagnostics({"query": "q", "candidate_k": 5, "freedom_level": "strict"})
+        self.assertEqual(report["original_query"], "q")
+
+    def test_evidence_packets_wraps_synthesis_in_integration_contract(self):
+        with patch("canon.product.service.build_query_diagnostics") as diagnostics:
             with patch("canon.product.service.synthesize") as synthesize:
+                diagnostics.return_value = {
+                    "query_to_corpus": {"matched_terms": ["water"], "weak_terms": ["permitting"]},
+                    "result_neighborhood": {"field_phrases": ["grid stress"]},
+                    "query_variants": [{"query": "water grid stress"}],
+                    "stability": {"status": "needs_caution"},
+                }
                 synthesize.return_value = {
-                    "query": "democratic peace",
+                    "query": "AI data center water risk",
                     "mode": "m",
                     "policy": "rag",
+                    "top_k": 5,
                     "answer": "Answer.",
                     "citations": [{"citation_id": "C1"}],
                     "evidence": [
                         {
                             "citation_id": "C1",
-                            "chunk_id": "c1",
-                            "work_id": "w1",
-                            "title": "A",
-                            "source_name": "J",
-                            "year": 2020,
+                            "chunk_id": "chunk:1",
+                            "work_id": "doc:1",
+                            "title": "Grid Stress",
+                            "source_name": "Local News",
+                            "year": 2026,
                             "rank": 1,
-                            "cluster_id": 1,
-                            "final_score": 0.7,
-                            "claim": {"id": "claim-a"},
-                            "preview": "preview",
-                            "explanation": {"reasons": ["high_lexical_relevance"]},
+                            "cluster_id": "energy",
+                            "preview": "Water and grid stress are debated.",
+                            "claim": {"id": "claim:1", "text": "Data centers can stress water supply."},
                         }
                     ],
-                    "support_assessment": {"support_level": "strong"},
-                    "limitations": [],
-                    "conflict_notes": [],
+                    "support_assessment": {"support_level": "moderate", "support_confidence": 0.51},
+                    "limitations": ["Human review is still required."],
+                    "conflict_notes": [{"id": "conflict:1"}],
                 }
-                report = service.answer({"query": "democratic peace", "mode": "m", "policy": "rag"})
-        self.assertEqual(report["evidence"][0]["explanation"]["reasons"], ["high_lexical_relevance"])
-        self.assertEqual(report["evidence"][0]["claim"]["id"], "claim-a")
+
+                report = service.evidence_packets(
+                    {
+                        "request_id": "req_001",
+                        "project_id": "ai_infra_geo_risk",
+                        "question": "AI data center water risk",
+                        "mode": "m",
+                        "research_frame": {
+                            "subdomains": ["water", "energy"],
+                            "regions": ["Latin America"],
+                            "languages": ["English", "Spanish"],
+                        },
+                        "evidence_requirements": {
+                            "top_k": 5,
+                            "minimum_source_types": ["official", "local_media"],
+                        },
+                    }
+                )
+
+        packet = report["evidence_packets"][0]
+        self.assertEqual(report["request_id"], "req_001")
+        self.assertEqual(packet["support_level"], "mixed")
+        self.assertEqual(packet["confidence"], "medium")
+        self.assertEqual(packet["issue_categories"], ["water", "energy"])
+        self.assertEqual(packet["supporting_evidence"][0]["evidence_id"], "C1")
+        self.assertEqual(packet["conflicting_evidence"][0]["id"], "conflict:1")
+        self.assertEqual(report["query_diagnostics"]["weak_terms"], ["permitting"])
+        self.assertEqual(report["retrieval_metrics"]["source_diversity_status"], "pass")
+
+    def test_evidence_packets_rejects_non_object_requirements(self):
+        with self.assertRaises(service.ProductError):
+            service.evidence_packets({"query": "q", "evidence_requirements": "top 10"})
+
+    def test_invalid_freedom_level_raises_product_error(self):
+        with self.assertRaises(service.ProductError):
+            service.query_diagnostics({"query": "q", "freedom_level": "wild"})
+
+    def test_source_profile_wraps_flexible_profiler(self):
+        with patch("canon.product.service.profile_source", return_value={"source_shape": "crm_record"}) as profiler:
+            report = service.source_profile({"input_path": "data/my_docs", "sample_size": "5"})
+
+        profiler.assert_called_once()
+        self.assertEqual(report["source_shape"], "crm_record")
+        self.assertEqual(profiler.call_args.kwargs["sample_size"], 5)
+
+    def test_source_profile_missing_path_raises_404(self):
+        with patch("canon.product.service.profile_source", side_effect=FileNotFoundError("missing")):
+            with self.assertRaises(service.ProductError) as context:
+                service.source_profile({"input_path": "missing"})
+        self.assertEqual(context.exception.status_code, 404)
+
+    def test_source_ingest_wraps_flexible_ingest(self):
+        with patch("canon.product.service.ingest_flexible_source", return_value={"mode": "m"}) as ingest:
+            report = service.source_ingest(
+                {
+                    "input_path": "data/my_docs",
+                    "mode": "m",
+                    "domain": "energy",
+                    "chunk_tokens": "50",
+                    "overlap_tokens": "0",
+                }
+            )
+
+        ingest.assert_called_once()
+        self.assertEqual(report["mode"], "m")
+        self.assertEqual(ingest.call_args.kwargs["chunk_tokens"], 50)
+        self.assertEqual(ingest.call_args.kwargs["overlap_tokens"], 0)
+
+    def test_corpus_build_requires_source_modes_and_wraps_phase16(self):
+        with patch(
+            "canon.product.service.run_phase16",
+            return_value={"corpus": {"corpus_id": "c"}, "validation": {"status": "corpus_only"}},
+        ) as build:
+            report = service.corpus_build({"corpus_id": "c", "from_modes": "m1,m2", "corpus_only": "false"})
+
+        self.assertEqual(report["corpus"]["corpus_id"], "c")
+        self.assertFalse(build.call_args.kwargs["corpus_only"])
+        self.assertEqual(build.call_args.kwargs["from_modes"], ["m1", "m2"])
+        with self.assertRaises(service.ProductError):
+            service.corpus_build({"corpus_id": "c"})
+
+    def test_model_evaluation_requires_labels_and_wraps_eval(self):
+        with patch("canon.product.service.evaluate_semantic_models", return_value={"report_id": "semantic_model_evaluation_v1"}) as evaluate:
+            report = service.model_evaluation(
+                {
+                    "mode": "m",
+                    "qrels_path": "gold/qrels.json",
+                    "providers": ["local", "openai"],
+                    "k": "5",
+                }
+            )
+
+        self.assertEqual(report["report_id"], "semantic_model_evaluation_v1")
+        self.assertEqual(evaluate.call_args.kwargs["providers"], ["local", "openai"])
+        self.assertEqual(evaluate.call_args.kwargs["k"], 5)
+        with self.assertRaises(service.ProductError):
+            service.model_evaluation({"mode": "m"})
+
+    def test_optional_bool_parses_strings(self):
+        self.assertTrue(service.optional_bool("true"))
+        self.assertFalse(service.optional_bool("false"))
+        with self.assertRaises(service.ProductError):
+            service.optional_bool("maybe")
 
     def test_compact_answer_evidence_caps_long_lists(self):
         evidence = [

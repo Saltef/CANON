@@ -5,9 +5,20 @@ from pathlib import Path
 from typing import Any
 
 from canon.config import load_settings
+from canon.corpus.build import run_phase16
+from canon.eval.model_evaluation import evaluate_semantic_models, parse_providers
 from canon.eval.diversity import run_diversity_audit
+from canon.eval.source_diversity import (
+    DEFAULT_MAX_DOMINANT_SOURCE_SHARE,
+    DEFAULT_MIN_CLUSTER_COUNT,
+    DEFAULT_MIN_DISTINCT_SOURCES,
+    source_diversity_row,
+)
+from canon.ingest.flexible import ingest_flexible_source, profile_source
 from canon.reports.claim_decision import build_claim_decision
 from canon.retrieval.compare import compare
+from canon.retrieval.experiment import cached_documents
+from canon.retrieval.query_diagnostics import FREEDOM_THRESHOLDS, diagnose_query
 from canon.synthesis.answer import synthesize
 
 
@@ -67,6 +78,7 @@ def answer(payload: dict[str, Any]) -> dict:
     mode = str(payload.get("mode") or DEFAULT_MODE)
     policy = str(payload.get("policy") or DEFAULT_POLICY)
     top_k = optional_int(payload.get("top_k"))
+    freedom_level = optional_freedom_level(payload.get("freedom_level"))
     report = synthesize(query=query, policy=policy, mode=mode, top_k=top_k)
     decision = safe_claim_decision(mode)
     return {
@@ -80,7 +92,185 @@ def answer(payload: dict[str, Any]) -> dict:
         "limitations": report["limitations"],
         "conflict_notes": report["conflict_notes"],
         "claim_boundaries": decision.get("global_winner_claim", {}),
+        "query_diagnostics": build_query_diagnostics(
+            query=query,
+            mode=mode,
+            top_k=top_k or report.get("top_k"),
+            freedom_level=freedom_level,
+        ),
     }
+
+
+def evidence_packets(payload: dict[str, Any]) -> dict:
+    query = optional_text(payload, "question") or require_text(payload, "query")
+    mode = str(payload.get("mode") or DEFAULT_MODE)
+    policy = str(payload.get("policy") or DEFAULT_POLICY)
+    research_frame = optional_dict(payload.get("research_frame"), "research_frame")
+    requirements = optional_dict(payload.get("evidence_requirements"), "evidence_requirements")
+    top_k = optional_positive_int(requirements.get("top_k"), "top_k") if requirements else None
+    top_k = top_k or optional_int(payload.get("top_k"))
+    freedom_level = optional_freedom_level(payload.get("freedom_level"))
+    report = synthesize(query=query, policy=policy, mode=mode, top_k=top_k)
+    diagnostics = build_query_diagnostics(
+        query=query,
+        mode=mode,
+        top_k=top_k or report.get("top_k"),
+        freedom_level=freedom_level,
+    )
+    diversity = packet_source_diversity(query, report.get("evidence") or [], top_k or report.get("top_k") or 10)
+    support = report.get("support_assessment") or {}
+    packet = {
+        "packet_id": f"packet_{str(payload.get('request_id') or '001')}",
+        "claim": packet_claim(query, support),
+        "support_level": packet_support_level(support),
+        "confidence": packet_confidence(support),
+        "evidence_role": "direct_support" if report.get("evidence") else "insufficient_evidence",
+        "issue_categories": infer_issue_categories(research_frame, query),
+        "regions": optional_string_list(research_frame.get("regions"), "regions") or [],
+        "languages": optional_string_list(research_frame.get("languages"), "languages") or [],
+        "source_types": optional_string_list(requirements.get("minimum_source_types"), "minimum_source_types")
+        if requirements
+        else [],
+        "supporting_evidence": [packet_evidence_item(item) for item in report.get("evidence", [])],
+        "conflicting_evidence": report.get("conflict_notes", []),
+        "limitations": report.get("limitations", []),
+        "source_diversity": {
+            "distinct_sources": diversity["distinct_sources"],
+            "distinct_clusters": diversity["distinct_clusters"],
+            "dominant_source_share": diversity["dominant_source_share"],
+            "warnings": diversity["warnings"],
+        },
+    }
+    gaps = coverage_gaps(diagnostics, diversity, report.get("limitations", []))
+    return {
+        "request_id": str(payload.get("request_id") or ""),
+        "project_id": str(payload.get("project_id") or ""),
+        "status": "complete",
+        "query": query,
+        "mode": mode,
+        "policy": policy,
+        "research_frame": research_frame,
+        "evidence_packets": [packet],
+        "query_diagnostics": compact_packet_diagnostics(diagnostics),
+        "coverage_gaps": gaps,
+        "retrieval_metrics": {
+            "estimated_confidence": packet["confidence"],
+            "source_diversity_status": "pass" if not diversity["warnings"] else "review",
+            "human_review_status": str(payload.get("human_review_status") or "not_reviewed"),
+            "support_confidence": support.get("support_confidence"),
+        },
+        "answer_report": {
+            "answer": report.get("answer"),
+            "citations": report.get("citations", []),
+            "support_assessment": support,
+        },
+    }
+
+
+def packet_source_diversity(query: str, evidence: list[dict[str, Any]], top_k: int) -> dict[str, Any]:
+    return source_diversity_row(
+        query={"id": "evidence_packet", "query": query},
+        evidence=evidence,
+        top_k=top_k,
+        min_distinct_sources=DEFAULT_MIN_DISTINCT_SOURCES,
+        max_dominant_source_share=DEFAULT_MAX_DOMINANT_SOURCE_SHARE,
+        min_cluster_count=DEFAULT_MIN_CLUSTER_COUNT,
+    )
+
+
+def packet_claim(query: str, support: dict[str, Any]) -> str:
+    if support.get("support_level") in {"none", "weak"}:
+        return f"The current corpus provides limited support for: {query}"
+    return f"Retrieved evidence addresses: {query}"
+
+
+def packet_support_level(support: dict[str, Any]) -> str:
+    level = str(support.get("support_level") or "none")
+    if level == "strong":
+        return "supported"
+    if level == "moderate":
+        return "mixed"
+    if level == "weak":
+        return "weak"
+    return "insufficient"
+
+
+def packet_confidence(support: dict[str, Any]) -> str:
+    score = float(support.get("support_confidence") or 0.0)
+    if score >= 0.7:
+        return "high"
+    if score >= 0.4:
+        return "medium"
+    if score > 0.0:
+        return "low"
+    return "none"
+
+
+def infer_issue_categories(research_frame: Any, query: str) -> list[str]:
+    if isinstance(research_frame, dict):
+        subdomains = optional_string_list(research_frame.get("subdomains"), "subdomains") or []
+        if subdomains:
+            return subdomains
+    terms = [term for term in query.lower().replace("/", " ").split() if len(term) >= 4]
+    return terms[:6]
+
+
+def packet_evidence_item(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "evidence_id": item.get("citation_id"),
+        "chunk_id": item.get("chunk_id"),
+        "document_id": item.get("work_id"),
+        "title": item.get("title"),
+        "source_name": item.get("source_name"),
+        "url": item.get("url"),
+        "published_at": item.get("published_at") or item.get("year"),
+        "text": item.get("preview"),
+        "citation": item.get("citation_id"),
+        "rank": item.get("rank"),
+        "cluster_id": item.get("cluster_id"),
+        "claim": item.get("claim"),
+    }
+
+
+def compact_packet_diagnostics(diagnostics: dict[str, Any]) -> dict[str, Any]:
+    query_to_corpus = diagnostics.get("query_to_corpus") or {}
+    neighborhood = diagnostics.get("result_neighborhood") or {}
+    stability = diagnostics.get("stability") or {}
+    return {
+        "matched_terms": query_to_corpus.get("matched_terms", []),
+        "weak_terms": query_to_corpus.get("weak_terms", []),
+        "field_phrases": neighborhood.get("field_phrases", []),
+        "query_variants": diagnostics.get("query_variants", []),
+        "drift_risk": stability.get("status") or "needs_caution",
+    }
+
+
+def coverage_gaps(
+    diagnostics: dict[str, Any],
+    diversity: dict[str, Any],
+    limitations: list[str],
+) -> list[dict[str, Any]]:
+    gaps = []
+    weak_terms = ((diagnostics.get("query_to_corpus") or {}).get("weak_terms") or [])[:5]
+    if weak_terms:
+        gaps.append(
+            {
+                "gap": f"Weak corpus match for terms: {', '.join(weak_terms)}.",
+                "severity": "medium",
+                "suggested_next_query": " ".join(weak_terms),
+            }
+        )
+    for warning in diversity.get("warnings", []):
+        gaps.append(
+            {
+                "gap": warning.get("message", warning.get("id", "Source diversity warning.")),
+                "severity": "medium",
+                "suggested_next_query": "",
+            }
+        )
+    for limitation in limitations[:3]:
+        gaps.append({"gap": limitation, "severity": "low", "suggested_next_query": ""})
+    return gaps
 
 
 def compact_answer_evidence(evidence: list[dict[str, Any]], limit: int = 10) -> list[dict[str, Any]]:
@@ -128,6 +318,130 @@ def compare_retrieval(payload: dict[str, Any]) -> dict:
             for run in report["runs"]
         ],
     }
+
+
+def query_diagnostics(payload: dict[str, Any]) -> dict:
+    query = require_text(payload, "query")
+    mode = str(payload.get("mode") or DEFAULT_MODE)
+    top_k = optional_int(payload.get("top_k")) or 5
+    candidate_k = optional_positive_int(payload.get("candidate_k"), "candidate_k") or 20
+    freedom_level = optional_freedom_level(payload.get("freedom_level"))
+    return build_query_diagnostics(
+        query=query,
+        mode=mode,
+        top_k=top_k,
+        candidate_k=candidate_k,
+        freedom_level=freedom_level,
+    )
+
+
+def source_profile(payload: dict[str, Any]) -> dict:
+    input_path = require_path(payload, "input_path")
+    input_format = optional_text(payload, "format")
+    sample_size = optional_positive_int(payload.get("sample_size"), "sample_size") or 25
+    try:
+        return profile_source(
+            input_path=input_path,
+            input_format=input_format,
+            sample_size=sample_size,
+        )
+    except FileNotFoundError as exc:
+        raise ProductError(str(exc), status_code=404) from exc
+    except ValueError as exc:
+        raise ProductError(str(exc), status_code=400) from exc
+
+
+def source_ingest(payload: dict[str, Any]) -> dict:
+    input_path = require_path(payload, "input_path")
+    mode = require_text(payload, "mode")
+    input_format = optional_text(payload, "format")
+    chunk_tokens = optional_positive_int(payload.get("chunk_tokens"), "chunk_tokens")
+    overlap_tokens = optional_nonnegative_int(payload.get("overlap_tokens"), "overlap_tokens")
+    try:
+        return ingest_flexible_source(
+            input_path=input_path,
+            mode=mode,
+            input_format=input_format,
+            domain=optional_text(payload, "domain"),
+            provenance=optional_text(payload, "provenance"),
+            source_name=optional_text(payload, "source_name"),
+            chunk_tokens=chunk_tokens,
+            overlap_tokens=overlap_tokens,
+        )
+    except FileNotFoundError as exc:
+        raise ProductError(str(exc), status_code=404) from exc
+    except ValueError as exc:
+        raise ProductError(str(exc), status_code=400) from exc
+
+
+def corpus_build(payload: dict[str, Any]) -> dict:
+    corpus_id = require_text(payload, "corpus_id")
+    source_modes = optional_string_list(payload.get("from_modes"), "from_modes")
+    if not source_modes:
+        raise ProductError("from_modes must be a non-empty list or comma-separated string.")
+    top_k = optional_positive_int(payload.get("top_k"), "top_k") or 5
+    policies = optional_string_list(payload.get("policies"), "policies") or ["lexical", "balanced", "semantic", "rag"]
+    try:
+        report = run_phase16(
+            corpus_id=corpus_id,
+            from_modes=source_modes,
+            harvest=False,
+            corpus_only=optional_bool(payload.get("corpus_only"), default=True),
+            top_k=top_k,
+            policies=policies,
+        )
+    except FileNotFoundError as exc:
+        raise ProductError(str(exc), status_code=404) from exc
+    except ValueError as exc:
+        raise ProductError(str(exc), status_code=400) from exc
+    return {
+        "corpus": report.get("corpus", {}),
+        "validation": report.get("validation", {}),
+    }
+
+
+def model_evaluation(payload: dict[str, Any]) -> dict:
+    mode = require_text(payload, "mode")
+    queries_path = optional_path(payload.get("queries_path"), "queries_path")
+    qrels_path = optional_path(payload.get("qrels_path") or payload.get("qrels"), "qrels_path")
+    if not queries_path and not qrels_path:
+        raise ProductError("qrels_path or queries_path is required.")
+    k = optional_positive_int(payload.get("k"), "k") or 10
+    batch_size = optional_positive_int(payload.get("batch_size"), "batch_size") or 32
+    providers = parse_providers_from_payload(payload.get("providers"))
+    try:
+        return evaluate_semantic_models(
+            mode=mode,
+            queries_path=queries_path,
+            qrels_path=qrels_path,
+            providers=providers,
+            k=k,
+            batch_size=batch_size,
+        )
+    except FileNotFoundError as exc:
+        raise ProductError(str(exc), status_code=404) from exc
+    except ValueError as exc:
+        raise ProductError(str(exc), status_code=400) from exc
+
+
+def build_query_diagnostics(
+    query: str,
+    mode: str,
+    top_k: int | None = None,
+    candidate_k: int = 20,
+    freedom_level: str = "balanced",
+) -> dict:
+    try:
+        documents = cached_documents(mode)
+    except FileNotFoundError as exc:
+        raise ProductError(f"Corpus for mode '{mode}' was not found.", status_code=404) from exc
+    return diagnose_query(
+        query=query,
+        documents=documents,
+        top_k=top_k or 5,
+        candidate_k=candidate_k,
+        freedom_level=freedom_level,
+    )
 
 
 def diversity_audit(payload: dict[str, Any]) -> dict:
@@ -338,9 +652,91 @@ def optional_positive_int(value: Any, name: str) -> int | None:
     return integer
 
 
+def optional_nonnegative_int(value: Any, name: str) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        integer = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ProductError(f"{name} must be an integer.") from exc
+    if integer < 0:
+        raise ProductError(f"{name} must be non-negative.")
+    return integer
+
+
+def optional_dict(value: Any, name: str) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ProductError(f"{name} must be an object.")
+    return value
+
+
+def optional_bool(value: Any, default: bool = False) -> bool:
+    if value is None or value == "":
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "y"}:
+            return True
+        if normalized in {"0", "false", "no", "n"}:
+            return False
+    raise ProductError("Boolean value must be true or false.")
+
+
+def optional_freedom_level(value: Any) -> str:
+    if value is None or value == "":
+        return "balanced"
+    level = str(value)
+    if level not in FREEDOM_THRESHOLDS:
+        raise ProductError(
+            f"freedom_level must be one of: {', '.join(sorted(FREEDOM_THRESHOLDS))}."
+        )
+    return level
+
+
 def optional_text(params: dict[str, Any], key: str) -> str | None:
     value = params.get(key)
     if value is None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def require_path(payload: dict[str, Any], key: str) -> Path:
+    text = require_text(payload, key)
+    return Path(text)
+
+
+def optional_path(value: Any, name: str) -> Path | None:
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        raise ProductError(f"{name} must be a path string.")
+    text = value.strip()
+    return Path(text) if text else None
+
+
+def optional_string_list(value: Any, name: str) -> list[str] | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        values = [piece.strip() for piece in value.split(",") if piece.strip()]
+    elif isinstance(value, list):
+        values = [str(piece).strip() for piece in value if str(piece).strip()]
+    else:
+        raise ProductError(f"{name} must be a list or comma-separated string.")
+    return values or None
+
+
+def parse_providers_from_payload(value: Any) -> list[str] | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, list):
+        providers = [str(provider).strip() for provider in value if str(provider).strip()]
+        return providers or None
+    if isinstance(value, str):
+        return parse_providers(value)
+    raise ProductError("providers must be a list or comma-separated string.")

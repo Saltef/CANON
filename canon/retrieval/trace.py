@@ -11,17 +11,28 @@ CONTROL_WEIGHT_KEYS = {
     "diversity_focus_floor",
     "diversity_relevance_floor",
     "exclusion_penalty",
+    "method_signal_bonus",
+    "limitation_signal_bonus",
+    "evidence_specificity_bonus",
     "low_relevance_penalty",
     "relevance_floor",
+    "candidate_k",
+    "committee_gate",
+    "candidate_syntax_weight",
 }
 COMPONENT_LABELS = {
     "relevance": "Lexical query match",
     "semantic_similarity": "Semantic query match",
+    "syntax_relevance": "Syntax/form match",
     "source_quality": "Source quality",
     "citation_centrality": "Citation centrality",
     "author_score": "Author signal",
     "section_role": "Section importance",
     "claim_density": "Claim density",
+    "method_signal": "Method detail",
+    "limitation_signal": "Limitation or caveat",
+    "evidence_specificity": "Evidence specificity",
+    "uncertainty_signal": "Uncertainty signal",
     "recency": "Recency",
 }
 
@@ -42,6 +53,7 @@ class RetrievalTraceItem:
     diversity_bonus: float
     components: dict[str, float]
     weights: dict[str, float]
+    decision: dict
     explanation: dict
 
     def to_dict(self) -> dict:
@@ -56,6 +68,7 @@ def make_trace_item(
     weights: dict[str, float],
     preview_chars: int,
     base_score: float | None = None,
+    decision: dict | None = None,
 ) -> RetrievalTraceItem:
     preview = document.text[:preview_chars].strip()
     if len(document.text) > preview_chars:
@@ -79,6 +92,7 @@ def make_trace_item(
         diversity_bonus=rounded_diversity_bonus,
         components=rounded_components,
         weights=weights,
+        decision=decision or {},
         explanation=explain_trace_item(
             rank=rank,
             final_score=rounded_final_score,
@@ -158,11 +172,16 @@ def explanation_reasons(components: dict[str, float], diversity_bonus: float) ->
     thresholds = [
         ("relevance", 0.75, "high_lexical_relevance"),
         ("semantic_similarity", 0.75, "high_semantic_alignment"),
+        ("syntax_relevance", 0.75, "high_syntax_form_alignment"),
         ("source_quality", 0.75, "high_source_quality"),
         ("citation_centrality", 0.25, "citation_centrality_signal"),
         ("author_score", 0.25, "author_score_signal"),
         ("section_role", 0.75, "important_section"),
         ("claim_density", 0.5, "claim_dense"),
+        ("method_signal", 0.45, "method_detail"),
+        ("limitation_signal", 0.45, "limitation_or_caveat"),
+        ("evidence_specificity", 0.45, "specific_evidence"),
+        ("uncertainty_signal", 0.45, "uncertainty_signal"),
         ("recency", 0.75, "recent_work"),
     ]
     for component, threshold, reason in thresholds:

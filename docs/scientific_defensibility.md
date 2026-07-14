@@ -71,6 +71,27 @@ The current portfolio bundle should include:
 - Reproducibility manifest: `reports/experiment_manifest_social_science_ir_v1_harvest10_full.json`
 - Scientific audit: `reports/scientific_audit_social_science_ir_v1_harvest10_baseline_methods_v1.md`
 
+The heterogeneous unstructured portfolio should include:
+
+- Mixed unstructured routing benchmark: `reports/mixed_unstructured_document_routing_v1.json`
+- Document-type slices: `reports/document_type_slices_unstructured_demo_corpus.json`
+- Domain slices: `reports/domain_slices_mixed_domain_demo_corpus.json`
+- Heterogeneous readiness gate:
+  `reports/heterogeneous_unstructured_readiness_unstructured_demo_corpus_mixed_domain_demo_corpus.json`
+- Unstructured coverage matrix:
+  `reports/unstructured_experiment_coverage_matrix_v1.json`
+- Public-opinion analysis:
+  `reports/public_opinion_analysis_social_public_opinion_demo_corpus.json`
+- Evidence committee:
+  `reports/evidence_committee_social_public_opinion_demo_corpus.json`
+- Public-opinion synthesis smoke test:
+  `reports/synthesis_social_public_opinion_demo_corpus_rag_public-opinion-battery-storage-safety-concerns.json`
+- Chunking strategy benchmark: `reports/chunking_strategy_eval_ct14_ov0.json`
+- Adversarial RAG security benchmark: `reports/adversarial_rag_security_v1.json`
+- Importance phase gate: `reports/importance_phase_gate_v1.json`
+- Unstructured experiment portfolio:
+  `reports/unstructured_experiment_portfolio_v1.md`
+
 ## Scientific Controls Already Present
 
 - Multiple baselines: lexical, balanced, semantic, hybrid RAG, diversity-first,
@@ -98,6 +119,12 @@ The current portfolio bundle should include:
 - Regression gates that fail when required technical evidence falls below
   explicit thresholds.
 - Query-aware abstention and weak-support diagnostics.
+- Heterogeneous unstructured portfolio checks that connect document-type,
+  domain, public-opinion, chunking, safety, committee, synthesis, and anchor
+  artifacts into one claim-bounded report.
+- Coverage-matrix checks that distinguish fixture coverage from broad
+  validation readiness across domains, document types, task families, and label
+  anchors.
 - Reproducible report hashes through experiment manifests.
 - Dockerized execution path.
 
@@ -116,6 +143,17 @@ The current portfolio bundle should include:
   one external model or public argument-mining benchmark.
 - Generalization: test non-IR social-science corpora and non-social-science
   corpora to separate domain effects from method effects.
+- Unstructured validation: replace the current fixture-heavy portfolio with
+  larger corpora and domain-expert labels for economics, psychology,
+  anthropology, history, cultural studies, legal/market, and public-opinion
+  tasks.
+- Coverage gaps currently flagged by the matrix are no longer basic source-form
+  absence for the task matrix; the expanded fixtures include market reports,
+  policy reports, preprints, public-opinion records, web pages, legal authority,
+  filings, transcripts, archival primary sources, and an unknown-text negative
+  control. The remaining matrix gaps are scientific: fixture-only scale,
+  preferred-type gaps inside some domain profiles, and missing or limited labels
+  for document type, evidence role, source trust, and answer usefulness.
 - Human-free for now does not mean assumption-free. Technical-only evaluation
   should be labeled as such until human expert review is added.
 
@@ -136,3 +174,8 @@ Then show:
 
 The strongest portfolio signal is not that CANON has a perfect winner. It is
 that the system makes trade-offs visible, auditable, and reproducible.
+
+For heterogeneous unstructured data, the strongest portfolio signal is similar:
+CANON now makes unsafe, aggregate-only, weakly supported, and domain-mismatched
+evidence visible before generation. The current artifact still proves
+experiment discipline, not broad real-world validity.

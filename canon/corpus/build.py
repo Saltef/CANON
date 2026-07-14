@@ -52,7 +52,9 @@ def build_named_corpus(
     if not source_modes:
         source_modes = ["live"]
     raw_works, works, chunks, provenance = merge_modes(settings.data_dir, source_modes)
-    write_json(settings.data_dir / "raw" / f"openalex_{corpus_id}.json", raw_works)
+    write_json(settings.data_dir / "raw" / f"raw_{corpus_id}.json", raw_works)
+    if all(raw_source_kind(raw_mode_path(settings.data_dir, mode)) == "openalex" for mode in source_modes):
+        write_json(settings.data_dir / "raw" / f"openalex_{corpus_id}.json", raw_works)
     write_json(settings.data_dir / "processed" / f"works_{corpus_id}.json", works)
     write_json(settings.data_dir / "processed" / f"chunks_{corpus_id}.json", chunks)
     manifest = {
@@ -128,7 +130,7 @@ def merge_modes(data_dir: Path, modes: list[str]) -> tuple[list[dict], list[dict
     for mode in modes:
         works_path = data_dir / "processed" / f"works_{mode}.json"
         chunks_path = data_dir / "processed" / f"chunks_{mode}.json"
-        raw_path = data_dir / "raw" / f"openalex_{mode}.json"
+        raw_path = raw_mode_path(data_dir, mode)
         if not works_path.exists() or not chunks_path.exists() or not raw_path.exists():
             raise FileNotFoundError(f"Missing processed corpus files for mode '{mode}'.")
         raw_works = json.loads(raw_path.read_text(encoding="utf-8"))
@@ -148,6 +150,7 @@ def merge_modes(data_dir: Path, modes: list[str]) -> tuple[list[dict], list[dict
             provenance[work_id]["source_modes"] = sorted(
                 set(provenance[work_id]["source_modes"]) | {mode}
             )
+            provenance[work_id]["raw_source_kind"] = raw_source_kind(raw_path)
         for chunk in chunks:
             chunk_id = chunk["id"]
             current_chunk = chunks_by_id.setdefault(chunk_id, dict(chunk))
@@ -165,11 +168,32 @@ def merge_modes(data_dir: Path, modes: list[str]) -> tuple[list[dict], list[dict
 def mode_files_exist(data_dir: Path, mode: str) -> bool:
     return all(
         [
-            (data_dir / "raw" / f"openalex_{mode}.json").exists(),
+            raw_mode_path(data_dir, mode).exists(),
             (data_dir / "processed" / f"works_{mode}.json").exists(),
             (data_dir / "processed" / f"chunks_{mode}.json").exists(),
         ]
     )
+
+
+def raw_mode_path(data_dir: Path, mode: str) -> Path:
+    candidates = [
+        data_dir / "raw" / f"openalex_{mode}.json",
+        data_dir / "raw" / f"unstructured_{mode}.json",
+        data_dir / "raw" / f"raw_{mode}.json",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+def raw_source_kind(path: Path) -> str:
+    name = path.name
+    if name.startswith("openalex_"):
+        return "openalex"
+    if name.startswith("unstructured_"):
+        return "unstructured_jsonl"
+    return "raw_json"
 
 
 def resumed_topic_run(reports_dir: Path, mode: str, topic_file: str) -> dict:

@@ -6,9 +6,10 @@ from functools import lru_cache
 from pathlib import Path
 
 from canon.config import load_settings
+from canon.eval.contracts import CONTRACT_VERSION, validate_report
 from canon.retrieval.clusters import load_cluster_assignments
 from canon.retrieval.corpus import RetrievalDocument, load_processed_corpus
-from canon.retrieval.engine import retrieve
+from canon.retrieval.engine import retrieve_with_stages
 
 
 def write_json(path: Path, payload: object) -> None:
@@ -36,7 +37,7 @@ def run(query: str, policy: str, mode: str, top_k: int | None) -> dict:
     if policy not in policies:
         raise ValueError(f"Unknown policy '{policy}'. Available: {', '.join(sorted(policies))}")
     resolved_top_k = top_k or int(retrieval_settings["top_k"])
-    trace = retrieve(
+    staged = retrieve_with_stages(
         query=query,
         documents=documents,
         weights={key: float(value) for key, value in policies[policy].items()},
@@ -44,12 +45,16 @@ def run(query: str, policy: str, mode: str, top_k: int | None) -> dict:
         preview_chars=int(retrieval_settings["preview_chars"]),
     )
     report = {
+        "contract_version": CONTRACT_VERSION,
         "query": query,
         "policy": policy,
         "mode": mode,
         "top_k": resolved_top_k,
-        "results": [item.to_dict() for item in trace],
+        "stage_summary": staged["stage_summary"],
+        "rejected_candidates": staged["rejected_candidates"],
+        "results": [item.to_dict() for item in staged["trace"]],
     }
+    report["contract_validation"] = validate_report(report, "retrieval")
     slug = "".join(character if character.isalnum() else "-" for character in query.lower())[:60].strip("-")
     write_json(settings.reports_dir / f"retrieval_{mode}_{policy}_{slug}.json", report)
     return report

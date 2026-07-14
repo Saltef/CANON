@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from canon.corpus.build import cli_summary, merge_modes, mode_files_exist, resumed_topic_run, validation_warnings
+from canon.corpus.build import cli_summary, merge_modes, mode_files_exist, raw_mode_path, raw_source_kind, resumed_topic_run, validation_warnings
 
 
 class CorpusBuildTests(unittest.TestCase):
@@ -50,6 +50,40 @@ class CorpusBuildTests(unittest.TestCase):
             self.assertFalse(mode_files_exist(data_dir, "m"))
             (data_dir / "processed" / "chunks_m.json").write_text("[]", encoding="utf-8")
             self.assertTrue(mode_files_exist(data_dir, "m"))
+
+    def test_mode_files_exist_accepts_unstructured_raw_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data_dir = Path(directory)
+            (data_dir / "raw").mkdir()
+            (data_dir / "processed").mkdir()
+            (data_dir / "raw" / "unstructured_m.json").write_text("[]", encoding="utf-8")
+            (data_dir / "processed" / "works_m.json").write_text("[]", encoding="utf-8")
+            (data_dir / "processed" / "chunks_m.json").write_text("[]", encoding="utf-8")
+            self.assertTrue(mode_files_exist(data_dir, "m"))
+            self.assertEqual(raw_mode_path(data_dir, "m").name, "unstructured_m.json")
+            self.assertEqual(raw_source_kind(raw_mode_path(data_dir, "m")), "unstructured_jsonl")
+
+    def test_merge_modes_accepts_unstructured_raw_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data_dir = Path(directory)
+            (data_dir / "raw").mkdir()
+            (data_dir / "processed").mkdir()
+            (data_dir / "raw" / "unstructured_m.json").write_text(
+                json.dumps([{"id": "U1", "title": "Filing", "document_type": "regulatory_filing"}]),
+                encoding="utf-8",
+            )
+            (data_dir / "processed" / "works_m.json").write_text(
+                json.dumps([{"id": "U1", "title": "Filing", "year": 2026}]),
+                encoding="utf-8",
+            )
+            (data_dir / "processed" / "chunks_m.json").write_text(
+                json.dumps([{"id": "C1", "work_id": "U1", "text": "Text"}]),
+                encoding="utf-8",
+            )
+            raw, works, chunks, provenance = merge_modes(data_dir, ["m"])
+        self.assertEqual(len(raw), 1)
+        self.assertEqual(works[0]["corpus_source_modes"], ["m"])
+        self.assertEqual(provenance["U1"]["raw_source_kind"], "unstructured_jsonl")
 
     def test_resumed_topic_run_marks_existing_report(self):
         with tempfile.TemporaryDirectory() as directory:

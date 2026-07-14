@@ -44,8 +44,20 @@ class CanonHandler(BaseHTTPRequestHandler):
             payload = self.read_json()
             if parsed.path == "/v1/answer":
                 self.send_json(service.answer(payload))
+            elif parsed.path == "/v1/evidence-packets":
+                self.send_json(service.evidence_packets(payload))
             elif parsed.path == "/v1/compare":
                 self.send_json(service.compare_retrieval(payload))
+            elif parsed.path == "/v1/query-diagnostics":
+                self.send_json(service.query_diagnostics(payload))
+            elif parsed.path == "/v1/sources/profile":
+                self.send_json(service.source_profile(payload))
+            elif parsed.path == "/v1/sources/ingest":
+                self.send_json(service.source_ingest(payload))
+            elif parsed.path == "/v1/corpora/build":
+                self.send_json(service.corpus_build(payload))
+            elif parsed.path == "/v1/model-evaluation":
+                self.send_json(service.model_evaluation(payload))
             elif parsed.path == "/v1/diversity-audit":
                 self.send_json(service.diversity_audit(payload))
             else:

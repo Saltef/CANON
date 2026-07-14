@@ -1,4 +1,4 @@
-.PHONY: build product-api product-readiness dry-run test live diagnostics eval graph claims conflicts claim-model embeddings synthesize rag-eval topic-pack corpus-expansion harvest-v2 harvest-10k workbench phase16 methods eval-pipeline eval-diversity diversity-diagnostics diversity-gate eval-batches eval-slices eval-probes eval-batches-large qrels-validate public-qrels-validate external-ir bootstrap-ir paired-significance faithfulness perturbations data-card claim-decision regression-gate provider-compare pgvector-plan grobid-plan tune-weights dashboard manifest scientific-audit portfolio finished-demo full-eval
+.PHONY: build product-api product-smoke product-readiness product-release-audit product-final-check product-final-check-report industry-pilot industry-pilot-review industry-pilot-review-status industry-pilot-review-csv industry-pilot-import-review-csv dry-run test live diagnostics eval graph claims conflicts claim-model embeddings synthesize rag-eval topic-pack corpus-expansion harvest-v2 harvest-10k ingest-unstructured-demo ingest-mixed-domain-demo ingest-social-public-opinion-demo chunking-eval evidence-committee document-type-slices domain-slices social-public-opinion-analysis social-public-opinion-demo public-opinion-synthesis-smoke unstructured-readiness unstructured-coverage-matrix unstructured-portfolio workbench phase16 methods eval-pipeline eval-diversity diversity-diagnostics diversity-gate eval-batches eval-slices eval-probes eval-batches-large qrels-validate public-qrels-validate external-ir bootstrap-ir paired-significance faithfulness label-tasks label-calibration technical-calibration calibration-model preference-model hard-negative-anchors preference-model-anchors mixed-unstructured adversarial-corroboration adversarial-rag-security evaluation-anchors contract-validate importance-phase-gate perturbations data-card claim-decision regression-gate provider-compare pgvector-plan grobid-plan tune-weights dashboard manifest scientific-audit portfolio finished-demo full-eval
 
 build:
 	docker compose build canon
@@ -6,8 +6,35 @@ build:
 product-api:
 	docker compose up canon
 
+product-smoke:
+	docker compose run --rm --no-deps canon python -m canon.product.smoke --mode social_science_ir_v1_harvest10
+
 product-readiness:
 	docker compose run --rm --no-deps canon python -m canon.product.readiness --mode social_science_ir_v1_harvest10
+
+product-release-audit:
+	docker compose run --rm --no-deps canon python -m canon.product.release_audit --mode social_science_ir_v1_harvest10
+
+product-final-check:
+	docker compose run --rm --no-deps canon python -m canon.product.final_check --mode social_science_ir_v1_harvest10 --records /app/reports/human_review_tasks_v1.json
+
+product-final-check-report:
+	docker compose run --rm --no-deps canon python -m canon.product.final_check --mode social_science_ir_v1_harvest10 --records /app/reports/human_review_tasks_v1.json --no-fail
+
+industry-pilot:
+	docker compose run --rm --no-deps canon python -m canon.product.industry_pilot --mode social_science_ir_v1_harvest10
+
+industry-pilot-review:
+	docker compose run --rm --no-deps canon python -m canon.product.industry_pilot --mode social_science_ir_v1_harvest10 --prepare-review
+
+industry-pilot-review-status:
+	docker compose run --rm --no-deps canon python -m canon.product.industry_pilot --mode social_science_ir_v1_harvest10 --records /app/reports/human_review_tasks_v1.json --review-status
+
+industry-pilot-review-csv:
+	docker compose run --rm --no-deps canon python -m canon.product.industry_pilot --mode social_science_ir_v1_harvest10 --records /app/reports/human_review_tasks_v1.json --export-review-csv --output /app/reports/human_review_tasks_v1.review.csv
+
+industry-pilot-import-review-csv:
+	docker compose run --rm --no-deps canon python -m canon.product.industry_pilot --mode social_science_ir_v1_harvest10 --records /app/reports/human_review_tasks_v1.json --import-review-csv /app/reports/human_review_tasks_v1.review.csv
 
 dry-run:
 	docker compose run --rm canon python -m canon.ingest.pipeline --dry-run
@@ -56,6 +83,54 @@ harvest-v2:
 
 harvest-10k:
 	docker compose run --rm --no-deps canon python -m canon.corpus.build --corpus-id social_science_ir_10k --harvest --max-results 2200 --corpus-only --top-k 5 --policies lexical,balanced,semantic,rag,diverse,conflict_aware
+
+ingest-unstructured-demo:
+	docker compose run --rm --no-deps canon python -m canon.ingest.unstructured --input /app/data/fixtures/unstructured_sample.jsonl --mode unstructured_demo
+
+ingest-mixed-domain-demo:
+	docker compose run --rm --no-deps canon python -m canon.ingest.unstructured --input /app/data/fixtures/mixed_domain_sample.jsonl --mode mixed_domain_demo
+
+ingest-social-public-opinion-demo:
+	docker compose run --rm --no-deps canon python -m canon.ingest.social_media --input /app/data/fixtures/social_media_public_opinion_sample.jsonl --mode social_public_opinion_demo --format jsonl
+
+chunking-eval:
+	docker compose run --rm --no-deps canon python -m canon.eval.chunking --chunk-tokens 14 --overlap-tokens 0 --write-report
+
+evidence-committee:
+	docker compose run --rm --no-deps canon python -m canon.eval.committee --mode social_public_opinion_demo_corpus --policies balanced,rag --top-k 3
+
+document-type-slices: ingest-unstructured-demo
+	docker compose run --rm --no-deps canon python -m canon.corpus.build --corpus-id unstructured_demo_corpus --from-modes unstructured_demo --corpus-only
+	docker compose run --rm --no-deps canon python -m canon.eval.document_type_slices --mode unstructured_demo_corpus --policies lexical,balanced,rag
+
+domain-slices: ingest-mixed-domain-demo
+	docker compose run --rm --no-deps canon python -m canon.corpus.build --corpus-id mixed_domain_demo_corpus --from-modes mixed_domain_demo --corpus-only
+	docker compose run --rm --no-deps canon python -m canon.eval.domain_slices --mode mixed_domain_demo_corpus --policies lexical,balanced,rag
+
+social-public-opinion-analysis:
+	docker compose run --rm --no-deps canon python -m canon.eval.public_opinion --mode social_public_opinion_demo_corpus
+
+social-public-opinion-demo: ingest-social-public-opinion-demo
+	docker compose run --rm --no-deps canon python -m canon.corpus.build --corpus-id social_public_opinion_demo_corpus --from-modes social_public_opinion_demo --corpus-only
+	docker compose run --rm --no-deps canon python -m canon.reports.data_card --mode social_public_opinion_demo_corpus
+	docker compose run --rm --no-deps canon python -m canon.eval.document_type_slices --mode social_public_opinion_demo_corpus --policies lexical,balanced,rag
+	docker compose run --rm --no-deps canon python -m canon.eval.domain_slices --mode social_public_opinion_demo_corpus --policies lexical,balanced,rag
+	docker compose run --rm --no-deps canon python -m canon.eval.public_opinion --mode social_public_opinion_demo_corpus
+	docker compose run --rm --no-deps canon python -m canon.eval.committee --mode social_public_opinion_demo_corpus --policies balanced,rag --top-k 3
+
+public-opinion-synthesis-smoke: social-public-opinion-demo
+	docker compose run --rm --no-deps canon python -m canon.synthesis.answer "public opinion battery storage safety concerns" --mode social_public_opinion_demo_corpus --policy rag --top-k 3
+
+unstructured-readiness: mixed-unstructured document-type-slices domain-slices
+	docker compose run --rm --no-deps canon python -m canon.reports.data_card --mode unstructured_demo_corpus
+	docker compose run --rm --no-deps canon python -m canon.reports.data_card --mode mixed_domain_demo_corpus
+	docker compose run --rm --no-deps canon python -m canon.eval.unstructured_readiness --document-type-mode unstructured_demo_corpus --domain-mode mixed_domain_demo_corpus
+
+unstructured-coverage-matrix: unstructured-readiness social-public-opinion-demo evaluation-anchors
+	docker compose run --rm --no-deps canon python -m canon.eval.unstructured_matrix
+
+unstructured-portfolio: unstructured-readiness unstructured-coverage-matrix social-public-opinion-demo public-opinion-synthesis-smoke chunking-eval adversarial-rag-security adversarial-corroboration evaluation-anchors importance-phase-gate
+	docker compose run --rm --no-deps canon python -m canon.reports.unstructured_portfolio
 
 workbench:
 	docker compose run --rm --no-deps canon python -m canon.workbench.build --mode live
@@ -120,6 +195,52 @@ paired-significance:
 faithfulness:
 	docker compose run --rm --no-deps canon python -m canon.eval.faithfulness --mode social_science_ir_v1_harvest10 --query-limit 5
 
+label-tasks:
+	docker compose run --rm --no-deps canon python -m canon.labeling.tasks --mode social_science_ir_v1_harvest10 --policies lexical,balanced,semantic,rag
+
+label-calibration: label-tasks
+	docker compose run --rm --no-deps canon python -m canon.labeling.calibration --mode social_science_ir_v1_harvest10
+
+technical-calibration:
+	docker compose run --rm --no-deps canon python -m canon.eval.technical_calibration --mode social_science_ir_v1_harvest10 --policies lexical,balanced,semantic,rag
+
+calibration-model:
+	docker compose run --rm --no-deps canon python -m canon.modeling.calibration_model --mode social_science_ir_v1_harvest10 --source technical --policies lexical,balanced,semantic,rag
+
+preference-model:
+	docker compose run --rm --no-deps canon python -m canon.modeling.preference_model --mode social_science_ir_v1_harvest10 --source technical --policies lexical,balanced,semantic,rag
+
+hard-negative-anchors:
+	docker compose run --rm --no-deps canon python -m canon.eval.hard_negatives --write-report
+
+preference-model-anchors: hard-negative-anchors
+	docker compose run --rm --no-deps canon python -m canon.modeling.preference_model --mode hard_negative_anchor_preferences_v1 --source anchors
+
+mixed-unstructured:
+	docker compose run --rm --no-deps canon python -m canon.eval.unstructured --write-report
+
+adversarial-corroboration:
+	docker compose run --rm --no-deps canon python -m canon.eval.corroboration --write-report
+
+adversarial-rag-security:
+	docker compose run --rm --no-deps canon python -m canon.eval.security --write-report
+
+evaluation-anchors:
+	docker compose run --rm --no-deps canon python -m canon.eval.anchors --write-report
+
+contract-validate: adversarial-corroboration adversarial-rag-security evaluation-anchors unstructured-readiness unstructured-portfolio
+	docker compose run --rm --no-deps canon python -m canon.eval.contracts /app/reports/adversarial_corroboration_v1.json --type adversarial_corroboration
+	docker compose run --rm --no-deps canon python -m canon.eval.contracts /app/reports/adversarial_rag_security_v1.json --type adversarial_rag_security
+	docker compose run --rm --no-deps canon python -m canon.eval.contracts /app/reports/evaluation_anchor_registry_v1.json --type evaluation_anchors
+	docker compose run --rm --no-deps canon python -m canon.eval.contracts /app/reports/document_type_slices_unstructured_demo_corpus.json --type document_type_slices
+	docker compose run --rm --no-deps canon python -m canon.eval.contracts /app/reports/domain_slices_mixed_domain_demo_corpus.json --type domain_slices
+	docker compose run --rm --no-deps canon python -m canon.eval.contracts /app/reports/heterogeneous_unstructured_readiness_unstructured_demo_corpus_mixed_domain_demo_corpus.json --type heterogeneous_unstructured_readiness
+	docker compose run --rm --no-deps canon python -m canon.eval.contracts /app/reports/unstructured_experiment_coverage_matrix_v1.json --type unstructured_coverage_matrix
+	docker compose run --rm --no-deps canon python -m canon.eval.contracts /app/reports/unstructured_experiment_portfolio_v1.json --type unstructured_experiment_portfolio
+
+importance-phase-gate:
+	docker compose run --rm --no-deps canon python -m canon.eval.phase_gate --write-report
+
 perturbations:
 	docker compose run --rm --no-deps canon python -m canon.eval.perturbations --mode social_science_ir_v1_harvest10 --query-limit 8
 
@@ -153,4 +274,4 @@ manifest:
 scientific-audit:
 	docker compose run --rm --no-deps canon python -m canon.reports.scientific_audit --mode social_science_ir_v1_harvest10
 
-full-eval: eval-pipeline eval-batches-large eval-slices eval-probes qrels-validate public-qrels-validate external-ir bootstrap-ir paired-significance faithfulness perturbations data-card provider-compare pgvector-plan grobid-plan tune-weights dashboard claim-decision product-readiness regression-gate manifest scientific-audit
+full-eval: eval-pipeline eval-batches-large eval-slices eval-probes qrels-validate public-qrels-validate external-ir bootstrap-ir paired-significance faithfulness label-calibration technical-calibration calibration-model preference-model preference-model-anchors mixed-unstructured document-type-slices domain-slices unstructured-readiness unstructured-coverage-matrix unstructured-portfolio adversarial-corroboration adversarial-rag-security evaluation-anchors contract-validate importance-phase-gate perturbations data-card provider-compare pgvector-plan grobid-plan tune-weights dashboard claim-decision product-readiness regression-gate manifest scientific-audit

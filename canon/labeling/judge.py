@@ -23,6 +23,15 @@ def judge_task(task: dict) -> dict:
     if metrics["conflict_note_count"] >= 1:
         score += 0.25
         reasons.append("surfaces_conflict_notes")
+    extra_score = 0.0
+    if metrics.get("distinct_sources", 0) >= 2:
+        extra_score += 0.1
+        reasons.append("has_source_diversity")
+    average_components = metrics.get("average_components") or task.get("average_components") or {}
+    if float(average_components.get("source_quality", 0.0) or 0.0) >= 0.45:
+        extra_score += 0.1
+        reasons.append("moderate_source_trust_proxy")
+    score = min(1.0, score + extra_score)
     return {
         "task_id": task["id"],
         "policy": task["policy"],

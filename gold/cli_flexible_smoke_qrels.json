@@ -1,0 +1,31 @@
+{
+  "benchmark_id": "cli_flexible_smoke_qrels",
+  "benchmark_kind": "local_smoke_qrels",
+  "description": "Small labeled smoke set for flexible ingest and semantic model evaluation.",
+  "queries": [
+    {
+      "id": "own-docs-ingest",
+      "query": "How do I ingest my own documents?",
+      "relevant": {
+        "chunk:36c8b7ef2f4488b2": 2,
+        "chunk:945ea4b0d7572f62": 3
+      }
+    },
+    {
+      "id": "query-lingo",
+      "query": "How do I test query lingo and wording sensitivity?",
+      "relevant": {
+        "chunk:a26cc28d1ad6b74b": 3,
+        "chunk:bb4f430eff0d631e": 2
+      }
+    },
+    {
+      "id": "pilot-pass-criteria",
+      "query": "What are the pass criteria for a personal corpus pilot?",
+      "relevant": {
+        "chunk:6536c5328276e2d4": 3,
+        "chunk:bb4f430eff0d631e": 2
+      }
+    }
+  ]
+}

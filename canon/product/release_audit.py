@@ -1,0 +1,262 @@
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any
+
+from canon.config import load_settings
+from canon.product import report_io
+from canon.product import service
+
+
+def build_release_audit(mode: str = service.DEFAULT_MODE, write_report: bool = True) -> dict[str, Any]:
+    settings = load_settings()
+    reports_dir = settings.reports_dir
+    source_reports = {
+        "product_smoke": {
+            "path": reports_dir / f"product_smoke_{mode}.json",
+            "expected_report_id": "product_smoke_v1",
+            "expected_mode": mode,
+        },
+        "product_readiness": {
+            "path": reports_dir / f"product_readiness_{mode}.json",
+            "expected_report_id": None,
+            "expected_mode": mode,
+        },
+        "human_review_status": {
+            "path": reports_dir / "human_review_status_v1.json",
+            "expected_report_id": "human_review_status_v1",
+            "expected_mode": mode,
+        },
+        "industry_pilot": {
+            "path": reports_dir / "industry_pilot_acceptance_v1.json",
+            "expected_report_id": "industry_pilot_acceptance_v1",
+            "expected_mode": mode,
+        },
+    }
+    smoke = load_json(source_reports["product_smoke"]["path"])
+    readiness = load_json(source_reports["product_readiness"]["path"])
+    review_status = load_json(source_reports["human_review_status"]["path"])
+    industry_pilot = load_json(source_reports["industry_pilot"]["path"])
+    integrity = source_report_integrity(source_reports, {
+        "product_smoke": smoke,
+        "product_readiness": readiness,
+        "human_review_status": review_status,
+        "industry_pilot": industry_pilot,
+    })
+    components = [
+        component(
+            "source_report_integrity",
+            not integrity,
+            "pass" if not integrity else "fail",
+            {"errors": integrity},
+        ),
+        component("product_smoke", smoke.get("status") == "pass", smoke.get("status")),
+        component("product_readiness", readiness.get("status") == "pass", readiness.get("status")),
+        component(
+            "human_review_status",
+            human_review_status_passes(review_status),
+            review_status.get("status"),
+            {
+                "reviewed_question_count": review_status.get("reviewed_question_count", 0),
+                "minimum_question_count": review_status.get("minimum_question_count", 30),
+                "missing_field_count": review_status.get("missing_field_count", 0),
+                "validation_error_count": review_status.get("validation_error_count", 0),
+            },
+        ),
+        component(
+            "industry_pilot",
+            industry_pilot.get("status") == "pass",
+            industry_pilot.get("status"),
+            {
+                "release_blockers": industry_pilot.get("release_blockers", []),
+                "reviewed_question_count": industry_pilot.get("reviewed_question_count", 0),
+                "minimum_question_count": industry_pilot.get("minimum_question_count", 30),
+            },
+        ),
+    ]
+    report = {
+        "report_id": "product_release_audit_v1",
+        "mode": mode,
+        "status": "pass" if all(item["passed"] for item in components) else "blocked",
+        "claim": release_claim(components),
+        "components": components,
+        "next_required_action": next_required_action(components),
+        "source_reports": {
+            key: str(value["path"].relative_to(reports_dir.parent))
+            for key, value in source_reports.items()
+        },
+    }
+    if write_report:
+        write_json(reports_dir / f"product_release_audit_{mode}.json", report)
+        write_markdown(reports_dir / f"product_release_audit_{mode}.md", render_markdown(report))
+    return report
+
+
+def component(
+    identifier: str,
+    passed: bool,
+    observed_status: Any,
+    details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "id": identifier,
+        "passed": bool(passed),
+        "observed_status": observed_status or "missing",
+        "details": details or {},
+    }
+
+
+def source_report_integrity(
+    source_reports: dict[str, dict[str, Any]],
+    payloads: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    errors = []
+    for identifier, spec in source_reports.items():
+        path = spec["path"]
+        payload = payloads.get(identifier) or {}
+        if not path.exists():
+            errors.append(
+                {
+                    "source": identifier,
+                    "field": "path",
+                    "message": "source report is missing",
+                    "value": str(path),
+                }
+            )
+            continue
+        if payload.get("_load_error"):
+            errors.append(
+                {
+                    "source": identifier,
+                    "field": "json",
+                    "message": "source report could not be parsed",
+                    "value": payload.get("_load_error"),
+                }
+            )
+            continue
+        expected_report_id = spec.get("expected_report_id")
+        if expected_report_id and payload.get("report_id") != expected_report_id:
+            errors.append(
+                {
+                    "source": identifier,
+                    "field": "report_id",
+                    "message": f"expected {expected_report_id}",
+                    "value": payload.get("report_id"),
+                }
+            )
+        expected_mode = spec.get("expected_mode")
+        if expected_mode and payload.get("mode") != expected_mode:
+            errors.append(
+                {
+                    "source": identifier,
+                    "field": "mode",
+                    "message": f"expected {expected_mode}",
+                    "value": payload.get("mode"),
+                }
+            )
+    return errors
+
+
+def human_review_status_passes(report: dict[str, Any]) -> bool:
+    reviewed = int(report.get("reviewed_question_count") or 0)
+    minimum = int(report.get("minimum_question_count") or 30)
+    missing = int(report.get("missing_field_count") or 0)
+    validation_errors = int(report.get("validation_error_count") or 0)
+    return (
+        report.get("status") == "complete"
+        and reviewed >= minimum
+        and missing == 0
+        and validation_errors == 0
+    )
+
+
+def release_claim(components: list[dict[str, Any]]) -> str:
+    if not next(item for item in components if item["id"] == "source_report_integrity")["passed"]:
+        return "Product release is not ready: source reports are missing or inconsistent."
+    if all(item["passed"] for item in components):
+        return "Industry pilot complete: automated gates and human-reviewed acceptance criteria passed."
+    automated = {
+        item["id"]: item["passed"]
+        for item in components
+        if item["id"] in {"product_smoke", "product_readiness"}
+    }
+    if all(automated.values()):
+        return "Automated product gates pass; industry pilot remains blocked on human-reviewed acceptance evidence."
+    return "Product release is not ready: automated gates are incomplete or failing."
+
+
+def next_required_action(components: list[dict[str, Any]]) -> str:
+    by_id = {item["id"]: item for item in components}
+    if not by_id.get("source_report_integrity", {}).get("passed"):
+        return "Regenerate missing or inconsistent source reports before auditing release readiness."
+    if not by_id.get("product_smoke", {}).get("passed"):
+        return "Run and fix python -m canon.product.smoke."
+    if not by_id.get("product_readiness", {}).get("passed"):
+        return "Run and fix python -m canon.product.readiness."
+    if not by_id.get("human_review_status", {}).get("passed"):
+        details = by_id["human_review_status"]["details"]
+        return (
+            "Complete human review labels for "
+            f"{details.get('minimum_question_count', 30) - details.get('reviewed_question_count', 0)} "
+            "remaining acceptance questions."
+        )
+    if not by_id.get("industry_pilot", {}).get("passed"):
+        blockers = by_id["industry_pilot"]["details"].get("release_blockers", [])
+        return f"Resolve industry pilot release blockers: {', '.join(blockers)}."
+    return "No required action remains."
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return {"_load_error": str(exc)}
+
+
+def render_markdown(report: dict[str, Any]) -> str:
+    components = "\n".join(
+        f"- {'PASS' if item['passed'] else 'BLOCKED'}: `{item['id']}` observed={item['observed_status']}"
+        for item in report["components"]
+    )
+    sources = "\n".join(f"- `{key}`: `{value}`" for key, value in report["source_reports"].items())
+    return f"""# CANON Product Release Audit
+
+Status: **{report['status']}**
+
+Mode: `{report['mode']}`
+
+Claim: {report['claim']}
+
+Next required action: {report['next_required_action']}
+
+## Components
+
+{components}
+
+## Source Reports
+
+{sources}
+"""
+
+
+def write_json(path: Path, payload: object) -> None:
+    report_io.write_json(path, payload)
+
+
+def write_markdown(path: Path, text: str) -> None:
+    report_io.write_markdown(path, text)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Build CANON product release audit.")
+    parser.add_argument("--mode", default=service.DEFAULT_MODE)
+    args = parser.parse_args()
+    print(json.dumps(build_release_audit(args.mode), indent=2))
+
+
+if __name__ == "__main__":
+    main()

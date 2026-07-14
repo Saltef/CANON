@@ -34,4 +34,4 @@ class Chunk:
     text: str
     token_start: int
     token_end: int
-    importance: dict[str, float]
+    importance: dict[str, Any]
