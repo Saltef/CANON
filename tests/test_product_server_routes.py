@@ -17,6 +17,7 @@ class ProductServerRouteTests(unittest.TestCase):
         self.assertIn("/v1/routes", payload["get"])
         self.assertGreater(payload["route_count"], 0)
         self.assertIn("/v1/evidence-packets", payload["post"])
+        self.assertIn("/v1/frame-coverage", payload["post"])
         self.assertIn("/v1/intelligence-brief", payload["post"])
         self.assertIn("/v1/intelligence-brief/evaluate", payload["post"])
         self.assertIn("/v1/alert-digest", payload["post"])
@@ -47,6 +48,8 @@ class ProductServerRouteTests(unittest.TestCase):
         self.assertIn("human_review_boundary", payload)
         paths = {route["path"]: route for route in payload["routes"]}
         self.assertEqual(paths["/v1/flagship-handoff"]["method"], "POST")
+        self.assertEqual(paths["/v1/frame-coverage"]["method"], "POST")
+        self.assertIn("research_frame", paths["/v1/frame-coverage"]["required"])
         self.assertIn("mode", paths["/v1/flagship-handoff"]["optional"])
         self.assertEqual(paths["/v1/intelligence-review/import-csv"]["example"]["csv_path"], "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv")
 
@@ -66,6 +69,7 @@ class ProductServerRouteTests(unittest.TestCase):
             "/v1/corpora/build": ("corpus_build", {"corpus": {"corpus_id": "c"}}),
             "/v1/model-evaluation": ("model_evaluation", {"report_id": "semantic_model_evaluation_v1"}),
             "/v1/evidence-packets": ("evidence_packets", {"status": "complete"}),
+            "/v1/frame-coverage": ("frame_coverage_report", {"status": "coverage_gap_human_review_required"}),
             "/v1/intelligence-brief": ("intelligence_brief", {"status": "ready_for_human_review"}),
             "/v1/intelligence-brief/evaluate": ("intelligence_brief_evaluation", {"status": "pass"}),
             "/v1/alert-digest": ("alert_digest", {"status": "ready_for_human_review"}),

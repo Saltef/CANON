@@ -17,6 +17,7 @@ class ProductReadinessTests(unittest.TestCase):
         self.assertEqual(report["status"], "pass")
         self.assertIn("POST /v1/answer", report["endpoints"])
         self.assertIn("POST /v1/evidence-packets", report["endpoints"])
+        self.assertIn("POST /v1/frame-coverage", report["endpoints"])
         self.assertIn("POST /v1/query-diagnostics", report["endpoints"])
         self.assertIn("POST /v1/intelligence-brief", report["endpoints"])
         self.assertIn("POST /v1/alert-digest", report["endpoints"])
@@ -25,6 +26,7 @@ class ProductReadinessTests(unittest.TestCase):
         self.assertGreater(report["route_metadata"]["route_count"], 0)
         self.assertTrue(report["route_metadata"]["human_review_boundary"])
         self.assertIn("evidence_packets_endpoint_documented", [check["id"] for check in report["checks"]])
+        self.assertIn("frame_coverage_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("routes_metadata_examples_present", [check["id"] for check in report["checks"]])
         self.assertIn("product_smoke_passed", [check["id"] for check in report["checks"]])
 
@@ -48,6 +50,7 @@ class ProductReadinessTests(unittest.TestCase):
     def test_release_console_scripts_are_registered(self):
         pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
         scripts = pyproject["project"]["scripts"]
+        self.assertEqual(scripts["canon-frame-coverage"], "canon.product.frame_coverage:main")
         self.assertEqual(scripts["canon-readiness"], "canon.product.readiness:main")
         self.assertEqual(scripts["canon-release-audit"], "canon.product.release_audit:main")
         self.assertEqual(scripts["canon-product-final-check"], "canon.product.final_check:main")

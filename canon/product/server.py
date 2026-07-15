@@ -53,6 +53,8 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.answer(payload))
             elif parsed.path == "/v1/evidence-packets":
                 self.send_json(service.evidence_packets(payload))
+            elif parsed.path == "/v1/frame-coverage":
+                self.send_json(service.frame_coverage_report(payload))
             elif parsed.path == "/v1/intelligence-brief":
                 self.send_json(service.intelligence_brief(payload))
             elif parsed.path == "/v1/intelligence-brief/evaluate":
@@ -151,6 +153,7 @@ def api_index() -> dict:
         "post": [
             "/v1/answer",
             "/v1/evidence-packets",
+            "/v1/frame-coverage",
             "/v1/intelligence-brief",
             "/v1/intelligence-brief/evaluate",
             "/v1/alert-digest",
@@ -223,6 +226,23 @@ def api_routes() -> dict:
                     "question": "What does the corpus say about grid risk?",
                     "mode": "my_topic_v1_corpus",
                     "evidence_requirements": {"top_k": 10},
+                },
+            ),
+            route(
+                "POST",
+                "/v1/frame-coverage",
+                "Run a focused research-frame coverage diagnostic over retrieved evidence.",
+                ["query or question", "research_frame"],
+                ["mode", "policy", "project_id", "evidence_requirements", "top_k", "write_report"],
+                {
+                    "question": "What does the corpus say about grid risk?",
+                    "mode": "my_topic_v1_corpus",
+                    "research_frame": {
+                        "subdomains": ["energy", "water"],
+                        "regions": ["Latin America"],
+                        "languages": ["English", "Spanish"],
+                    },
+                    "evidence_requirements": {"top_k": 10, "minimum_source_types": ["official", "local_media"]},
                 },
             ),
             route(

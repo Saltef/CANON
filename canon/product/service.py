@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,7 @@ from canon.config import load_settings
 from canon.corpus.build import run_phase16
 from canon.eval.model_evaluation import evaluate_semantic_models, parse_providers
 from canon.eval.diversity import run_diversity_audit
+from canon.product import report_io
 from canon.eval.source_diversity import (
     DEFAULT_MAX_DOMINANT_SOURCE_SHARE,
     DEFAULT_MIN_CLUSTER_COUNT,
@@ -174,6 +176,71 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
             "support_assessment": support,
         },
     }
+
+
+def frame_coverage_report(payload: dict[str, Any]) -> dict:
+    packet_response = evidence_packets(payload)
+    question = packet_response.get("query", "")
+    frame_coverage = packet_response.get("frame_coverage", {})
+    status = frame_coverage_status(frame_coverage)
+    report = {
+        "report_id": "research_frame_coverage_v1",
+        "status": status,
+        "request_id": packet_response.get("request_id", ""),
+        "project_id": packet_response.get("project_id", ""),
+        "question": question,
+        "mode": packet_response.get("mode", ""),
+        "policy": packet_response.get("policy", ""),
+        "research_frame": packet_response.get("research_frame", {}),
+        "frame_coverage": frame_coverage,
+        "coverage_gaps": packet_response.get("coverage_gaps", []),
+        "query_diagnostics": packet_response.get("query_diagnostics", {}),
+        "retrieval_metrics": packet_response.get("retrieval_metrics", {}),
+        "human_review_required": True,
+        "human_review_boundary": (
+            "Frame coverage is inferred from retrieved evidence and query diagnostics. "
+            "It is useful for gap-finding, but it is not proof that all relevant evidence was found."
+        ),
+        "next_actions": frame_coverage_next_actions(frame_coverage, packet_response.get("coverage_gaps", [])),
+    }
+    if optional_bool(payload.get("write_report"), default=True):
+        settings = load_settings()
+        output = settings.reports_dir / f"frame_coverage_{safe_report_slug(report['mode'])}_{safe_report_slug(question)}.json"
+        report_io.write_json(output, report)
+        report["output_path"] = str(output).replace("\\", "/")
+    return report
+
+
+def frame_coverage_status(frame_coverage: dict[str, Any]) -> str:
+    status = frame_coverage.get("status")
+    if status == "pass":
+        return "pass_human_review_required"
+    if status in {"partial", "missing"}:
+        return "coverage_gap_human_review_required"
+    if status == "not_requested":
+        return "not_requested"
+    return "needs_review"
+
+
+def frame_coverage_next_actions(
+    frame_coverage: dict[str, Any],
+    gaps: list[dict[str, Any]],
+) -> list[str]:
+    actions = [
+        gap.get("suggested_next_query")
+        for gap in gaps
+        if gap.get("suggested_next_query")
+    ]
+    if not actions:
+        for row in frame_coverage.get("diagnostics", []):
+            if row.get("suggested_next_query"):
+                actions.append(row["suggested_next_query"])
+    return actions[:5] or ["Review frame coverage and evidence citations before treating the result as complete."]
+
+
+def safe_report_slug(text: Any, limit: int = 72) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", str(text or "").lower()).strip("-")
+    return slug[:limit].strip("-") or "report"
 
 
 def intelligence_brief(payload: dict[str, Any]) -> dict:

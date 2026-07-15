@@ -104,6 +104,16 @@ Ask for evidence:
 Invoke-RestMethod -Method Post http://localhost:8000/v1/evidence-packets -ContentType "application/json" -Body '{"request_id":"req_001","project_id":"my_project","question":"What does this corpus say about grid risk?","mode":"my_topic_v1_corpus","evidence_requirements":{"top_k":10,"include_conflicts":true,"include_source_diversity":true,"include_query_diagnostics":true}}'
 ```
 
+Check whether retrieved evidence visibly covers the frame you asked for:
+
+```powershell
+python -m canon.product.frame_coverage "What does this corpus say about grid risk?" --mode my_topic_v1_corpus --top-k 10
+Invoke-RestMethod -Method Post http://localhost:8000/v1/frame-coverage -ContentType "application/json" -Body '{"question":"What does this corpus say about grid risk?","mode":"my_topic_v1_corpus","research_frame":{"subdomains":["energy","water"],"regions":["Latin America"],"languages":["English","Spanish"]},"evidence_requirements":{"top_k":10,"minimum_source_types":["official","local_media"]}}'
+```
+
+Frame coverage is diagnostic. It highlights missing dimensions and follow-up
+queries, but human review is still required before treating coverage as complete.
+
 For the intended Drive-first workflow, use the private corpus as the first
 evidence source, then allow external expansion only when you want corroboration,
 freshness checks, or gap filling. See [drive_first_rag.md](drive_first_rag.md).

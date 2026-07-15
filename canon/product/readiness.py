@@ -24,6 +24,7 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
         check("routes_metadata_examples_present", all_post_routes_have_examples(route_metadata)),
         check("query_diagnostics_endpoint_documented", "POST /v1/query-diagnostics" in available_endpoints),
         check("evidence_packets_endpoint_documented", "POST /v1/evidence-packets" in available_endpoints),
+        check("frame_coverage_endpoint_documented", "POST /v1/frame-coverage" in available_endpoints),
         check("intelligence_brief_endpoint_documented", "POST /v1/intelligence-brief" in available_endpoints),
         check("alert_digest_endpoint_documented", "POST /v1/alert-digest" in available_endpoints),
         check("flagship_handoff_endpoint_documented", "POST /v1/flagship-handoff" in available_endpoints),

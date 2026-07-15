@@ -149,6 +149,39 @@ class ProductServiceTests(unittest.TestCase):
         self.assertIn("official", report["coverage"]["source_types"]["missing"])
         self.assertTrue(any(row["field"] == "query_terms" for row in report["diagnostics"]))
 
+    def test_frame_coverage_report_focuses_packet_output(self):
+        with patch("canon.product.service.evidence_packets") as packets:
+            packets.return_value = {
+                "request_id": "req_1",
+                "project_id": "ai_infra_geo_risk",
+                "query": "AI data center grid risk",
+                "mode": "m",
+                "policy": "rag",
+                "research_frame": {"subdomains": ["energy"]},
+                "frame_coverage": {
+                    "status": "partial",
+                    "diagnostics": [
+                        {
+                            "field": "regions",
+                            "status": "missing",
+                            "suggested_next_query": "Chile Brazil",
+                        }
+                    ],
+                },
+                "coverage_gaps": [{"gap": "Missing regions.", "suggested_next_query": "Chile Brazil"}],
+                "query_diagnostics": {"weak_terms": ["grid"]},
+                "retrieval_metrics": {"estimated_confidence": "medium"},
+            }
+
+            report = service.frame_coverage_report({"query": "AI data center grid risk", "write_report": "false"})
+
+        self.assertEqual(report["report_id"], "research_frame_coverage_v1")
+        self.assertEqual(report["status"], "coverage_gap_human_review_required")
+        self.assertTrue(report["human_review_required"])
+        self.assertEqual(report["next_actions"], ["Chile Brazil"])
+        self.assertIn("human_review_boundary", report)
+        packets.assert_called_once()
+
     def test_packet_evidence_item_exposes_metadata_for_downstream_agents(self):
         item = service.packet_evidence_item(
             {
