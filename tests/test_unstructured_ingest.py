@@ -69,6 +69,32 @@ class UnstructuredIngestTests(unittest.TestCase):
         works = json.loads(works_path.read_text(encoding="utf-8"))
         self.assertEqual(works[0]["raw"]["document_type"], "regulatory_filing")
 
+    def test_ai_infra_geo_risk_fixture_has_mvp_coverage_metadata(self):
+        settings = load_settings()
+        mode = "unit_ai_infra_geo_risk"
+        report = ingest_unstructured_jsonl(
+            settings.fixtures_dir / "ai_infra_geo_risk_sample.jsonl",
+            mode=mode,
+            chunk_tokens=32,
+            overlap_tokens=4,
+        )
+
+        self.assertEqual(report["work_count"], 5)
+        profile = report["document_type_profile"]
+        self.assertIn("news_article", profile["document_type_counts"])
+        self.assertIn("policy_report", profile["document_type_counts"])
+        self.assertIn("transcript", profile["document_type_counts"])
+        works_path = settings.data_dir / "processed" / f"works_{mode}.json"
+        works = json.loads(works_path.read_text(encoding="utf-8"))
+        languages = {work["language"] for work in works}
+        domains = {(work.get("raw") or {}).get("domain") for work in works}
+        raw_types = {(work.get("raw") or {}).get("document_type") for work in works}
+        self.assertGreaterEqual(len(languages), 3)
+        self.assertEqual(domains, {"ai_infra_geo_risk"})
+        self.assertIn("official_report", raw_types)
+        self.assertIn("local_media", raw_types)
+        self.assertIn("company_announcement", raw_types)
+
 
 if __name__ == "__main__":
     unittest.main()

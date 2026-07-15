@@ -117,6 +117,64 @@ class ProductServiceTests(unittest.TestCase):
         self.assertEqual(packet["conflicting_evidence"][0]["id"], "conflict:1")
         self.assertEqual(report["query_diagnostics"]["weak_terms"], ["permitting"])
         self.assertEqual(report["retrieval_metrics"]["source_diversity_status"], "pass")
+        self.assertTrue(report["frame_coverage"]["human_review_required"])
+
+    def test_frame_coverage_reports_requested_missing_dimensions(self):
+        report = service.analyze_frame_coverage(
+            research_frame={
+                "subdomains": ["water and cooling", "sovereign AI"],
+                "regions": ["Brazil", "Chile"],
+                "languages": ["English", "Portuguese"],
+                "representation_goals": ["language diversity"],
+            },
+            requirements={"minimum_source_types": ["official", "local_media"]},
+            evidence=[
+                {
+                    "title": "Brazil data center water risk",
+                    "preview": "Water and cooling concerns and local opposition around a data center.",
+                    "source_name": "Local News",
+                    "source_type": "local_media",
+                    "language": "pt",
+                    "jurisdiction": "Brazil",
+                }
+            ],
+            diagnostics={"query_to_corpus": {"weak_terms": ["sovereign"]}},
+        )
+
+        self.assertEqual(report["status"], "partial")
+        self.assertIn("water and cooling", report["coverage"]["subdomains"]["covered"])
+        self.assertIn("sovereign AI", report["coverage"]["subdomains"]["missing"])
+        self.assertIn("Chile", report["coverage"]["regions"]["missing"])
+        self.assertIn("English", report["coverage"]["languages"]["missing"])
+        self.assertIn("official", report["coverage"]["source_types"]["missing"])
+        self.assertTrue(any(row["field"] == "query_terms" for row in report["diagnostics"]))
+
+    def test_packet_evidence_item_exposes_metadata_for_downstream_agents(self):
+        item = service.packet_evidence_item(
+            {
+                "citation_id": "C1",
+                "chunk_id": "chunk:1",
+                "work_id": "doc:1",
+                "title": "Title",
+                "source_name": "Regulator",
+                "url": "https://example.test",
+                "year": 2026,
+                "rank": 1,
+                "cluster_id": "energy",
+                "preview": "Text",
+                "language": "en",
+                "source_type": "official_report",
+                "provenance": "official",
+                "domain": "ai_infra_geo_risk",
+                "jurisdiction": "Chile",
+            }
+        )
+
+        self.assertEqual(item["language"], "en")
+        self.assertEqual(item["source_type"], "official_report")
+        self.assertEqual(item["provenance"], "official")
+        self.assertEqual(item["domain"], "ai_infra_geo_risk")
+        self.assertEqual(item["jurisdiction"], "Chile")
 
     def test_evidence_packets_rejects_non_object_requirements(self):
         with self.assertRaises(service.ProductError):

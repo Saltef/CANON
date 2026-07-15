@@ -1,0 +1,32 @@
+[
+  {
+    "id": "ai_infra_geo_risk_q1",
+    "query": "What are the emerging geopolitical risks around AI data center expansion in Latin America?",
+    "type": "regional_risk_report",
+    "human_review_status": "seed_unreviewed"
+  },
+  {
+    "id": "ai_infra_geo_risk_q2",
+    "query": "How could data center water and cooling needs affect local opposition in Brazil?",
+    "type": "water_cooling_local_opposition",
+    "human_review_status": "seed_unreviewed"
+  },
+  {
+    "id": "ai_infra_geo_risk_q3",
+    "query": "What evidence links sovereign AI policy to cloud dependency in Latin America?",
+    "type": "cloud_dependency_sovereign_ai",
+    "human_review_status": "seed_unreviewed"
+  },
+  {
+    "id": "ai_infra_geo_risk_q4",
+    "query": "Which sources discuss grid bottlenecks from AI cloud regions in Chile?",
+    "type": "energy_grid_bottlenecks",
+    "human_review_status": "seed_unreviewed"
+  },
+  {
+    "id": "ai_infra_geo_risk_q5",
+    "query": "Is there representative polling on public opinion about AI data centers in Mexico?",
+    "type": "public_opinion_caveat",
+    "human_review_status": "seed_unreviewed"
+  }
+]

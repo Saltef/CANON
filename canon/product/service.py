@@ -111,27 +111,34 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
     top_k = top_k or optional_int(payload.get("top_k"))
     freedom_level = optional_freedom_level(payload.get("freedom_level"))
     report = synthesize(query=query, policy=policy, mode=mode, top_k=top_k)
+    evidence = enrich_evidence_metadata(report.get("evidence") or [], mode)
     diagnostics = build_query_diagnostics(
         query=query,
         mode=mode,
         top_k=top_k or report.get("top_k"),
         freedom_level=freedom_level,
     )
-    diversity = packet_source_diversity(query, report.get("evidence") or [], top_k or report.get("top_k") or 10)
+    diversity = packet_source_diversity(query, evidence, top_k or report.get("top_k") or 10)
+    frame_coverage = analyze_frame_coverage(
+        research_frame=research_frame,
+        requirements=requirements,
+        evidence=evidence,
+        diagnostics=diagnostics,
+    )
     support = report.get("support_assessment") or {}
     packet = {
         "packet_id": f"packet_{str(payload.get('request_id') or '001')}",
         "claim": packet_claim(query, support),
         "support_level": packet_support_level(support),
         "confidence": packet_confidence(support),
-        "evidence_role": "direct_support" if report.get("evidence") else "insufficient_evidence",
+        "evidence_role": "direct_support" if evidence else "insufficient_evidence",
         "issue_categories": infer_issue_categories(research_frame, query),
         "regions": optional_string_list(research_frame.get("regions"), "regions") or [],
         "languages": optional_string_list(research_frame.get("languages"), "languages") or [],
         "source_types": optional_string_list(requirements.get("minimum_source_types"), "minimum_source_types")
         if requirements
         else [],
-        "supporting_evidence": [packet_evidence_item(item) for item in report.get("evidence", [])],
+        "supporting_evidence": [packet_evidence_item(item) for item in evidence],
         "conflicting_evidence": report.get("conflict_notes", []),
         "limitations": report.get("limitations", []),
         "source_diversity": {
@@ -140,8 +147,9 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
             "dominant_source_share": diversity["dominant_source_share"],
             "warnings": diversity["warnings"],
         },
+        "frame_coverage": frame_coverage,
     }
-    gaps = coverage_gaps(diagnostics, diversity, report.get("limitations", []))
+    gaps = coverage_gaps(diagnostics, diversity, report.get("limitations", []), frame_coverage)
     return {
         "request_id": str(payload.get("request_id") or ""),
         "project_id": str(payload.get("project_id") or ""),
@@ -152,6 +160,7 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
         "research_frame": research_frame,
         "evidence_packets": [packet],
         "query_diagnostics": compact_packet_diagnostics(diagnostics),
+        "frame_coverage": frame_coverage,
         "coverage_gaps": gaps,
         "retrieval_metrics": {
             "estimated_confidence": packet["confidence"],
@@ -165,6 +174,36 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
             "support_assessment": support,
         },
     }
+
+
+def enrich_evidence_metadata(evidence: list[dict[str, Any]], mode: str) -> list[dict[str, Any]]:
+    work_metadata = load_work_metadata(mode)
+    enriched = []
+    for item in evidence:
+        work = work_metadata.get(str(item.get("work_id"))) or {}
+        raw = work.get("raw") or {}
+        next_item = dict(item)
+        next_item["language"] = work.get("language")
+        next_item["source_type"] = raw.get("source_type") or raw.get("document_type")
+        next_item["document_type"] = raw.get("document_type")
+        next_item["provenance"] = raw.get("provenance") or work.get("provenance")
+        next_item["domain"] = raw.get("domain") or work.get("domain")
+        next_item["jurisdiction"] = raw.get("jurisdiction")
+        next_item["url"] = work.get("landing_page_url") or work.get("pdf_url")
+        enriched.append(next_item)
+    return enriched
+
+
+def load_work_metadata(mode: str) -> dict[str, dict[str, Any]]:
+    settings = load_settings()
+    path = settings.data_dir / "processed" / f"works_{mode}.json"
+    if not path.exists():
+        return {}
+    try:
+        works = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return {str(work.get("id")): work for work in works if isinstance(work, dict)}
 
 
 def packet_source_diversity(query: str, evidence: list[dict[str, Any]], top_k: int) -> dict[str, Any]:
@@ -228,6 +267,11 @@ def packet_evidence_item(item: dict[str, Any]) -> dict[str, Any]:
         "citation": item.get("citation_id"),
         "rank": item.get("rank"),
         "cluster_id": item.get("cluster_id"),
+        "language": item.get("language"),
+        "source_type": item.get("source_type") or item.get("document_type"),
+        "provenance": item.get("provenance"),
+        "domain": item.get("domain"),
+        "jurisdiction": item.get("jurisdiction"),
         "claim": item.get("claim"),
     }
 
@@ -249,6 +293,7 @@ def coverage_gaps(
     diagnostics: dict[str, Any],
     diversity: dict[str, Any],
     limitations: list[str],
+    frame_coverage: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     gaps = []
     weak_terms = ((diagnostics.get("query_to_corpus") or {}).get("weak_terms") or [])[:5]
@@ -268,9 +313,204 @@ def coverage_gaps(
                 "suggested_next_query": "",
             }
         )
+    for diagnostic in (frame_coverage or {}).get("diagnostics", []):
+        if diagnostic.get("status") == "missing":
+            gaps.append(
+                {
+                    "gap": diagnostic["message"],
+                    "severity": diagnostic.get("severity", "medium"),
+                    "suggested_next_query": diagnostic.get("suggested_next_query", ""),
+                }
+            )
     for limitation in limitations[:3]:
         gaps.append({"gap": limitation, "severity": "low", "suggested_next_query": ""})
     return gaps
+
+
+def analyze_frame_coverage(
+    research_frame: dict[str, Any],
+    requirements: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    diagnostics: dict[str, Any],
+) -> dict[str, Any]:
+    expected = {
+        "subdomains": optional_string_list(research_frame.get("subdomains"), "subdomains") or [],
+        "regions": optional_string_list(research_frame.get("regions"), "regions") or [],
+        "languages": optional_string_list(research_frame.get("languages"), "languages") or [],
+        "source_types": optional_string_list(requirements.get("minimum_source_types"), "minimum_source_types") or [],
+        "representation_goals": optional_string_list(
+            research_frame.get("representation_goals"),
+            "representation_goals",
+        )
+        or [],
+    }
+    coverage = {
+        "subdomains": term_coverage(expected["subdomains"], evidence),
+        "regions": term_coverage(expected["regions"], evidence),
+        "languages": language_coverage(expected["languages"], evidence),
+        "source_types": source_type_coverage(expected["source_types"], evidence),
+        "representation_goals": representation_goal_coverage(expected["representation_goals"], evidence),
+    }
+    diagnostics_rows = frame_coverage_diagnostics(expected, coverage, diagnostics)
+    missing_count = sum(len(row["missing"]) for row in coverage.values())
+    covered_count = sum(len(row["covered"]) for row in coverage.values())
+    if not expected_total(expected):
+        status = "not_requested"
+    elif missing_count == 0:
+        status = "pass"
+    elif covered_count:
+        status = "partial"
+    else:
+        status = "missing"
+    return {
+        "status": status,
+        "expected": expected,
+        "coverage": coverage,
+        "diagnostics": diagnostics_rows,
+        "human_review_required": True,
+        "note": "Frame coverage is a diagnostic over retrieved evidence, not proof that the corpus contains all relevant evidence.",
+    }
+
+
+def expected_total(expected: dict[str, list[str]]) -> int:
+    return sum(len(values) for values in expected.values())
+
+
+def term_coverage(terms: list[str], evidence: list[dict[str, Any]]) -> dict[str, list[str]]:
+    text = evidence_text(evidence)
+    covered = [term for term in terms if normalized_term(term) in text]
+    return split_coverage(terms, covered)
+
+
+def language_coverage(languages: list[str], evidence: list[dict[str, Any]]) -> dict[str, list[str]]:
+    evidence_languages = {normalize_language(item.get("language")) for item in evidence if item.get("language")}
+    covered = [
+        language
+        for language in languages
+        if normalize_language(language) in evidence_languages or normalized_term(language) in evidence_text(evidence)
+    ]
+    return split_coverage(languages, covered)
+
+
+def source_type_coverage(source_types: list[str], evidence: list[dict[str, Any]]) -> dict[str, list[str]]:
+    text = " ".join(
+        normalized_term(value)
+        for item in evidence
+        for value in [
+            item.get("source_type"),
+            item.get("document_type"),
+            item.get("provenance"),
+            item.get("source_name"),
+        ]
+        if value
+    )
+    covered = [source_type for source_type in source_types if normalized_term(source_type) in text]
+    return split_coverage(source_types, covered)
+
+
+def representation_goal_coverage(goals: list[str], evidence: list[dict[str, Any]]) -> dict[str, list[str]]:
+    covered = []
+    for goal in goals:
+        normalized = normalized_term(goal)
+        if "language" in normalized and len({item.get("language") for item in evidence if item.get("language")}) >= 2:
+            covered.append(goal)
+        elif "source" in normalized and len({item.get("source_name") for item in evidence if item.get("source_name")}) >= 3:
+            covered.append(goal)
+        elif "region" in normalized and normalized in evidence_text(evidence):
+            covered.append(goal)
+        elif normalized in evidence_text(evidence):
+            covered.append(goal)
+    return split_coverage(goals, covered)
+
+
+def split_coverage(expected: list[str], covered: list[str]) -> dict[str, list[str]]:
+    covered_set = set(covered)
+    return {
+        "covered": covered,
+        "missing": [item for item in expected if item not in covered_set],
+    }
+
+
+def frame_coverage_diagnostics(
+    expected: dict[str, list[str]],
+    coverage: dict[str, dict[str, list[str]]],
+    diagnostics: dict[str, Any],
+) -> list[dict[str, Any]]:
+    rows = []
+    weak_terms = set((diagnostics.get("query_to_corpus") or {}).get("weak_terms") or [])
+    for field, values in expected.items():
+        if not values:
+            continue
+        missing = coverage[field]["missing"]
+        if missing:
+            rows.append(
+                {
+                    "field": field,
+                    "status": "missing",
+                    "severity": "medium",
+                    "message": f"Retrieved evidence did not visibly cover requested {field}: {', '.join(missing)}.",
+                    "suggested_next_query": " ".join(missing),
+                }
+            )
+        else:
+            rows.append(
+                {
+                    "field": field,
+                    "status": "covered",
+                    "severity": "info",
+                    "message": f"Retrieved evidence visibly covered requested {field}.",
+                    "suggested_next_query": "",
+                }
+            )
+    if weak_terms:
+        rows.append(
+            {
+                "field": "query_terms",
+                "status": "review",
+                "severity": "low",
+                "message": f"Some query terms remain weak in the corpus: {', '.join(sorted(weak_terms))}.",
+                "suggested_next_query": " ".join(sorted(weak_terms)),
+            }
+        )
+    return rows
+
+
+def evidence_text(evidence: list[dict[str, Any]]) -> str:
+    return " ".join(
+        normalized_term(value)
+        for item in evidence
+        for value in [
+            item.get("title"),
+            item.get("source_name"),
+            item.get("preview"),
+            item.get("domain"),
+            item.get("provenance"),
+            item.get("jurisdiction"),
+            item.get("source_type"),
+            item.get("document_type"),
+        ]
+        if value
+    )
+
+
+def normalized_term(value: Any) -> str:
+    return str(value or "").lower().replace("_", " ").replace("-", " ").strip()
+
+
+def normalize_language(value: Any) -> str:
+    normalized = normalized_term(value)
+    aliases = {
+        "en": "english",
+        "eng": "english",
+        "english": "english",
+        "es": "spanish",
+        "spa": "spanish",
+        "spanish": "spanish",
+        "pt": "portuguese",
+        "por": "portuguese",
+        "portuguese": "portuguese",
+    }
+    return aliases.get(normalized, normalized)
 
 
 def compact_answer_evidence(evidence: list[dict[str, Any]], limit: int = 10) -> list[dict[str, Any]]:

@@ -55,6 +55,14 @@ python -m canon.product.mounted_corpus --input "G:\My Drive\CANON Corpus" --mode
 python -m canon.product.mounted_corpus --input "C:\path\to\repo" --mode repo_review_v1 --profile-only
 ```
 
+Try the built-in AI infrastructure geopolitical risk fixture:
+
+```powershell
+python -m canon.ingest.unstructured --input data/fixtures/ai_infra_geo_risk_sample.jsonl --mode ai_infra_geo_risk_demo --chunk-tokens 80 --overlap-tokens 10
+python -m canon.synthesis.answer "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag --top-k 5
+python -m canon.intelligence.evidence_runner "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag
+```
+
 Start the product API:
 
 ```powershell
@@ -113,6 +121,7 @@ See [docs/evaluation.md](docs/evaluation.md) and
 - [Drive-First RAG Workflow](docs/drive_first_rag.md)
 - [Supported Sources](docs/supported_sources.md)
 - [Evaluation and Human Review](docs/evaluation.md)
+- [Evidence-Grounded Intelligence Runner](docs/intelligence_runner.md)
 - [Human Review Rubric](docs/human_review_rubric.md)
 - [Testing on Your Own Documents](docs/test_own_documents.md)
 - [Use Case and Product Boundary](docs/use_case.md)

@@ -5,6 +5,36 @@ description = "Importance-aware scholarly RAG ingestion and evaluation workbench
 requires-python = ">=3.12"
 dependencies = []
 
+[project.optional-dependencies]
+docs = [
+  "beautifulsoup4>=4.12",
+  "openpyxl>=3.1",
+  "pypdf>=4.0",
+  "python-docx>=1.1",
+  "python-pptx>=0.6.23",
+]
+models = [
+  "cohere>=5.0",
+  "openai>=1.0",
+]
+dev = [
+  "pytest>=8.0",
+]
+
+[project.scripts]
+canon-api = "canon.product.server:main"
+canon-ingest = "canon.ingest.flexible:main"
+canon-intelligence-brief = "canon.intelligence.evidence_runner:main"
+canon-mounted-corpus = "canon.product.mounted_corpus:main"
+canon-prehuman-check = "canon.product.prehuman_check:main"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["canon*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
