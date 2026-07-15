@@ -107,6 +107,7 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/frame-coverage -ContentT
 Invoke-RestMethod -Method Post http://localhost:8000/v1/report-quality -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","write_report":true}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/prehuman-check -ContentType "application/json" -Body '{"mode":"my_topic_v1_corpus","benchmark_id":"llm_judged_my_topic_v1","judge_provider":"heuristic","model_providers":["local"],"rerankers":["heuristic"],"top_k":10,"candidate_k":25}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/acceptance-scenario -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/handoff -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json"}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/feedback -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
 ```
 

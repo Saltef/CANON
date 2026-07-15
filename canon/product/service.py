@@ -503,6 +503,18 @@ def intelligence_review_feedback(payload: dict[str, Any]) -> dict:
     )
 
 
+def intelligence_review_handoff(payload: dict[str, Any]) -> dict:
+    from canon.product.intelligence_review import build_review_handoff
+
+    records_path = intelligence_review_records_path(payload)
+    output_path = optional_path(payload.get("output_path") or payload.get("output"), "output_path")
+    return build_review_handoff(
+        records_path,
+        output_path=output_path,
+        write_report=optional_bool(payload.get("write_report"), default=True),
+    )
+
+
 def intelligence_review_export_csv(payload: dict[str, Any]) -> dict:
     from canon.product.intelligence_review import export_review_csv
 

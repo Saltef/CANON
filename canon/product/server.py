@@ -77,6 +77,8 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.intelligence_review_status(payload))
             elif parsed.path == "/v1/intelligence-review/feedback":
                 self.send_json(service.intelligence_review_feedback(payload))
+            elif parsed.path == "/v1/intelligence-review/handoff":
+                self.send_json(service.intelligence_review_handoff(payload))
             elif parsed.path == "/v1/intelligence-review/export-csv":
                 self.send_json(service.intelligence_review_export_csv(payload))
             elif parsed.path == "/v1/intelligence-review/import-csv":
@@ -183,6 +185,7 @@ def api_index() -> dict:
             "/v1/intelligence-review/prepare",
             "/v1/intelligence-review/status",
             "/v1/intelligence-review/feedback",
+            "/v1/intelligence-review/handoff",
             "/v1/intelligence-review/export-csv",
             "/v1/intelligence-review/import-csv",
             "/v1/compare",
@@ -393,6 +396,14 @@ def api_routes() -> dict:
                 ["records_path or mode"],
                 ["write_report"],
                 {"records_path": "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"},
+            ),
+            route(
+                "POST",
+                "/v1/intelligence-review/handoff",
+                "Write the review CSV and return exact human-review handoff commands.",
+                ["records_path or mode"],
+                ["output_path", "write_report"],
+                {"records_path": "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json"},
             ),
             route(
                 "POST",

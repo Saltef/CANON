@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from canon.product.intelligence_review import (
     build_feedback_report,
+    build_review_handoff,
     build_review_status_report,
     build_review_tasks,
     export_review_csv,
@@ -164,6 +165,23 @@ class IntelligenceReviewTests(unittest.TestCase):
         self.assertIn("unsupported_claim", report["regression_candidates"][0]["reasons"])
         self.assertIn("packet_contract_not_passed", report["regression_candidates"][0]["reasons"])
         self.assertIn("external_expansion_executed", report["regression_candidates"][0]["reasons"])
+
+    def test_review_handoff_exports_csv_and_commands_without_completing_review(self):
+        with tempfile.TemporaryDirectory() as directory:
+            records_path = Path(directory) / "records.json"
+            csv_path = Path(directory) / "review.csv"
+            records_path.write_text(json.dumps({"records": [review_record()]}), encoding="utf-8")
+
+            handoff = build_review_handoff(records_path, output_path=csv_path, write_report=False)
+            csv_exists = csv_path.exists()
+
+        self.assertEqual(handoff["report_id"], "intelligence_brief_review_handoff_v1")
+        self.assertEqual(handoff["status"], "ready_for_human_review")
+        self.assertEqual(handoff["record_count"], 1)
+        self.assertEqual(handoff["remaining_record_count"], 1)
+        self.assertIn("usefulness_1_5", handoff["required_review_fields"])
+        self.assertTrue(csv_exists)
+        self.assertTrue(any(item["step"] == "rerun_final_check" for item in handoff["reviewer_workflow"]))
 
 
 def review_record():

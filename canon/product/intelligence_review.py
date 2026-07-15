@@ -170,6 +170,42 @@ def build_feedback_report(records_path: Path, write_report: bool = True) -> dict
     return report
 
 
+def build_review_handoff(
+    records_path: Path,
+    output_path: Path | None = None,
+    write_report: bool = True,
+) -> dict[str, Any]:
+    settings = load_settings()
+    records = load_records(records_path)
+    review_csv_path = export_review_csv(records_path, output_path)
+    completed_records_path = records_path.with_name(f"{records_path.stem}.completed.json")
+    status = build_review_status_report(records_path, write_report=write_report)
+    handoff = {
+        "report_id": "intelligence_brief_review_handoff_v1",
+        "status": "ready_for_human_review" if records else "no_records",
+        "records_path": relative(settings.root, resolve_path(settings.root, records_path)),
+        "review_csv_path": relative(settings.root, resolve_path(settings.root, review_csv_path)),
+        "completed_records_path": relative(settings.root, resolve_path(settings.root, completed_records_path)),
+        "record_count": len(records),
+        "reviewed_record_count": status.get("reviewed_question_count", 0),
+        "remaining_record_count": max(0, len(records) - int(status.get("reviewed_question_count") or 0)),
+        "required_review_fields": REQUIRED_REVIEW_FIELDS,
+        "human_label_schema": human_label_schema(),
+        "reviewer_workflow": intelligence_review_workflow(records_path, review_csv_path, completed_records_path),
+        "human_review_boundary": (
+            "This handoff prepares review artifacts and commands. It does not complete review, "
+            "approve model quality, or change release status until a human fills and imports labels."
+        ),
+    }
+    if write_report:
+        write_json(settings.reports_dir / "intelligence_brief_review_handoff_v1.json", handoff)
+        write_markdown(
+            settings.reports_dir / "intelligence_brief_review_handoff_v1.md",
+            render_review_handoff(handoff),
+        )
+    return handoff
+
+
 def export_review_csv(records_path: Path, output_path: Path | None = None) -> Path:
     records = load_records(records_path)
     output = output_path or records_path.with_suffix(".review.csv")
@@ -713,6 +749,77 @@ External expansion executed count: {packet_metadata.get('external_expansion_exec
 """
 
 
+def intelligence_review_workflow(records_path: Path, review_csv_path: Path, completed_records_path: Path) -> list[dict[str, str]]:
+    return [
+        {
+            "step": "fill_review_csv",
+            "path": str(review_csv_path).replace("\\", "/"),
+            "description": "A human reviewer fills the required label columns in this CSV.",
+        },
+        {
+            "step": "import_completed_labels",
+            "command": (
+                "python -m canon.product.intelligence_review "
+                f"--import-review-csv {review_csv_path} "
+                f"--records {records_path} "
+                f"--output {completed_records_path}"
+            ),
+        },
+        {
+            "step": "check_review_status",
+            "command": (
+                "python -m canon.product.intelligence_review "
+                f"--review-status --records {completed_records_path}"
+            ),
+        },
+        {
+            "step": "summarize_feedback",
+            "command": (
+                "python -m canon.product.intelligence_review "
+                f"--feedback-report --records {completed_records_path}"
+            ),
+        },
+        {
+            "step": "rerun_final_check",
+            "command": (
+                "python -m canon.product.final_check "
+                "--mode ai_infra_geo_risk_demo "
+                f"--records {completed_records_path} --no-fail"
+            ),
+        },
+    ]
+
+
+def render_review_handoff(report: dict[str, Any]) -> str:
+    fields = "\n".join(f"- `{field}`" for field in report["required_review_fields"])
+    workflow = "\n".join(
+        f"- `{item['step']}`: {item.get('command') or item.get('path')}"
+        for item in report["reviewer_workflow"]
+    )
+    return f"""# Intelligence Brief Review Handoff
+
+Status: **{report['status']}**
+
+Records: {report['reviewed_record_count']} reviewed / {report['record_count']} total
+
+Review CSV: `{report['review_csv_path']}`
+
+Completed records target: `{report['completed_records_path']}`
+
+## Required Fields
+
+{fields}
+
+## Workflow
+
+{workflow}
+
+## Boundary
+
+{report['human_review_boundary']}
+"""
+
+
 def render_counts(counts: dict[str, Any]) -> str:
     return "\n".join(f"- `{key}`: {value}" for key, value in counts.items()) or "- None"
 
@@ -728,6 +835,7 @@ def main() -> None:
     parser.add_argument("--prepare-review", action="store_true")
     parser.add_argument("--review-status", action="store_true")
     parser.add_argument("--feedback-report", action="store_true")
+    parser.add_argument("--review-handoff", action="store_true")
     parser.add_argument("--export-review-csv", action="store_true")
     parser.add_argument("--import-review-csv", type=Path)
     parser.add_argument("--reset-review-labels", action="store_true")
@@ -754,6 +862,11 @@ def main() -> None:
             raise SystemExit("--records is required with --feedback-report")
         print(json.dumps(build_feedback_report(args.records), indent=2))
         return
+    if args.review_handoff:
+        if not args.records:
+            raise SystemExit("--records is required with --review-handoff")
+        print(json.dumps(build_review_handoff(args.records, args.output), indent=2))
+        return
     if args.export_review_csv:
         if not args.records:
             raise SystemExit("--records is required with --export-review-csv")
@@ -765,7 +878,7 @@ def main() -> None:
             raise SystemExit("--records is required with --import-review-csv")
         print(json.dumps(import_review_csv(args.records, args.import_review_csv, args.output), indent=2))
         return
-    raise SystemExit("Choose --prepare-review, --review-status, --feedback-report, --export-review-csv, or --import-review-csv.")
+    raise SystemExit("Choose --prepare-review, --review-status, --feedback-report, --review-handoff, --export-review-csv, or --import-review-csv.")
 
 
 if __name__ == "__main__":

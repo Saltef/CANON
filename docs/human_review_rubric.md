@@ -1,12 +1,38 @@
 # CANON Human Review Rubric
 
-Use this rubric to complete `reports/human_review_tasks_v1.json` or
-`reports/human_review_tasks_v1.review.csv`.
+Use this rubric to complete industry-pilot review files such as
+`reports/human_review_tasks_v1.json` or `reports/human_review_tasks_v1.review.csv`,
+and intelligence-brief review files such as
+`reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv`.
 
 CANON should be reviewed as a first-pass evidence briefing tool. Do not score it
 as an autonomous expert or final decision system.
 
-## Required Fields
+## Intelligence Brief Required Fields
+
+For intelligence brief review packets, complete:
+
+- `usefulness_1_5`
+- `actionability_1_5`
+- `evidence_trust_1_5`
+- `uncertainty_clarity_1_5`
+- `missing_perspective`
+- `unsupported_claim`
+- `overclaim_risk`
+- `final_review_status`
+- `reviewer_notes`
+
+Create the review handoff CSV and commands:
+
+```powershell
+python -m canon.product.intelligence_review --review-handoff --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json
+```
+
+The intelligence final check treats the fixture as reviewed only after every
+intelligence brief record has valid required labels. The current automated
+handoff intentionally stops at `blocked_human_review` until that happens.
+
+## Industry Pilot Required Fields
 
 For every question, complete:
 

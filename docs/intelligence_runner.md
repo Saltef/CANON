@@ -190,6 +190,12 @@ Export the review fields to CSV:
 python -m canon.product.intelligence_review --export-review-csv --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json
 ```
 
+Or create a full handoff packet with the review CSV path and follow-up commands:
+
+```powershell
+python -m canon.product.intelligence_review --review-handoff --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json
+```
+
 After a human reviewer fills the labels, import them:
 
 ```powershell
