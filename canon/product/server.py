@@ -41,7 +41,7 @@ class CanonHandler(BaseHTTPRequestHandler):
                 name = parsed.path.removeprefix("/v1/reports/")
                 self.send_json(service.report(name, mode, params))
             else:
-                self.send_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
+                self.send_json(not_found_payload("GET", parsed.path), HTTPStatus.NOT_FOUND)
         except service.ProductError as exc:
             self.send_json({"error": str(exc)}, exc.status_code)
 
@@ -98,7 +98,7 @@ class CanonHandler(BaseHTTPRequestHandler):
             elif parsed.path == "/v1/diversity-audit":
                 self.send_json(service.diversity_audit(payload))
             else:
-                self.send_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
+                self.send_json(not_found_payload("POST", parsed.path), HTTPStatus.NOT_FOUND)
         except service.ProductError as exc:
             self.send_json({"error": str(exc)}, exc.status_code)
         except json.JSONDecodeError:
@@ -131,6 +131,14 @@ class CanonHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args) -> None:
         return
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
 
 class CanonHTTPServer(ThreadingHTTPServer):
@@ -453,6 +461,23 @@ def api_routes() -> dict:
                 {"mode": "social_science_ir_10k"},
             ),
         ],
+    }
+
+
+def not_found_payload(method: str, path: str) -> dict:
+    routes = api_routes()["routes"]
+    available = [
+        f"{route['method']} {route['path']}"
+        for route in routes
+        if route["method"] == method
+    ]
+    return {
+        "error": "not_found",
+        "method": method,
+        "path": path,
+        "message": "Route not found. Use GET /v1/routes to list supported endpoints and example payloads.",
+        "routes_url": "/v1/routes",
+        "available_routes": available,
     }
 
 

@@ -153,3 +153,16 @@ python -m canon.product.final_check --mode ai_infra_geo_risk_demo --records repo
 
 `blocked_human_review` is an expected final-check status before human labels are
 complete. It means the automated gates are separate from final acceptance.
+
+## Troubleshooting
+
+If the API returns `not_found`, the server is usually running but the path or
+HTTP method is wrong. Check the route list:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/v1/routes
+```
+
+The error response also includes `available_routes` for the method you used.
+Most product actions are `POST` routes with JSON bodies; health and route
+discovery are `GET` routes.

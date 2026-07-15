@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from canon.product.server import CanonHandler, api_routes
+from canon.product.server import CanonHandler, api_routes, not_found_payload
 
 
 class ProductServerRouteTests(unittest.TestCase):
@@ -42,6 +42,31 @@ class ProductServerRouteTests(unittest.TestCase):
 
         handler.send_empty.assert_called_once()
 
+    def test_unknown_route_returns_route_discovery_hint(self):
+        handler = object.__new__(CanonHandler)
+        handler.path = "/v1/missing"
+        handler.send_json = Mock()
+
+        handler.do_GET()
+
+        payload, status = handler.send_json.call_args.args
+        self.assertEqual(status.value, 404)
+        self.assertEqual(payload["error"], "not_found")
+        self.assertEqual(payload["routes_url"], "/v1/routes")
+        self.assertIn("GET /v1/routes", payload["available_routes"])
+
+    def test_options_route_allows_preflight(self):
+        handler = object.__new__(CanonHandler)
+        handler.send_response = Mock()
+        handler.send_header = Mock()
+        handler.end_headers = Mock()
+
+        handler.do_OPTIONS()
+
+        handler.send_response.assert_called_once()
+        header_calls = [call.args for call in handler.send_header.call_args_list]
+        self.assertIn(("Access-Control-Allow-Methods", "GET, POST, OPTIONS"), header_calls)
+
     def test_routes_endpoint_returns_route_metadata(self):
         handler = object.__new__(CanonHandler)
         handler.path = "/v1/routes"
@@ -72,6 +97,11 @@ class ProductServerRouteTests(unittest.TestCase):
             if route["method"] == "POST" and route["example"] is None
         ]
         self.assertEqual(missing_examples, [])
+
+    def test_not_found_payload_lists_only_matching_method_routes(self):
+        payload = not_found_payload("POST", "/v1/nope")
+        self.assertIn("POST /v1/evidence-packets", payload["available_routes"])
+        self.assertNotIn("GET /v1/routes", payload["available_routes"])
 
     def test_post_routes_include_integration_endpoints(self):
         routes = {
