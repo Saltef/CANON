@@ -10,6 +10,8 @@ contested. CANON is not a truth oracle and does not replace expert review.
 ## What It Does
 
 - Ingests local folders, mounted Google Drive folders, and local git checkouts.
+- Searches a user's private corpus first, then supports controlled expansion to
+  external sources for corroboration, freshness, and missing coverage.
 - Supports text files, Markdown, CSV/JSON/JSONL, PDF, DOCX, XLSX, PPTX, HTML,
   notebooks, source code, and common config files.
 - Detects Google-native pointers, images, and legacy presentations without
@@ -108,6 +110,7 @@ See [docs/evaluation.md](docs/evaluation.md) and
 ## Public Docs
 
 - [Quickstart](docs/quickstart.md)
+- [Drive-First RAG Workflow](docs/drive_first_rag.md)
 - [Supported Sources](docs/supported_sources.md)
 - [Evaluation and Human Review](docs/evaluation.md)
 - [Human Review Rubric](docs/human_review_rubric.md)

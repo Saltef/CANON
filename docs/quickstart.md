@@ -80,6 +80,10 @@ Ask for evidence:
 Invoke-RestMethod -Method Post http://localhost:8000/v1/evidence-packets -ContentType "application/json" -Body '{"request_id":"req_001","project_id":"my_project","question":"What does this corpus say about grid risk?","mode":"my_topic_v1_corpus","evidence_requirements":{"top_k":10,"include_conflicts":true,"include_source_diversity":true,"include_query_diagnostics":true}}'
 ```
 
+For the intended Drive-first workflow, use the private corpus as the first
+evidence source, then allow external expansion only when you want corroboration,
+freshness checks, or gap filling. See [drive_first_rag.md](drive_first_rag.md).
+
 ## 6. Run The Pre-Human Gate
 
 ```powershell
