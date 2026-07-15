@@ -168,8 +168,10 @@ class IntelligenceReviewTests(unittest.TestCase):
 
     def test_review_handoff_exports_csv_and_commands_without_completing_review(self):
         with tempfile.TemporaryDirectory() as directory:
-            records_path = Path(directory) / "records.json"
-            csv_path = Path(directory) / "review.csv"
+            review_dir = Path(directory) / "review exports"
+            review_dir.mkdir()
+            records_path = review_dir / "records with spaces.json"
+            csv_path = review_dir / "review labels.csv"
             records_path.write_text(json.dumps({"records": [review_record()]}), encoding="utf-8")
 
             handoff = build_review_handoff(records_path, output_path=csv_path, write_report=False)
@@ -182,6 +184,21 @@ class IntelligenceReviewTests(unittest.TestCase):
         self.assertIn("usefulness_1_5", handoff["required_review_fields"])
         self.assertTrue(csv_exists)
         self.assertTrue(any(item["step"] == "rerun_final_check" for item in handoff["reviewer_workflow"]))
+        commands = [item.get("command", "") for item in handoff["reviewer_workflow"]]
+        self.assertTrue(
+            any(
+                "--import-review-csv \"" in command
+                and "review exports/review labels.csv\"" in command
+                for command in commands
+            )
+        )
+        self.assertTrue(
+            any(
+                "--records \"" in command
+                and "review exports/records with spaces.completed.json\"" in command
+                for command in commands
+            )
+        )
 
 
 def review_record():

@@ -652,6 +652,15 @@ def relative(root: Path, path: Path) -> str:
         return str(path).replace("\\", "/")
 
 
+def command_arg(path: Path | str) -> str:
+    text = str(path).replace("\\", "/")
+    if not text:
+        return '""'
+    if any(character.isspace() for character in text) or '"' in text:
+        return f'"{text.replace(chr(34), chr(92) + chr(34))}"'
+    return text
+
+
 def render_review_packet(packet: dict[str, Any]) -> str:
     rows = "\n".join(f"- `{record['id']}`: {record['query']}" for record in packet["records"])
     return f"""# Intelligence Brief Review Tasks
@@ -750,6 +759,9 @@ External expansion executed count: {packet_metadata.get('external_expansion_exec
 
 
 def intelligence_review_workflow(records_path: Path, review_csv_path: Path, completed_records_path: Path) -> list[dict[str, str]]:
+    records_arg = command_arg(records_path)
+    review_csv_arg = command_arg(review_csv_path)
+    completed_records_arg = command_arg(completed_records_path)
     return [
         {
             "step": "fill_review_csv",
@@ -760,23 +772,23 @@ def intelligence_review_workflow(records_path: Path, review_csv_path: Path, comp
             "step": "import_completed_labels",
             "command": (
                 "python -m canon.product.intelligence_review "
-                f"--import-review-csv {review_csv_path} "
-                f"--records {records_path} "
-                f"--output {completed_records_path}"
+                f"--import-review-csv {review_csv_arg} "
+                f"--records {records_arg} "
+                f"--output {completed_records_arg}"
             ),
         },
         {
             "step": "check_review_status",
             "command": (
                 "python -m canon.product.intelligence_review "
-                f"--review-status --records {completed_records_path}"
+                f"--review-status --records {completed_records_arg}"
             ),
         },
         {
             "step": "summarize_feedback",
             "command": (
                 "python -m canon.product.intelligence_review "
-                f"--feedback-report --records {completed_records_path}"
+                f"--feedback-report --records {completed_records_arg}"
             ),
         },
         {
@@ -784,7 +796,7 @@ def intelligence_review_workflow(records_path: Path, review_csv_path: Path, comp
             "command": (
                 "python -m canon.product.final_check "
                 "--mode ai_infra_geo_risk_demo "
-                f"--records {completed_records_path} --no-fail"
+                f"--records {completed_records_arg} --no-fail"
             ),
         },
     ]
