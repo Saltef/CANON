@@ -237,6 +237,79 @@ def flagship_handoff(payload: dict[str, Any]) -> dict:
     )
 
 
+def intelligence_review_prepare(payload: dict[str, Any]) -> dict:
+    from canon.eval.intelligence_brief import DEFAULT_QUERY_PATH
+    from canon.product.intelligence_review import build_review_tasks
+
+    mode = str(payload.get("mode") or "ai_infra_geo_risk_demo")
+    policy = str(payload.get("policy") or DEFAULT_POLICY)
+    project_id = str(payload.get("project_id") or "ai_infra_geo_risk")
+    queries_path = optional_path(payload.get("queries_path"), "queries_path") or DEFAULT_QUERY_PATH
+    existing_records_path = optional_path(payload.get("records_path") or payload.get("records"), "records_path")
+    reset_review_labels = optional_bool(payload.get("reset_review_labels"), default=False)
+    try:
+        return build_review_tasks(
+            mode=mode,
+            queries_path=queries_path,
+            policy=policy,
+            project_id=project_id,
+            write_report=optional_bool(payload.get("write_report"), default=True),
+            preserve_existing_reviews=not reset_review_labels,
+            existing_records_path=existing_records_path,
+        )
+    except FileNotFoundError as exc:
+        raise ProductError(str(exc), status_code=404) from exc
+    except ValueError as exc:
+        raise ProductError(str(exc), status_code=400) from exc
+
+
+def intelligence_review_status(payload: dict[str, Any]) -> dict:
+    from canon.product.intelligence_review import build_review_status_report
+
+    records_path = intelligence_review_records_path(payload)
+    return build_review_status_report(
+        records_path,
+        write_report=optional_bool(payload.get("write_report"), default=True),
+    )
+
+
+def intelligence_review_export_csv(payload: dict[str, Any]) -> dict:
+    from canon.product.intelligence_review import export_review_csv
+
+    records_path = intelligence_review_records_path(payload)
+    output_path = optional_path(payload.get("output_path") or payload.get("output"), "output_path")
+    path = export_review_csv(records_path, output_path)
+    return {
+        "status": "review_csv_written",
+        "records_path": str(records_path).replace("\\", "/"),
+        "output_path": str(path).replace("\\", "/"),
+    }
+
+
+def intelligence_review_import_csv(payload: dict[str, Any]) -> dict:
+    from canon.product.intelligence_review import import_review_csv
+
+    records_path = intelligence_review_records_path(payload)
+    csv_path = optional_path(payload.get("csv_path") or payload.get("csv"), "csv_path")
+    if not csv_path:
+        raise ProductError("csv_path is required.")
+    output_path = optional_path(payload.get("output_path") or payload.get("output"), "output_path")
+    try:
+        return import_review_csv(records_path, csv_path, output_path)
+    except FileNotFoundError as exc:
+        raise ProductError(str(exc), status_code=404) from exc
+    except ValueError as exc:
+        raise ProductError(str(exc), status_code=400) from exc
+
+
+def intelligence_review_records_path(payload: dict[str, Any]) -> Path:
+    explicit = optional_path(payload.get("records_path") or payload.get("records"), "records_path")
+    if explicit:
+        return explicit
+    mode = str(payload.get("mode") or "ai_infra_geo_risk_demo")
+    return load_settings().reports_dir / f"intelligence_brief_review_tasks_{mode}.json"
+
+
 def enrich_evidence_metadata(evidence: list[dict[str, Any]], mode: str) -> list[dict[str, Any]]:
     work_metadata = load_work_metadata(mode)
     enriched = []

@@ -57,6 +57,14 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.alert_digest(payload))
             elif parsed.path == "/v1/flagship-handoff":
                 self.send_json(service.flagship_handoff(payload))
+            elif parsed.path == "/v1/intelligence-review/prepare":
+                self.send_json(service.intelligence_review_prepare(payload))
+            elif parsed.path == "/v1/intelligence-review/status":
+                self.send_json(service.intelligence_review_status(payload))
+            elif parsed.path == "/v1/intelligence-review/export-csv":
+                self.send_json(service.intelligence_review_export_csv(payload))
+            elif parsed.path == "/v1/intelligence-review/import-csv":
+                self.send_json(service.intelligence_review_import_csv(payload))
             elif parsed.path == "/v1/compare":
                 self.send_json(service.compare_retrieval(payload))
             elif parsed.path == "/v1/query-diagnostics":
@@ -138,6 +146,10 @@ def api_index() -> dict:
             "/v1/intelligence-brief",
             "/v1/alert-digest",
             "/v1/flagship-handoff",
+            "/v1/intelligence-review/prepare",
+            "/v1/intelligence-review/status",
+            "/v1/intelligence-review/export-csv",
+            "/v1/intelligence-review/import-csv",
             "/v1/compare",
             "/v1/query-diagnostics",
             "/v1/sources/profile",

@@ -247,6 +247,64 @@ class ProductServiceTests(unittest.TestCase):
         self.assertEqual(str(runner.call_args.kwargs["fixture_path"]).replace("\\", "/"), "data/fixtures/ai_infra_geo_risk_sample.jsonl")
         self.assertEqual(str(runner.call_args.kwargs["queries_path"]).replace("\\", "/"), "gold/ai_infra_geo_risk_seed_queries.json")
 
+    def test_intelligence_review_prepare_wraps_review_tasks(self):
+        with patch("canon.product.intelligence_review.build_review_tasks", return_value={"report_id": "intelligence_brief_review_tasks_v1"}) as builder:
+            report = service.intelligence_review_prepare(
+                {
+                    "mode": "m",
+                    "queries_path": "gold/ai_infra_geo_risk_seed_queries.json",
+                    "records_path": "reports/review.json",
+                    "reset_review_labels": "true",
+                    "write_report": "false",
+                }
+            )
+
+        self.assertEqual(report["report_id"], "intelligence_brief_review_tasks_v1")
+        builder.assert_called_once()
+        self.assertEqual(builder.call_args.kwargs["mode"], "m")
+        self.assertFalse(builder.call_args.kwargs["preserve_existing_reviews"])
+        self.assertFalse(builder.call_args.kwargs["write_report"])
+
+    def test_intelligence_review_status_uses_mode_default_records_path(self):
+        with patch("canon.product.intelligence_review.build_review_status_report", return_value={"status": "incomplete"}) as status:
+            report = service.intelligence_review_status({"mode": "m", "write_report": "false"})
+
+        self.assertEqual(report["status"], "incomplete")
+        self.assertTrue(str(status.call_args.args[0]).replace("\\", "/").endswith("reports/intelligence_brief_review_tasks_m.json"))
+        self.assertFalse(status.call_args.kwargs["write_report"])
+
+    def test_intelligence_review_export_csv_returns_written_path(self):
+        with patch("canon.product.intelligence_review.export_review_csv", return_value=service.Path("reports/review.csv")) as exporter:
+            report = service.intelligence_review_export_csv(
+                {
+                    "records_path": "reports/review.json",
+                    "output_path": "reports/review.csv",
+                }
+            )
+
+        self.assertEqual(report["status"], "review_csv_written")
+        self.assertEqual(report["output_path"], "reports/review.csv")
+        exporter.assert_called_once()
+
+    def test_intelligence_review_import_csv_requires_csv_path(self):
+        with self.assertRaises(service.ProductError):
+            service.intelligence_review_import_csv({"records_path": "reports/review.json"})
+
+    def test_intelligence_review_import_csv_wraps_importer(self):
+        with patch("canon.product.intelligence_review.import_review_csv", return_value={"status": "imported"}) as importer:
+            report = service.intelligence_review_import_csv(
+                {
+                    "records_path": "reports/review.json",
+                    "csv_path": "reports/review.csv",
+                    "output_path": "reports/completed.json",
+                }
+            )
+
+        self.assertEqual(report["status"], "imported")
+        importer.assert_called_once()
+        self.assertEqual(str(importer.call_args.args[0]).replace("\\", "/"), "reports/review.json")
+        self.assertEqual(str(importer.call_args.args[1]).replace("\\", "/"), "reports/review.csv")
+
     def test_invalid_freedom_level_raises_product_error(self):
         with self.assertRaises(service.ProductError):
             service.query_diagnostics({"query": "q", "freedom_level": "wild"})

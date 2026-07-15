@@ -59,6 +59,18 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/flagship-handoff -Conten
 The flagship handoff returns `automated_pass_human_review_required` when the
 offline workflow passes automated gates and still needs human labels.
 
+Prepare and manage the human review packet through the API:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/prepare -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","queries_path":"gold/ai_infra_geo_risk_seed_queries.json","policy":"rag","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/export-csv -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json","output_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv"}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/import-csv -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json","csv_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv","output_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/status -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
+```
+
+The import endpoint validates human-entered labels. It does not create labels or
+upgrade automated results into final acceptance on its own.
+
 ## Evaluation Gate
 
 Run the intelligence-brief gate over seed questions:
