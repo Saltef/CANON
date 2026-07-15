@@ -62,11 +62,13 @@ python -m canon.product.mounted_corpus --input "G:\My Drive\CANON Corpus" --mode
 
 The mounted-corpus command treats Drive as a normal local filesystem mount. It
 does not read Google credentials or call Google APIs. Text-extractable files are
-JSON, JSONL, CSV, TXT, Markdown, PDF, DOCX, XLSX, HTML, and folders containing
-those files. Google native pointer files (`.gdoc`, `.gsheet`, `.gslides`) and
-images are detected and reported, but they are not treated as evidence text
-unless exported or OCR-extracted first. Raw and processed corpus outputs go
-under `data/`, which is gitignored by default.
+JSON, JSONL, CSV, TXT, Markdown, PDF, DOCX, XLSX, PPTX, HTML, notebooks, common
+source-code/config files, and folders containing those files. Google native
+pointer files (`.gdoc`, `.gsheet`, `.gslides`), images, legacy `.ppt`, and
+`.odp` files are detected and reported, but they are not treated as evidence
+text unless exported or OCR-extracted first. Do not ingest folders containing
+secrets such as `.env` files or private keys. Raw and processed corpus outputs
+go under `data/`, which is gitignored by default.
 
 Semantic model evaluation:
 

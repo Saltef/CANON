@@ -24,13 +24,59 @@ TEXT_EXTRACTABLE_FILE_EXTENSIONS = {
     ".pdf",
     ".docx",
     ".xlsx",
+    ".pptx",
     ".html",
     ".htm",
+}
+CODE_FILE_EXTENSIONS = {
+    ".bat",
+    ".c",
+    ".cc",
+    ".cmd",
+    ".cpp",
+    ".cs",
+    ".css",
+    ".go",
+    ".h",
+    ".hpp",
+    ".java",
+    ".js",
+    ".jsx",
+    ".kt",
+    ".kts",
+    ".lua",
+    ".mjs",
+    ".php",
+    ".ps1",
+    ".py",
+    ".r",
+    ".rb",
+    ".rs",
+    ".scala",
+    ".sh",
+    ".sql",
+    ".swift",
+    ".toml",
+    ".ts",
+    ".tsx",
+    ".xml",
+    ".yaml",
+    ".yml",
+}
+NOTEBOOK_FILE_EXTENSIONS = {".ipynb"}
+CODE_FILE_NAMES = {
+    "cmakelists.txt",
+    "containerfile",
+    "dockerfile",
+    "jenkinsfile",
+    "makefile",
 }
 NON_TEXT_FILE_EXTENSIONS = {
     ".gdoc",
     ".gsheet",
     ".gslides",
+    ".odp",
+    ".ppt",
     ".png",
     ".jpg",
     ".jpeg",
@@ -40,7 +86,9 @@ NON_TEXT_FILE_EXTENSIONS = {
     ".tif",
     ".tiff",
 }
-SUPPORTED_FILE_EXTENSIONS = TEXT_EXTRACTABLE_FILE_EXTENSIONS | NON_TEXT_FILE_EXTENSIONS
+SUPPORTED_FILE_EXTENSIONS = (
+    TEXT_EXTRACTABLE_FILE_EXTENSIONS | CODE_FILE_EXTENSIONS | NOTEBOOK_FILE_EXTENSIONS | NON_TEXT_FILE_EXTENSIONS
+)
 TEXT_FIELDS = ["text", "content", "body", "abstract", "description", "notes", "message", "comment"]
 TITLE_FIELDS = ["title", "name", "subject", "headline", "file_name"]
 DATE_FIELDS = ["year", "date", "created_at", "updated_at", "timestamp", "published_at"]
@@ -145,7 +193,7 @@ def load_source_records(
     if path.is_dir():
         records = []
         for child in sorted(path.rglob("*")):
-            if child.is_file() and child.suffix.lower() in SUPPORTED_FILE_EXTENSIONS:
+            if child.is_file() and is_supported_file(child):
                 records.extend(load_source_records(child, profile_only=profile_only))
         return records
     fmt = detect_format(path, input_format)
@@ -164,13 +212,25 @@ def load_source_records(
         return [record_from_docx_file(path)]
     if fmt == "xlsx":
         return records_from_xlsx_file(path)
+    if fmt == "pptx":
+        return [record_from_pptx_file(path)]
+    if fmt == "ipynb":
+        return [record_from_notebook_file(path)]
     if fmt in {"html", "htm"}:
         return [record_from_html_file(path)]
+    if path.suffix.lower() in CODE_FILE_EXTENSIONS or path.name.lower() in CODE_FILE_NAMES:
+        return [record_from_code_file(path)]
     if fmt in {"gdoc", "gsheet", "gslides"}:
         return [record_from_google_pointer_file(path)]
+    if fmt in {"odp", "ppt"}:
+        return [record_from_binary_presentation_file(path)]
     if fmt in {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff"}:
         return [record_from_image_file(path)]
     raise ValueError(f"Unsupported flexible ingest format: {fmt}")
+
+
+def is_supported_file(path: Path) -> bool:
+    return path.suffix.lower() in SUPPORTED_FILE_EXTENSIONS or path.name.lower() in CODE_FILE_NAMES
 
 
 def detect_format(path: Path, input_format: str | None = None) -> str:
@@ -234,6 +294,31 @@ def record_from_text_file(path: Path) -> dict[str, Any]:
     }
 
 
+def record_from_code_file(path: Path) -> dict[str, Any]:
+    return file_record(
+        path,
+        document_type="source_code",
+        sections=[{"section": "source", "text": path.read_text(encoding="utf-8", errors="ignore")}],
+        extra_metadata={"content_warning": "Source files may contain secrets; curate inputs before indexing."},
+    )
+
+
+def record_from_notebook_file(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    cells = payload.get("cells") if isinstance(payload, dict) else None
+    sections = []
+    if isinstance(cells, list):
+        for index, cell in enumerate(cells, start=1):
+            if not isinstance(cell, dict):
+                continue
+            source = cell.get("source") or []
+            text = "".join(source) if isinstance(source, list) else str(source)
+            if text.strip():
+                cell_type = str(cell.get("cell_type") or "cell")
+                sections.append({"section": f"{cell_type}_{index}", "text": text.strip()})
+    return file_record(path, document_type="notebook", sections=sections)
+
+
 def record_from_pdf_file(path: Path) -> dict[str, Any]:
     try:
         from pypdf import PdfReader
@@ -288,6 +373,24 @@ def records_from_xlsx_file(path: Path) -> list[dict[str, Any]]:
         workbook.close()
 
 
+def record_from_pptx_file(path: Path) -> dict[str, Any]:
+    try:
+        from pptx import Presentation
+    except ImportError as exc:
+        raise ValueError("PPTX ingest requires the optional python-pptx package.") from exc
+    deck = Presentation(str(path))
+    sections = []
+    for index, slide in enumerate(deck.slides, start=1):
+        lines = []
+        for shape in slide.shapes:
+            text = getattr(shape, "text", "")
+            if text and text.strip():
+                lines.append(text.strip())
+        if lines:
+            sections.append({"section": f"slide_{index}", "text": "\n".join(lines)})
+    return file_record(path, document_type="presentation", sections=sections, extra_metadata={"slide_count": len(deck.slides)})
+
+
 def record_from_html_file(path: Path) -> dict[str, Any]:
     raw = path.read_text(encoding="utf-8", errors="ignore")
     try:
@@ -340,6 +443,18 @@ def record_from_image_file(path: Path) -> dict[str, Any]:
     except Exception:
         pass
     return file_record(path, document_type="image", sections=[], extra_metadata=metadata)
+
+
+def record_from_binary_presentation_file(path: Path) -> dict[str, Any]:
+    return file_record(
+        path,
+        document_type="presentation_binary",
+        sections=[],
+        extra_metadata={
+            "extraction_status": "legacy_presentation_without_text_extraction",
+            "extraction_limitation": "Export legacy or OpenDocument presentations to PPTX, PDF, or text before ingest.",
+        },
+    )
 
 
 def file_record(
@@ -403,7 +518,9 @@ def infer_source_shape(path: Path, records: list[dict[str, Any]], field_counts: 
         return "sectioned_document"
     if path.suffix.lower() == ".csv":
         return "table_record"
-    if path.suffix.lower() in TEXT_EXTRACTABLE_FILE_EXTENSIONS:
+    if path.suffix.lower() in TEXT_EXTRACTABLE_FILE_EXTENSIONS | CODE_FILE_EXTENSIONS | NOTEBOOK_FILE_EXTENSIONS:
+        return "document_file"
+    if path.name.lower() in CODE_FILE_NAMES:
         return "document_file"
     if path.suffix.lower() in NON_TEXT_FILE_EXTENSIONS:
         return "non_text_file"

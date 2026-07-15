@@ -124,6 +124,63 @@ class FlexibleIngestTests(unittest.TestCase):
         self.assertIn("spreadsheet", document_types)
         self.assertIn("html_document", document_types)
 
+    def test_ingest_code_and_notebook_files(self):
+        settings = load_settings()
+        mode = "unit_flexible_code_files"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "pipeline.py").write_text(
+                "def build_corpus(path):\n    return f'index {path}'\n",
+                encoding="utf-8",
+            )
+            (root / "config.yaml").write_text(
+                "retrieval:\n  top_k: 10\n  method: hybrid\n",
+                encoding="utf-8",
+            )
+            (root / "analysis.ipynb").write_text(
+                json.dumps(
+                    {
+                        "cells": [
+                            {"cell_type": "markdown", "source": ["# Evidence notes\n"]},
+                            {"cell_type": "code", "source": ["query = 'data center water risk'\n"]},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = ingest_flexible_source(root, mode=mode, chunk_tokens=24, overlap_tokens=4)
+
+        self.assertEqual(report["normalized_record_count"], 3)
+        works_path = settings.data_dir / "processed" / f"works_{mode}.json"
+        works = json.loads(works_path.read_text(encoding="utf-8"))
+        document_types = {work["raw"]["document_type"] for work in works}
+        self.assertIn("source_code", document_types)
+        self.assertIn("notebook", document_types)
+
+    def test_ingest_pptx_presentation_files(self):
+        try:
+            from pptx import Presentation
+        except ImportError as exc:
+            self.skipTest(f"Optional presentation parser missing: {exc}")
+        settings = load_settings()
+        mode = "unit_flexible_presentation_files"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            deck = Presentation()
+            slide = deck.slides.add_slide(deck.slide_layouts[5])
+            slide.shapes.title.text = "AI infrastructure risks"
+            text_box = slide.shapes.add_textbox(0, 0, 4000000, 1000000)
+            text_box.text = "Power availability and water stress affect deployment."
+            deck.save(root / "briefing.pptx")
+
+            report = ingest_flexible_source(root, mode=mode, chunk_tokens=24, overlap_tokens=4)
+
+        self.assertEqual(report["normalized_record_count"], 1)
+        works_path = settings.data_dir / "processed" / f"works_{mode}.json"
+        works = json.loads(works_path.read_text(encoding="utf-8"))
+        self.assertEqual(works[0]["raw"]["document_type"], "presentation")
+
     def test_google_pointer_and_image_are_detected_but_not_ingested_as_text(self):
         try:
             from PIL import Image

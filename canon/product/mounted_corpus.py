@@ -7,7 +7,7 @@ from typing import Any
 
 from canon.config import load_settings
 from canon.corpus.build import run_phase16
-from canon.ingest.flexible import SUPPORTED_FILE_EXTENSIONS, ingest_flexible_source, profile_source
+from canon.ingest.flexible import SUPPORTED_FILE_EXTENSIONS, ingest_flexible_source, is_supported_file, profile_source
 from canon.product import report_io
 from canon.product.prehuman_check import run_prehuman_check
 
@@ -90,7 +90,7 @@ def resolve_mounted_path(path: Path) -> Path:
     resolved = path.expanduser()
     if not resolved.exists():
         raise FileNotFoundError(f"Mounted corpus path does not exist: {path}")
-    if not resolved.is_dir() and resolved.suffix.lower() not in SUPPORTED_FILE_EXTENSIONS:
+    if not resolved.is_dir() and not is_supported_file(resolved):
         raise ValueError(
             "Mounted corpus input must be a folder or supported file type: "
             f"{', '.join(sorted(SUPPORTED_FILE_EXTENSIONS))}"
@@ -100,8 +100,8 @@ def resolve_mounted_path(path: Path) -> Path:
 
 def supported_file_summary(path: Path) -> dict[str, Any]:
     files = [path] if path.is_file() else [child for child in path.rglob("*") if child.is_file()]
-    supported = [child for child in files if child.suffix.lower() in SUPPORTED_FILE_EXTENSIONS]
-    unsupported = [child for child in files if child.suffix.lower() not in SUPPORTED_FILE_EXTENSIONS]
+    supported = [child for child in files if is_supported_file(child)]
+    unsupported = [child for child in files if not is_supported_file(child)]
     return {
         "supported_count": len(supported),
         "unsupported_count": len(unsupported),
@@ -109,8 +109,8 @@ def supported_file_summary(path: Path) -> dict[str, Any]:
         "unsupported_extensions": sorted({child.suffix.lower() or "<none>" for child in unsupported})[:25],
         "sample_supported_files": [str(child) for child in supported[:10]],
         "limitations": [
-            "Text-extractable mounted files include JSON, JSONL, CSV, TXT, Markdown, PDF, DOCX, XLSX, HTML, and folders containing those files.",
-            "Google native pointer files and images are detected but not treated as evidence text unless exported or OCR-extracted first.",
+            "Text-extractable mounted files include JSON, JSONL, CSV, TXT, Markdown, PDF, DOCX, XLSX, PPTX, HTML, notebooks, source code, and folders containing those files.",
+            "Google native pointer files, images, and legacy presentations are detected but not treated as evidence text unless exported or OCR-extracted first.",
         ],
     }
 

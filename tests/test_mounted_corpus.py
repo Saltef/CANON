@@ -13,15 +13,23 @@ class MountedCorpusTests(unittest.TestCase):
             (root / "note.md").write_text("AI infrastructure risk", encoding="utf-8")
             (root / "scan.pdf").write_text("parsed when it contains extractable PDF text", encoding="utf-8")
             (root / "scan.png").write_text("image placeholder", encoding="utf-8")
+            (root / "model.py").write_text("print('risk model')", encoding="utf-8")
+            (root / "Dockerfile").write_text("FROM python:3.12-slim", encoding="utf-8")
+            (root / "slides.pptx").write_text("presentation placeholder", encoding="utf-8")
+            (root / "legacy.ppt").write_text("legacy presentation placeholder", encoding="utf-8")
             (root / "archive.bin").write_text("unsupported binary placeholder", encoding="utf-8")
 
             summary = supported_file_summary(root)
 
-        self.assertEqual(summary["supported_count"], 3)
+        self.assertEqual(summary["supported_count"], 7)
         self.assertEqual(summary["unsupported_count"], 1)
         self.assertIn(".md", summary["supported_extensions"])
         self.assertIn(".pdf", summary["supported_extensions"])
         self.assertIn(".png", summary["supported_extensions"])
+        self.assertIn(".py", summary["supported_extensions"])
+        self.assertIn(".pptx", summary["supported_extensions"])
+        self.assertIn(".ppt", summary["supported_extensions"])
+        self.assertIn("<none>", summary["supported_extensions"])
         self.assertIn(".bin", summary["unsupported_extensions"])
 
     def test_run_mounted_corpus_profiles_only(self):
