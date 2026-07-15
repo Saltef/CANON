@@ -54,6 +54,17 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-brief -Cont
 The response includes `grounding_report`, `red_team`, `report_quality`, and the
 final `brief`.
 
+Run a focused quality gate for one brief:
+
+```powershell
+python -m canon.product.report_quality "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag
+Invoke-RestMethod -Method Post http://localhost:8000/v1/report-quality -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","policy":"rag","write_report":true}'
+```
+
+This gate returns the grounding ratio, unsupported-claim count, red-team
+blockers, duplicate-agent rate, required-section checks, and the human-review
+boundary without requiring a reviewer to inspect the whole brief JSON first.
+
 Run the automated intelligence-brief evaluation gate through the API:
 
 ```powershell

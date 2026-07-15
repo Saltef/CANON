@@ -37,6 +37,7 @@ canon-prehuman-check = "canon.product.prehuman_check:main"
 canon-product-final-check = "canon.product.final_check:main"
 canon-readiness = "canon.product.readiness:main"
 canon-release-audit = "canon.product.release_audit:main"
+canon-report-quality = "canon.product.report_quality:main"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]

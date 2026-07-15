@@ -26,6 +26,7 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
         check("evidence_packets_endpoint_documented", "POST /v1/evidence-packets" in available_endpoints),
         check("frame_coverage_endpoint_documented", "POST /v1/frame-coverage" in available_endpoints),
         check("intelligence_brief_endpoint_documented", "POST /v1/intelligence-brief" in available_endpoints),
+        check("report_quality_endpoint_documented", "POST /v1/report-quality" in available_endpoints),
         check("alert_digest_endpoint_documented", "POST /v1/alert-digest" in available_endpoints),
         check("flagship_handoff_endpoint_documented", "POST /v1/flagship-handoff" in available_endpoints),
         check("intelligence_review_endpoint_documented", "POST /v1/intelligence-review/prepare" in available_endpoints),

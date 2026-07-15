@@ -229,6 +229,60 @@ class ProductServiceTests(unittest.TestCase):
         runner.assert_called_once()
         self.assertFalse(runner.call_args.kwargs["write_report"])
 
+    def test_report_quality_gate_compacts_brief_quality_signals(self):
+        with patch("canon.product.service.intelligence_brief") as brief:
+            brief.return_value = {
+                "report_id": "mock_evidence_intelligence_brief_v1",
+                "project_id": "ai_infra_geo_risk",
+                "mode": "m",
+                "policy": "rag",
+                "question": "AI data center risk",
+                "status": "ready_for_human_review",
+                "report_quality": {
+                    "status": "pass",
+                    "checks": [{"id": "grounded_claim_ratio", "status": "pass"}],
+                },
+                "grounding_report": {
+                    "status": "pass",
+                    "claim_count": 3,
+                    "supported_claim_count": 3,
+                    "unsupported_claim_count": 0,
+                    "grounded_claim_ratio": 1.0,
+                    "unsupported_claims": [],
+                },
+                "duplicate_agent_output": {"duplicate_agent_output_rate": 0.0},
+                "red_team": {"status": "pass_with_review", "blocking_issue_count": 0, "review_issue_count": 1, "objections": []},
+            }
+
+            report = service.report_quality_gate({"query": "AI data center risk", "write_report": "false"})
+
+        self.assertEqual(report["report_id"], "intelligence_report_quality_gate_v1")
+        self.assertEqual(report["status"], "pass_human_review_required")
+        self.assertEqual(report["grounding"]["grounded_claim_ratio"], 1.0)
+        self.assertTrue(report["human_review_required"])
+        self.assertIn("human_review_boundary", report)
+        brief.assert_called_once()
+
+    def test_report_quality_gate_blocks_unsupported_claims(self):
+        with patch("canon.product.service.intelligence_brief") as brief:
+            brief.return_value = {
+                "status": "blocked",
+                "report_quality": {"status": "fail", "checks": [{"id": "grounding_pass", "status": "fail"}]},
+                "grounding_report": {
+                    "status": "fail",
+                    "unsupported_claims": [{"claim_id": "c1"}],
+                },
+                "red_team": {
+                    "blocking_issue_count": 1,
+                    "objections": [{"severity": "blocker", "issue": "unsupported_claims"}],
+                },
+            }
+
+            report = service.report_quality_gate({"query": "q", "write_report": "false"})
+
+        self.assertEqual(report["status"], "blocked_grounding")
+        self.assertTrue(any("Resolve or remove claims" in action for action in report["next_actions"]))
+
     def test_alert_digest_wraps_runner(self):
         with patch("canon.intelligence.alerts.run_alert_digest", return_value={"status": "ready_for_human_review"}) as runner:
             report = service.alert_digest(

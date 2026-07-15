@@ -57,6 +57,8 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.frame_coverage_report(payload))
             elif parsed.path == "/v1/intelligence-brief":
                 self.send_json(service.intelligence_brief(payload))
+            elif parsed.path == "/v1/report-quality":
+                self.send_json(service.report_quality_gate(payload))
             elif parsed.path == "/v1/intelligence-brief/evaluate":
                 self.send_json(service.intelligence_brief_evaluation(payload))
             elif parsed.path == "/v1/alert-digest":
@@ -155,6 +157,7 @@ def api_index() -> dict:
             "/v1/evidence-packets",
             "/v1/frame-coverage",
             "/v1/intelligence-brief",
+            "/v1/report-quality",
             "/v1/intelligence-brief/evaluate",
             "/v1/alert-digest",
             "/v1/alert-digest/evaluate",
@@ -252,6 +255,18 @@ def api_routes() -> dict:
                 ["query or question"],
                 ["mode", "policy", "project_id", "write_report"],
                 {"query": "What are the emerging geopolitical risks around AI data center expansion in Latin America?", "mode": "ai_infra_geo_risk_demo", "write_report": True},
+            ),
+            route(
+                "POST",
+                "/v1/report-quality",
+                "Run a focused grounding, citation, red-team, and structure gate for one brief.",
+                ["query or question"],
+                ["mode", "policy", "project_id", "write_report"],
+                {
+                    "query": "What are the emerging geopolitical risks around AI data center expansion in Latin America?",
+                    "mode": "ai_infra_geo_risk_demo",
+                    "write_report": True,
+                },
             ),
             route(
                 "POST",

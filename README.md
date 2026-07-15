@@ -72,6 +72,7 @@ python -m canon.ingest.unstructured --input data/fixtures/ai_infra_geo_risk_samp
 python -m canon.synthesis.answer "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag --top-k 5
 python -m canon.product.frame_coverage "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag --top-k 8
 python -m canon.intelligence.evidence_runner "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag
+python -m canon.product.report_quality "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag
 python -m canon.eval.intelligence_brief --mode ai_infra_geo_risk_demo --queries-path gold/ai_infra_geo_risk_seed_queries.json --policy rag
 python -m canon.intelligence.alerts "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag
 python -m canon.eval.alert_digest --mode ai_infra_geo_risk_demo --queries-path gold/ai_infra_geo_risk_seed_queries.json --policy rag
@@ -92,6 +93,7 @@ Invoke-WebRequest http://localhost:8000/health
 Invoke-RestMethod http://localhost:8000/v1/routes
 Invoke-RestMethod -Method Post http://localhost:8000/v1/sources/profile -ContentType "application/json" -Body '{"input_path":"data/my_docs","sample_size":25}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/frame-coverage -ContentType "application/json" -Body '{"question":"What does this corpus cover about grid risk?","mode":"my_topic_v1_corpus","research_frame":{"subdomains":["energy","water"],"regions":["Latin America"],"languages":["English","Spanish"]},"evidence_requirements":{"top_k":10,"minimum_source_types":["official","local_media"]}}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/report-quality -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","write_report":true}'
 ```
 
 More examples are in [docs/quickstart.md](docs/quickstart.md).

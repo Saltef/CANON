@@ -263,6 +263,87 @@ def intelligence_brief(payload: dict[str, Any]) -> dict:
     )
 
 
+def report_quality_gate(payload: dict[str, Any]) -> dict:
+    brief_report = intelligence_brief({**payload, "write_report": optional_bool(payload.get("write_report"), default=False)})
+    quality = brief_report.get("report_quality") or {}
+    grounding = brief_report.get("grounding_report") or {}
+    duplicate = brief_report.get("duplicate_agent_output") or {}
+    red_team = brief_report.get("red_team") or {}
+    status = report_quality_status(brief_report, quality, grounding, red_team)
+    report = {
+        "report_id": "intelligence_report_quality_gate_v1",
+        "status": status,
+        "project_id": brief_report.get("project_id", ""),
+        "mode": brief_report.get("mode", ""),
+        "policy": brief_report.get("policy", ""),
+        "question": brief_report.get("question", ""),
+        "source_report_id": brief_report.get("report_id", ""),
+        "source_report_status": brief_report.get("status", ""),
+        "quality_status": quality.get("status", "missing"),
+        "checks": quality.get("checks", []),
+        "grounding": {
+            "status": grounding.get("status", "missing"),
+            "claim_count": grounding.get("claim_count", 0),
+            "supported_claim_count": grounding.get("supported_claim_count", 0),
+            "unsupported_claim_count": grounding.get("unsupported_claim_count", 0),
+            "grounded_claim_ratio": grounding.get("grounded_claim_ratio", 0.0),
+            "unsupported_claims": grounding.get("unsupported_claims", []),
+        },
+        "duplicate_agent_output": duplicate,
+        "red_team": {
+            "status": red_team.get("status", "missing"),
+            "blocking_issue_count": red_team.get("blocking_issue_count", 0),
+            "review_issue_count": red_team.get("review_issue_count", 0),
+            "objections": red_team.get("objections", []),
+        },
+        "human_review_required": True,
+        "human_review_boundary": (
+            "This gate checks structure, citation grounding, duplicate output, and red-team blockers. "
+            "It does not prove analyst usefulness, factual correctness, completeness, or publishability."
+        ),
+        "next_actions": report_quality_next_actions(quality, grounding, red_team),
+    }
+    if optional_bool(payload.get("write_report"), default=True):
+        settings = load_settings()
+        output = (
+            settings.reports_dir
+            / f"report_quality_gate_{safe_report_slug(report['mode'])}_{safe_report_slug(report['question'])}.json"
+        )
+        report_io.write_json(output, report)
+        report["output_path"] = str(output).replace("\\", "/")
+    return report
+
+
+def report_quality_status(
+    brief_report: dict[str, Any],
+    quality: dict[str, Any],
+    grounding: dict[str, Any],
+    red_team: dict[str, Any],
+) -> str:
+    if int(red_team.get("blocking_issue_count") or 0) > 0 or grounding.get("status") == "fail":
+        return "blocked_grounding"
+    if brief_report.get("status") == "ready_for_human_review" and quality.get("status") == "pass":
+        return "pass_human_review_required"
+    return "review_required"
+
+
+def report_quality_next_actions(
+    quality: dict[str, Any],
+    grounding: dict[str, Any],
+    red_team: dict[str, Any],
+) -> list[str]:
+    actions = []
+    for check_row in quality.get("checks", []):
+        if check_row.get("status") == "fail":
+            actions.append(f"Fix failed quality check: {check_row.get('id')}.")
+    if grounding.get("unsupported_claims"):
+        actions.append("Resolve or remove claims with missing or unknown evidence IDs.")
+    for objection in red_team.get("objections", []):
+        if objection.get("severity") == "blocker":
+            actions.append(f"Resolve red-team blocker: {objection.get('issue')}.")
+    return actions[:5] or ["Send the report to human review for usefulness, factual correctness, and missing perspectives."]
+
+
 def alert_digest(payload: dict[str, Any]) -> dict:
     from canon.intelligence.alerts import run_alert_digest
 
