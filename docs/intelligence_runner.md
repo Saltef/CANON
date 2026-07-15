@@ -20,6 +20,16 @@ evidence.
 
 ## Offline Demo
 
+Run the full fixture handoff and print a compact summary:
+
+```powershell
+python -m canon.product.demo
+```
+
+The installed console script is `canon-demo`.
+
+For lower-level debugging, run ingestion and the brief runner separately:
+
 ```powershell
 python -m canon.ingest.unstructured --input data/fixtures/ai_infra_geo_risk_sample.jsonl --mode ai_infra_geo_risk_demo --chunk-tokens 80 --overlap-tokens 10
 python -m canon.intelligence.evidence_runner "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag

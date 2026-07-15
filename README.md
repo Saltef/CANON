@@ -40,6 +40,16 @@ Run the test suite:
 python -m pytest
 ```
 
+Run the built-in flagship demo:
+
+```powershell
+python -m canon.product.demo
+```
+
+The demo ingests the fixture corpus, runs the grounded intelligence brief,
+alert digest, automated gates, and review-packet preparation, then prints the
+next human-review action. Installed packages also expose this as `canon-demo`.
+
 Profile and ingest your own local corpus:
 
 ```powershell

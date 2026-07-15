@@ -9,7 +9,25 @@ corpus you can query and evaluate.
 python -m pytest
 ```
 
-## 2. Prepare A Local Corpus Folder
+## 2. Run The Built-In Demo
+
+```powershell
+python -m canon.product.demo
+```
+
+The demo runs the AI infrastructure fixture end to end: ingest, grounded brief,
+automated brief evaluation, alert digest, alert evaluation, review packet, and
+handoff summary. A successful automated run ends with
+`automated_pass_human_review_required`, because final quality still needs human
+labels.
+
+If CANON is installed as a package, the same command is available as:
+
+```powershell
+canon-demo
+```
+
+## 3. Prepare A Local Corpus Folder
 
 Use a local folder, mounted Google Drive folder, or local git checkout.
 
@@ -26,7 +44,7 @@ data/my_docs/
 Do not include secrets, private keys, `.env` files, credentials, or files you do
 not want indexed into local artifacts.
 
-## 3. Profile The Source
+## 4. Profile The Source
 
 ```powershell
 python -m canon.ingest.flexible --input data/my_docs --mode my_topic_v1 --profile-only
@@ -44,7 +62,7 @@ For a local git checkout:
 python -m canon.product.mounted_corpus --input "C:\path\to\repo" --mode repo_review_v1 --profile-only
 ```
 
-## 4. Ingest And Build A Corpus
+## 5. Ingest And Build A Corpus
 
 ```powershell
 python -m canon.ingest.flexible --input data/my_docs --mode my_topic_v1
@@ -60,7 +78,7 @@ python -m canon.product.mounted_corpus --input "G:\My Drive\CANON Corpus" --mode
 Generated raw/processed artifacts are written under `data/`. Generated reports
 are written under `reports/`. Both locations are gitignored.
 
-## 5. Query Through The API
+## 6. Query Through The API
 
 Start the API:
 
@@ -84,7 +102,7 @@ For the intended Drive-first workflow, use the private corpus as the first
 evidence source, then allow external expansion only when you want corroboration,
 freshness checks, or gap filling. See [drive_first_rag.md](drive_first_rag.md).
 
-## 6. Run The Pre-Human Gate
+## 7. Run The Pre-Human Gate
 
 ```powershell
 python -m canon.product.prehuman_check --mode my_topic_v1_corpus --benchmark-id llm_judged_my_topic_v1 --judge-provider heuristic --model-providers local --rerankers heuristic --top-k 10 --candidate-k 25
