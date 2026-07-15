@@ -31,6 +31,7 @@ class ProductServerRouteTests(unittest.TestCase):
         self.assertIn("/v1/intelligence-review/feedback", payload["post"])
         self.assertIn("/v1/intelligence-review/export-csv", payload["post"])
         self.assertIn("/v1/intelligence-review/import-csv", payload["post"])
+        self.assertIn("/v1/prehuman-check", payload["post"])
 
     def test_favicon_route_returns_empty_success(self):
         handler = object.__new__(CanonHandler)
@@ -61,6 +62,7 @@ class ProductServerRouteTests(unittest.TestCase):
         self.assertIn("mode", paths["/v1/flagship-handoff"]["optional"])
         self.assertEqual(paths["/v1/intelligence-review/import-csv"]["example"]["csv_path"], "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv")
         self.assertEqual(paths["/v1/intelligence-review/feedback"]["method"], "POST")
+        self.assertEqual(paths["/v1/prehuman-check"]["method"], "POST")
 
     def test_api_routes_include_examples_for_public_post_routes(self):
         metadata = api_routes()
@@ -92,6 +94,7 @@ class ProductServerRouteTests(unittest.TestCase):
             "/v1/intelligence-review/feedback": ("intelligence_review_feedback", {"status": "ready"}),
             "/v1/intelligence-review/export-csv": ("intelligence_review_export_csv", {"status": "review_csv_written"}),
             "/v1/intelligence-review/import-csv": ("intelligence_review_import_csv", {"status": "imported"}),
+            "/v1/prehuman-check": ("prehuman_check", {"status": "automated_pass_human_review_required"}),
         }
         for path, (service_name, response) in routes.items():
             with self.subTest(path=path):

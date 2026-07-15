@@ -10,6 +10,12 @@ The pre-human gate can run without manual labels:
 python -m canon.product.prehuman_check --mode my_topic_v1_corpus --benchmark-id llm_judged_my_topic_v1 --judge-provider heuristic --model-providers local --rerankers heuristic --top-k 10 --candidate-k 25
 ```
 
+The same gate is available through the product API:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/prehuman-check -ContentType "application/json" -Body '{"mode":"my_topic_v1_corpus","benchmark_id":"llm_judged_my_topic_v1","judge_provider":"heuristic","model_providers":["local"],"rerankers":["heuristic"],"top_k":10,"candidate_k":25}'
+```
+
 This prepares qrels review candidates, fills provisional relevance labels, runs
 semantic-model evaluation, rerank evaluation, source diversity, smoke checks,
 and readiness checks.

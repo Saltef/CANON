@@ -1035,6 +1035,30 @@ def model_evaluation(payload: dict[str, Any]) -> dict:
         raise ProductError(str(exc), status_code=400) from exc
 
 
+def prehuman_check(payload: dict[str, Any]) -> dict:
+    from canon.product.prehuman_check import run_prehuman_check
+
+    mode = str(payload.get("mode") or DEFAULT_MODE)
+    qrels_path = optional_path(payload.get("qrels_path") or payload.get("qrels"), "qrels_path")
+    try:
+        return run_prehuman_check(
+            mode=mode,
+            benchmark_id=optional_text(payload, "benchmark_id"),
+            qrels_path=qrels_path,
+            judge_provider=str(payload.get("judge_provider") or "heuristic"),
+            judge_model=optional_text(payload, "judge_model"),
+            model_providers=parse_providers_from_payload(payload.get("model_providers")),
+            rerankers=optional_string_list(payload.get("rerankers"), "rerankers"),
+            top_k=optional_positive_int(payload.get("top_k"), "top_k") or 10,
+            candidate_k=optional_positive_int(payload.get("candidate_k"), "candidate_k") or 25,
+            write_report=optional_bool(payload.get("write_report"), default=True),
+        )
+    except FileNotFoundError as exc:
+        raise ProductError(str(exc), status_code=404) from exc
+    except ValueError as exc:
+        raise ProductError(str(exc), status_code=400) from exc
+
+
 def build_query_diagnostics(
     query: str,
     mode: str,

@@ -93,6 +93,8 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.corpus_build(payload))
             elif parsed.path == "/v1/model-evaluation":
                 self.send_json(service.model_evaluation(payload))
+            elif parsed.path == "/v1/prehuman-check":
+                self.send_json(service.prehuman_check(payload))
             elif parsed.path == "/v1/diversity-audit":
                 self.send_json(service.diversity_audit(payload))
             else:
@@ -181,6 +183,7 @@ def api_index() -> dict:
             "/v1/sources/ingest",
             "/v1/corpora/build",
             "/v1/model-evaluation",
+            "/v1/prehuman-check",
             "/v1/diversity-audit",
         ],
         "examples": {
@@ -415,6 +418,31 @@ def api_routes() -> dict:
                 ["mode", "qrels_path or queries_path"],
                 ["providers", "k", "batch_size"],
                 {"mode": "my_topic_v1_corpus", "qrels_path": "gold/my_topic_qrels.json", "providers": ["local"]},
+            ),
+            route(
+                "POST",
+                "/v1/prehuman-check",
+                "Run automated qrels, model, rerank, diversity, smoke, and readiness checks up to the human-review boundary.",
+                [],
+                [
+                    "mode",
+                    "benchmark_id",
+                    "qrels_path",
+                    "judge_provider",
+                    "judge_model",
+                    "model_providers",
+                    "rerankers",
+                    "top_k",
+                    "candidate_k",
+                    "write_report",
+                ],
+                {
+                    "mode": "my_topic_v1_corpus",
+                    "benchmark_id": "llm_judged_my_topic_v1",
+                    "judge_provider": "heuristic",
+                    "model_providers": ["local"],
+                    "rerankers": ["heuristic"],
+                },
             ),
             route(
                 "POST",

@@ -542,6 +542,27 @@ class ProductServiceTests(unittest.TestCase):
         with self.assertRaises(service.ProductError):
             service.model_evaluation({"mode": "m"})
 
+    def test_prehuman_check_wraps_release_boundary_gate(self):
+        with patch("canon.product.prehuman_check.run_prehuman_check", return_value={"status": "automated_pass_human_review_required"}) as runner:
+            report = service.prehuman_check(
+                {
+                    "mode": "m",
+                    "benchmark_id": "llm_judged_m",
+                    "model_providers": ["local"],
+                    "rerankers": "heuristic",
+                    "top_k": "5",
+                    "candidate_k": "10",
+                    "write_report": "false",
+                }
+            )
+
+        self.assertEqual(report["status"], "automated_pass_human_review_required")
+        runner.assert_called_once()
+        self.assertEqual(runner.call_args.kwargs["mode"], "m")
+        self.assertEqual(runner.call_args.kwargs["model_providers"], ["local"])
+        self.assertEqual(runner.call_args.kwargs["rerankers"], ["heuristic"])
+        self.assertFalse(runner.call_args.kwargs["write_report"])
+
     def test_optional_bool_parses_strings(self):
         self.assertTrue(service.optional_bool("true"))
         self.assertFalse(service.optional_bool("false"))
