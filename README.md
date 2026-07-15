@@ -96,6 +96,13 @@ It is suitable for automated triage and packaging confidence, but not for
 declaring model winners or release-quality unsupported-claim rates. Re-run the
 same evaluations later against human-reviewed qrels.
 
+After human qrels review, re-test the same automated gates against reviewed
+labels:
+
+```powershell
+python -m canon.product.prehuman_check --mode social_science_ir_v1_harvest10 --qrels gold/<human_reviewed_qrels>.json --model-providers local,openai,cohere --rerankers heuristic,cohere --top-k 10 --candidate-k 25
+```
+
 Rerank evaluation:
 
 ```powershell

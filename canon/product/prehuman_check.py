@@ -22,6 +22,7 @@ DEFAULT_RERANKERS = ["heuristic", "cohere"]
 def run_prehuman_check(
     mode: str = service.DEFAULT_MODE,
     benchmark_id: str | None = None,
+    qrels_path: Path | None = None,
     judge_provider: str = "heuristic",
     judge_model: str | None = None,
     model_providers: list[str] | None = None,
@@ -32,28 +33,17 @@ def run_prehuman_check(
 ) -> dict[str, Any]:
     settings = load_settings()
     benchmark_id = benchmark_id or default_benchmark_id(mode)
-    qrels_packet = build_qrels_review_packet(mode=mode, top_k=top_k)
-    _, review_csv, _ = artifact_paths(settings.reports_dir, mode)
-    judged_csv = settings.reports_dir / f"qrels_review_tasks_{mode}.llm_judged.csv"
-    judge_report = judge_qrels_csv(
-        csv_path=review_csv,
-        output_path=judged_csv,
-        provider_name=judge_provider,
-        model=judge_model,
-        fill_relevance=True,
-    )
-    qrels_path = settings.root / "gold" / f"{benchmark_id}.json"
-    qrels_result = qrels_from_review_csv(
-        csv_path=judged_csv,
+    qrels_report = prepare_qrels(
+        mode=mode,
+        settings=settings,
         benchmark_id=benchmark_id,
-        output_path=qrels_path,
-        benchmark_kind="llm_judged_qrels",
-        description=(
-            "LLM/heuristic-judged provisional CANON qrels. Use for automated "
-            "triage only; re-run against human-reviewed qrels before release claims."
-        ),
-        allow_missing_relevance=True,
+        qrels_path=qrels_path,
+        judge_provider=judge_provider,
+        judge_model=judge_model,
+        top_k=top_k,
     )
+    qrels_path = Path(qrels_report["qrels_path"])
+    benchmark_id = qrels_report["benchmark_id"]
     semantic_report = evaluate_semantic_models(
         mode=mode,
         qrels_path=qrels_path,
@@ -72,9 +62,7 @@ def run_prehuman_check(
     smoke_report = smoke.build_smoke_report(mode=mode)
     readiness_report = readiness.build_readiness_report(mode=mode)
     components = [
-        component("qrels_candidate_packet", qrels_packet.get("candidate_count", 0) > 0, qrels_packet),
-        component("provisional_qrels_judge", judge_report.get("status") == "judged", judge_report),
-        component("provisional_qrels_export", qrels_result.get("status") == "qrels_written", qrels_result),
+        *qrels_components(qrels_report),
         component("semantic_model_evaluation", has_available_provider(semantic_report.get("providers", [])), semantic_report),
         component("rerank_evaluation", has_available_provider(rerank_report.get("rerankers", [])), rerank_report),
         component("source_diversity", diversity_report.get("status") == "pass", diversity_report),
@@ -85,7 +73,7 @@ def run_prehuman_check(
             False,
             {
                 "status": "required_for_release_claims",
-                "reason": "LLM-judged qrels are provisional and must be replaced or audited by human-reviewed qrels.",
+                "reason": human_review_limit_reason(qrels_report.get("benchmark_kind")),
             },
         ),
     ]
@@ -97,6 +85,7 @@ def run_prehuman_check(
         "status": "automated_pass_human_review_required" if automated_passed else "automated_fail",
         "benchmark_id": benchmark_id,
         "qrels_path": relative(settings.root, qrels_path),
+        "qrels_kind": qrels_report.get("benchmark_kind"),
         "judge": {"provider": judge_provider, "model": judge_model},
         "claim": prehuman_claim(automated_passed),
         "components": [compact_component(item) for item in components],
@@ -109,7 +98,7 @@ def run_prehuman_check(
                 "claiming unsupported factual claim rates",
                 "shipping an industry-pilot release",
             ],
-            "next_test": "Replace this benchmark with human-reviewed qrels and re-run this command.",
+            "next_test": next_human_test(qrels_report.get("benchmark_kind")),
         },
         "artifacts": artifacts(settings.root, settings.reports_dir, mode, benchmark_id, top_k),
     }
@@ -121,6 +110,93 @@ def run_prehuman_check(
             render_markdown(report),
         )
     return report
+
+
+def prepare_qrels(
+    mode: str,
+    settings: Any,
+    benchmark_id: str,
+    qrels_path: Path | None,
+    judge_provider: str,
+    judge_model: str | None,
+    top_k: int,
+) -> dict[str, Any]:
+    if qrels_path is not None:
+        resolved = resolve_path(settings.root, qrels_path)
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+        return {
+            "status": "provided",
+            "benchmark_id": payload.get("benchmark_id") or benchmark_id,
+            "benchmark_kind": payload.get("benchmark_kind") or "unknown_qrels",
+            "qrels_path": str(resolved),
+            "query_count": len(payload.get("queries") or []),
+            "judgment_count": sum(len(query.get("relevant") or {}) for query in payload.get("queries") or []),
+        }
+    qrels_packet = build_qrels_review_packet(mode=mode, top_k=top_k)
+    _, review_csv, _ = artifact_paths(settings.reports_dir, mode)
+    judged_csv = settings.reports_dir / f"qrels_review_tasks_{mode}.llm_judged.csv"
+    judge_report = judge_qrels_csv(
+        csv_path=review_csv,
+        output_path=judged_csv,
+        provider_name=judge_provider,
+        model=judge_model,
+        fill_relevance=True,
+    )
+    output_path = settings.root / "gold" / f"{benchmark_id}.json"
+    qrels_result = qrels_from_review_csv(
+        csv_path=judged_csv,
+        benchmark_id=benchmark_id,
+        output_path=output_path,
+        benchmark_kind="llm_judged_qrels",
+        description=(
+            "LLM/heuristic-judged provisional CANON qrels. Use for automated "
+            "triage only; re-run against human-reviewed qrels before release claims."
+        ),
+        allow_missing_relevance=True,
+    )
+    return {
+        "status": "generated",
+        "benchmark_id": benchmark_id,
+        "benchmark_kind": "llm_judged_qrels",
+        "qrels_path": str(output_path),
+        "packet": qrels_packet,
+        "judge": judge_report,
+        "export": qrels_result,
+        "query_count": qrels_result.get("query_count", 0),
+        "judgment_count": qrels_result.get("judgment_count", 0),
+    }
+
+
+def resolve_path(root: Path, path: Path) -> Path:
+    return path if path.is_absolute() else root / path
+
+
+def qrels_components(qrels_report: dict[str, Any]) -> list[dict[str, Any]]:
+    if qrels_report.get("status") == "provided":
+        return [
+            component(
+                "qrels_source",
+                qrels_report.get("query_count", 0) > 0 and qrels_report.get("judgment_count", 0) > 0,
+                qrels_report,
+            )
+        ]
+    return [
+        component(
+            "qrels_candidate_packet",
+            (qrels_report.get("packet") or {}).get("candidate_count", 0) > 0,
+            qrels_report.get("packet") or {},
+        ),
+        component(
+            "provisional_qrels_judge",
+            (qrels_report.get("judge") or {}).get("status") == "judged",
+            qrels_report.get("judge") or {},
+        ),
+        component(
+            "provisional_qrels_export",
+            (qrels_report.get("export") or {}).get("status") == "qrels_written",
+            qrels_report.get("export") or {},
+        ),
+    ]
 
 
 def default_benchmark_id(mode: str) -> str:
@@ -142,6 +218,13 @@ def compact_component(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def component_summary(identifier: str, report: dict[str, Any]) -> dict[str, Any]:
+    if identifier == "qrels_source":
+        return {
+            "benchmark_id": report.get("benchmark_id"),
+            "benchmark_kind": report.get("benchmark_kind"),
+            "query_count": report.get("query_count", 0),
+            "judgment_count": report.get("judgment_count", 0),
+        }
     if identifier == "qrels_candidate_packet":
         return {
             "query_count": report.get("query_count", 0),
@@ -209,6 +292,21 @@ def prehuman_claim(automated_passed: bool) -> str:
     return "One or more automated pre-human gates failed; inspect component summaries before human review."
 
 
+def human_review_limit_reason(benchmark_kind: str | None) -> str:
+    if benchmark_kind == "human_reviewed_qrels":
+        return (
+            "Retrieval qrels are human-reviewed, but report-level human review is still "
+            "required before release-quality unsupported-claim and usefulness claims."
+        )
+    return "LLM-judged qrels are provisional and must be replaced or audited by human-reviewed qrels."
+
+
+def next_human_test(benchmark_kind: str | None) -> str:
+    if benchmark_kind == "human_reviewed_qrels":
+        return "Run industry-pilot report review and final release audit against the reviewed acceptance packet."
+    return "Re-run this command with --qrels gold/<human_reviewed_qrels>.json after human qrels review."
+
+
 def artifacts(root: Path, reports_dir: Path, mode: str, benchmark_id: str, top_k: int) -> dict[str, str]:
     return {
         "qrels_review_json": relative(root, reports_dir / f"qrels_review_tasks_{mode}.json"),
@@ -267,6 +365,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run CANON automated checks up to the human-review boundary.")
     parser.add_argument("--mode", default=service.DEFAULT_MODE)
     parser.add_argument("--benchmark-id", default=None)
+    parser.add_argument("--qrels", default=None)
     parser.add_argument("--judge-provider", default="heuristic")
     parser.add_argument("--judge-model", default=None)
     parser.add_argument("--model-providers", default="local,openai,cohere")
@@ -277,6 +376,7 @@ def main() -> None:
     report = run_prehuman_check(
         mode=args.mode,
         benchmark_id=args.benchmark_id,
+        qrels_path=Path(args.qrels) if args.qrels else None,
         judge_provider=args.judge_provider,
         judge_model=args.judge_model,
         model_providers=parse_providers(args.model_providers),
