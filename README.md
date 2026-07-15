@@ -62,6 +62,7 @@ python -m canon.ingest.unstructured --input data/fixtures/ai_infra_geo_risk_samp
 python -m canon.synthesis.answer "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag --top-k 5
 python -m canon.intelligence.evidence_runner "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag
 python -m canon.eval.intelligence_brief --mode ai_infra_geo_risk_demo --queries-path gold/ai_infra_geo_risk_seed_queries.json --policy rag
+python -m canon.product.intelligence_review --prepare-review --mode ai_infra_geo_risk_demo --queries-path gold/ai_infra_geo_risk_seed_queries.json --policy rag
 ```
 
 Start the product API:

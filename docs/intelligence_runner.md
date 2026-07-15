@@ -62,6 +62,36 @@ The evaluation report checks:
 
 It writes `reports/intelligence_brief_eval_<mode>_<policy>.json` and `.md`.
 
+## Human Review Packet
+
+Prepare review tasks from the seed questions:
+
+```powershell
+python -m canon.product.intelligence_review --prepare-review --mode ai_infra_geo_risk_demo --queries-path gold/ai_infra_geo_risk_seed_queries.json --policy rag
+```
+
+Export the review fields to CSV:
+
+```powershell
+python -m canon.product.intelligence_review --export-review-csv --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json
+```
+
+After a human reviewer fills the labels, import them:
+
+```powershell
+python -m canon.product.intelligence_review --import-review-csv reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json --output reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json
+```
+
+Then check completion:
+
+```powershell
+python -m canon.product.intelligence_review --review-status --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json
+```
+
+Review labels include usefulness, actionability, evidence trust, uncertainty
+clarity, missing perspective, unsupported claim, overclaim risk, final status,
+and reviewer notes.
+
 ## Human Review Boundary
 
 The output status `ready_for_human_review` means the grounding checks passed.
