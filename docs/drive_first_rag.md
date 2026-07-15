@@ -130,6 +130,11 @@ request should include the private corpus mode and expansion preferences:
 
 The response includes:
 
+- `evidence_packets[].evidence_scope_summary`: counts for `private_corpus` and
+  `external_source` evidence
+- `supporting_evidence[].evidence_scope`: `private_corpus` or `external_source`
+- `supporting_evidence[].retrieval_stage`: where the evidence entered the
+  packet
 - `external_expansion.status`: `disabled`, `planned`, or `no_action`
 - `external_expansion.executed`: always `false` for the current safe planner
 - `external_expansion.suggested_queries`: reviewer-approved candidate searches

@@ -144,6 +144,7 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
         "supporting_evidence": [packet_evidence_item(item) for item in evidence],
         "conflicting_evidence": report.get("conflict_notes", []),
         "limitations": report.get("limitations", []),
+        "evidence_scope_summary": evidence_scope_summary(evidence),
         "source_diversity": {
             "distinct_sources": diversity["distinct_sources"],
             "distinct_clusters": diversity["distinct_clusters"],
@@ -635,6 +636,7 @@ def infer_issue_categories(research_frame: Any, query: str) -> list[str]:
 
 
 def packet_evidence_item(item: dict[str, Any]) -> dict[str, Any]:
+    scope = evidence_scope(item)
     return {
         "evidence_id": item.get("citation_id"),
         "chunk_id": item.get("chunk_id"),
@@ -649,11 +651,40 @@ def packet_evidence_item(item: dict[str, Any]) -> dict[str, Any]:
         "cluster_id": item.get("cluster_id"),
         "language": item.get("language"),
         "source_type": item.get("source_type") or item.get("document_type"),
+        "evidence_scope": scope,
+        "retrieval_stage": item.get("retrieval_stage") or retrieval_stage_for_scope(scope),
         "provenance": item.get("provenance"),
         "domain": item.get("domain"),
         "jurisdiction": item.get("jurisdiction"),
         "claim": item.get("claim"),
     }
+
+
+def evidence_scope(item: dict[str, Any]) -> str:
+    explicit = str(item.get("evidence_scope") or "").strip()
+    if explicit in {"private_corpus", "external_source"}:
+        return explicit
+    retrieval_stage = str(item.get("retrieval_stage") or "").strip()
+    if retrieval_stage.startswith("external"):
+        return "external_source"
+    provenance = normalized_term(item.get("provenance"))
+    if provenance in {"external source", "external", "public web"}:
+        return "external_source"
+    return "private_corpus"
+
+
+def retrieval_stage_for_scope(scope: str) -> str:
+    if scope == "external_source":
+        return "external_expansion"
+    return "private_corpus_retrieval"
+
+
+def evidence_scope_summary(evidence: list[dict[str, Any]]) -> dict[str, int]:
+    summary = {"private_corpus": 0, "external_source": 0}
+    for item in evidence:
+        scope = evidence_scope(item)
+        summary[scope] = summary.get(scope, 0) + 1
+    return summary
 
 
 def compact_packet_diagnostics(diagnostics: dict[str, Any]) -> dict[str, Any]:

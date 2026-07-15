@@ -150,6 +150,9 @@ class ProductServiceTests(unittest.TestCase):
         self.assertEqual(packet["confidence"], "medium")
         self.assertEqual(packet["issue_categories"], ["water", "energy"])
         self.assertEqual(packet["supporting_evidence"][0]["evidence_id"], "C1")
+        self.assertEqual(packet["supporting_evidence"][0]["evidence_scope"], "private_corpus")
+        self.assertEqual(packet["supporting_evidence"][0]["retrieval_stage"], "private_corpus_retrieval")
+        self.assertEqual(packet["evidence_scope_summary"], {"private_corpus": 1, "external_source": 0})
         self.assertEqual(packet["conflicting_evidence"][0]["id"], "conflict:1")
         self.assertEqual(report["query_diagnostics"]["weak_terms"], ["permitting"])
         self.assertEqual(report["retrieval_metrics"]["source_diversity_status"], "pass")
@@ -272,9 +275,27 @@ class ProductServiceTests(unittest.TestCase):
 
         self.assertEqual(item["language"], "en")
         self.assertEqual(item["source_type"], "official_report")
+        self.assertEqual(item["evidence_scope"], "private_corpus")
+        self.assertEqual(item["retrieval_stage"], "private_corpus_retrieval")
         self.assertEqual(item["provenance"], "official")
         self.assertEqual(item["domain"], "ai_infra_geo_risk")
         self.assertEqual(item["jurisdiction"], "Chile")
+
+    def test_packet_evidence_item_preserves_external_scope(self):
+        item = service.packet_evidence_item(
+            {
+                "citation_id": "E1",
+                "chunk_id": "external:1",
+                "work_id": "external-doc:1",
+                "title": "External filing",
+                "source_name": "Regulator",
+                "preview": "Text",
+                "evidence_scope": "external_source",
+            }
+        )
+
+        self.assertEqual(item["evidence_scope"], "external_source")
+        self.assertEqual(item["retrieval_stage"], "external_expansion")
 
     def test_evidence_packets_rejects_non_object_requirements(self):
         with self.assertRaises(service.ProductError):
