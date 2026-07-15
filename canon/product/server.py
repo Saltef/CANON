@@ -69,6 +69,8 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.alert_digest_evaluation(payload))
             elif parsed.path == "/v1/flagship-handoff":
                 self.send_json(service.flagship_handoff(payload))
+            elif parsed.path == "/v1/acceptance-scenario":
+                self.send_json(service.acceptance_scenario(payload))
             elif parsed.path == "/v1/intelligence-review/prepare":
                 self.send_json(service.intelligence_review_prepare(payload))
             elif parsed.path == "/v1/intelligence-review/status":
@@ -165,6 +167,7 @@ def api_index() -> dict:
             "/v1/alert-digest",
             "/v1/alert-digest/evaluate",
             "/v1/flagship-handoff",
+            "/v1/acceptance-scenario",
             "/v1/intelligence-review/prepare",
             "/v1/intelligence-review/status",
             "/v1/intelligence-review/export-csv",
@@ -317,6 +320,14 @@ def api_routes() -> dict:
                 "Run the built-in fixture workflow and return automated gate plus human-review status.",
                 [],
                 ["mode", "question", "fixture_path", "queries_path", "policy", "project_id", "write_report"],
+                {"mode": "ai_infra_geo_risk_demo", "write_report": True},
+            ),
+            route(
+                "POST",
+                "/v1/acceptance-scenario",
+                "Run the flagship acceptance checklist across project, frame, brief, alert, and review artifacts.",
+                [],
+                ["mode", "question", "policy", "project_id", "source_boundaries", "write_report"],
                 {"mode": "ai_infra_geo_risk_demo", "write_report": True},
             ),
             route(

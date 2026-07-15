@@ -92,6 +92,18 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/flagship-handoff -Conten
 The flagship handoff returns `automated_pass_human_review_required` when the
 offline workflow passes automated gates and still needs human labels.
 
+Run the flagship acceptance checklist:
+
+```powershell
+python -m canon.product.acceptance_scenario --mode ai_infra_geo_risk_demo
+Invoke-RestMethod -Method Post http://localhost:8000/v1/acceptance-scenario -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","write_report":true}'
+```
+
+The checklist verifies the project boundary, grounded claims/citations, at
+least three issue categories, regional coverage or visible gaps, public opinion
+or a public-evidence gap, uncertainty, next-watch signals, alert readiness, and
+human-review packet creation. It still stops at human review.
+
 Prepare and manage the human review packet through the API:
 
 ```powershell

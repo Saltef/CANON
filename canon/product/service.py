@@ -403,6 +403,24 @@ def flagship_handoff(payload: dict[str, Any]) -> dict:
     )
 
 
+def acceptance_scenario(payload: dict[str, Any]) -> dict:
+    from canon.product.acceptance_scenario import (
+        DEFAULT_MODE as DEFAULT_ACCEPTANCE_MODE,
+        DEFAULT_QUESTION,
+        run_acceptance_scenario,
+    )
+
+    question = optional_text(payload, "question") or optional_text(payload, "query") or DEFAULT_QUESTION
+    return run_acceptance_scenario(
+        mode=str(payload.get("mode") or DEFAULT_ACCEPTANCE_MODE),
+        question=question,
+        policy=str(payload.get("policy") or DEFAULT_POLICY),
+        project_id=str(payload.get("project_id") or "ai_infra_geo_risk"),
+        source_boundaries=optional_string_list(payload.get("source_boundaries"), "source_boundaries"),
+        write_report=optional_bool(payload.get("write_report"), default=True),
+    )
+
+
 def intelligence_review_prepare(payload: dict[str, Any]) -> dict:
     from canon.eval.intelligence_brief import DEFAULT_QUERY_PATH
     from canon.product.intelligence_review import build_review_tasks

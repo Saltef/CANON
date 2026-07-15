@@ -30,6 +30,7 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
         check("report_quality_endpoint_documented", "POST /v1/report-quality" in available_endpoints),
         check("alert_digest_endpoint_documented", "POST /v1/alert-digest" in available_endpoints),
         check("flagship_handoff_endpoint_documented", "POST /v1/flagship-handoff" in available_endpoints),
+        check("acceptance_scenario_endpoint_documented", "POST /v1/acceptance-scenario" in available_endpoints),
         check("intelligence_review_endpoint_documented", "POST /v1/intelligence-review/prepare" in available_endpoints),
         check("product_smoke_passed", smoke_report.get("status") == "pass"),
     ]

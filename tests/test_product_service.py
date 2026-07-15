@@ -365,6 +365,18 @@ class ProductServiceTests(unittest.TestCase):
         self.assertEqual(str(runner.call_args.kwargs["fixture_path"]).replace("\\", "/"), "data/fixtures/ai_infra_geo_risk_sample.jsonl")
         self.assertEqual(str(runner.call_args.kwargs["queries_path"]).replace("\\", "/"), "gold/ai_infra_geo_risk_seed_queries.json")
 
+    def test_acceptance_scenario_wraps_runner_with_defaults(self):
+        with patch(
+            "canon.product.acceptance_scenario.run_acceptance_scenario",
+            return_value={"status": "automated_pass_human_review_required"},
+        ) as runner:
+            report = service.acceptance_scenario({"write_report": "false"})
+
+        self.assertEqual(report["status"], "automated_pass_human_review_required")
+        runner.assert_called_once()
+        self.assertEqual(runner.call_args.kwargs["mode"], "ai_infra_geo_risk_demo")
+        self.assertFalse(runner.call_args.kwargs["write_report"])
+
     def test_intelligence_review_prepare_wraps_review_tasks(self):
         with patch("canon.product.intelligence_review.build_review_tasks", return_value={"report_id": "intelligence_brief_review_tasks_v1"}) as builder:
             report = service.intelligence_review_prepare(

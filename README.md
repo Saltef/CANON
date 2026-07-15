@@ -87,6 +87,7 @@ python -m canon.intelligence.alerts "What are the emerging geopolitical risks ar
 python -m canon.eval.alert_digest --mode ai_infra_geo_risk_demo --queries-path gold/ai_infra_geo_risk_seed_queries.json --policy rag
 python -m canon.product.intelligence_review --prepare-review --mode ai_infra_geo_risk_demo --queries-path gold/ai_infra_geo_risk_seed_queries.json --policy rag
 python -m canon.product.flagship_handoff --mode ai_infra_geo_risk_demo
+python -m canon.product.acceptance_scenario --mode ai_infra_geo_risk_demo
 ```
 
 Start the product API:
@@ -104,6 +105,7 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/projects/start -ContentT
 Invoke-RestMethod -Method Post http://localhost:8000/v1/sources/profile -ContentType "application/json" -Body '{"input_path":"data/my_docs","sample_size":25}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/frame-coverage -ContentType "application/json" -Body '{"question":"What does this corpus cover about grid risk?","mode":"my_topic_v1_corpus","research_frame":{"subdomains":["energy","water"],"regions":["Latin America"],"languages":["English","Spanish"]},"evidence_requirements":{"top_k":10,"minimum_source_types":["official","local_media"]}}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/report-quality -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/acceptance-scenario -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","write_report":true}'
 ```
 
 More examples are in [docs/quickstart.md](docs/quickstart.md).

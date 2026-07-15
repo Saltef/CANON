@@ -22,6 +22,7 @@ dev = [
 ]
 
 [project.scripts]
+canon-acceptance-scenario = "canon.product.acceptance_scenario:main"
 canon-api = "canon.product.server:main"
 canon-alert-digest = "canon.intelligence.alerts:main"
 canon-alert-eval = "canon.eval.alert_digest:main"

@@ -25,6 +25,7 @@ class ProductServerRouteTests(unittest.TestCase):
         self.assertIn("/v1/alert-digest", payload["post"])
         self.assertIn("/v1/alert-digest/evaluate", payload["post"])
         self.assertIn("/v1/flagship-handoff", payload["post"])
+        self.assertIn("/v1/acceptance-scenario", payload["post"])
         self.assertIn("/v1/intelligence-review/prepare", payload["post"])
         self.assertIn("/v1/intelligence-review/status", payload["post"])
         self.assertIn("/v1/intelligence-review/export-csv", payload["post"])
@@ -52,6 +53,7 @@ class ProductServerRouteTests(unittest.TestCase):
         self.assertEqual(paths["/v1/projects/start"]["method"], "POST")
         self.assertIn("project_name", paths["/v1/projects/start"]["required"])
         self.assertEqual(paths["/v1/flagship-handoff"]["method"], "POST")
+        self.assertEqual(paths["/v1/acceptance-scenario"]["method"], "POST")
         self.assertEqual(paths["/v1/frame-coverage"]["method"], "POST")
         self.assertEqual(paths["/v1/report-quality"]["method"], "POST")
         self.assertIn("research_frame", paths["/v1/frame-coverage"]["required"])
@@ -82,6 +84,7 @@ class ProductServerRouteTests(unittest.TestCase):
             "/v1/alert-digest": ("alert_digest", {"status": "ready_for_human_review"}),
             "/v1/alert-digest/evaluate": ("alert_digest_evaluation", {"status": "pass"}),
             "/v1/flagship-handoff": ("flagship_handoff", {"status": "automated_pass_human_review_required"}),
+            "/v1/acceptance-scenario": ("acceptance_scenario", {"status": "automated_pass_human_review_required"}),
             "/v1/intelligence-review/prepare": ("intelligence_review_prepare", {"report_id": "intelligence_brief_review_tasks_v1"}),
             "/v1/intelligence-review/status": ("intelligence_review_status", {"status": "incomplete"}),
             "/v1/intelligence-review/export-csv": ("intelligence_review_export_csv", {"status": "review_csv_written"}),
