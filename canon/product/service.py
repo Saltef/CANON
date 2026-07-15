@@ -196,6 +196,47 @@ def intelligence_brief(payload: dict[str, Any]) -> dict:
     )
 
 
+def alert_digest(payload: dict[str, Any]) -> dict:
+    from canon.intelligence.alerts import run_alert_digest
+
+    question = optional_text(payload, "question") or require_text(payload, "query")
+    mode = str(payload.get("mode") or DEFAULT_MODE)
+    policy = str(payload.get("policy") or DEFAULT_POLICY)
+    project_id = str(payload.get("project_id") or "ai_infra_geo_risk")
+    return run_alert_digest(
+        question=question,
+        mode=mode,
+        policy=policy,
+        project_id=project_id,
+        write_report=optional_bool(payload.get("write_report"), default=True),
+    )
+
+
+def flagship_handoff(payload: dict[str, Any]) -> dict:
+    from canon.product.flagship_handoff import (
+        DEFAULT_FIXTURE,
+        DEFAULT_MODE as DEFAULT_HANDOFF_MODE,
+        DEFAULT_QUESTION,
+        run_flagship_handoff,
+    )
+
+    question = optional_text(payload, "question") or optional_text(payload, "query") or DEFAULT_QUESTION
+    mode = str(payload.get("mode") or DEFAULT_HANDOFF_MODE)
+    policy = str(payload.get("policy") or DEFAULT_POLICY)
+    project_id = str(payload.get("project_id") or "ai_infra_geo_risk")
+    fixture_path = optional_path(payload.get("fixture_path") or payload.get("fixture"), "fixture_path") or DEFAULT_FIXTURE
+    queries_path = optional_path(payload.get("queries_path"), "queries_path")
+    return run_flagship_handoff(
+        mode=mode,
+        question=question,
+        fixture_path=fixture_path,
+        queries_path=queries_path,
+        policy=policy,
+        project_id=project_id,
+        write_report=optional_bool(payload.get("write_report"), default=True),
+    )
+
+
 def enrich_evidence_metadata(evidence: list[dict[str, Any]], mode: str) -> list[dict[str, Any]]:
     work_metadata = load_work_metadata(mode)
     enriched = []

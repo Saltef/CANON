@@ -53,6 +53,10 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.evidence_packets(payload))
             elif parsed.path == "/v1/intelligence-brief":
                 self.send_json(service.intelligence_brief(payload))
+            elif parsed.path == "/v1/alert-digest":
+                self.send_json(service.alert_digest(payload))
+            elif parsed.path == "/v1/flagship-handoff":
+                self.send_json(service.flagship_handoff(payload))
             elif parsed.path == "/v1/compare":
                 self.send_json(service.compare_retrieval(payload))
             elif parsed.path == "/v1/query-diagnostics":
@@ -132,6 +136,8 @@ def api_index() -> dict:
             "/v1/answer",
             "/v1/evidence-packets",
             "/v1/intelligence-brief",
+            "/v1/alert-digest",
+            "/v1/flagship-handoff",
             "/v1/compare",
             "/v1/query-diagnostics",
             "/v1/sources/profile",

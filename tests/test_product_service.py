@@ -196,6 +196,57 @@ class ProductServiceTests(unittest.TestCase):
         runner.assert_called_once()
         self.assertFalse(runner.call_args.kwargs["write_report"])
 
+    def test_alert_digest_wraps_runner(self):
+        with patch("canon.intelligence.alerts.run_alert_digest", return_value={"status": "ready_for_human_review"}) as runner:
+            report = service.alert_digest(
+                {
+                    "query": "AI data center risk",
+                    "mode": "m",
+                    "policy": "rag",
+                    "project_id": "ai_infra_geo_risk",
+                    "write_report": "false",
+                }
+            )
+
+        self.assertEqual(report["status"], "ready_for_human_review")
+        runner.assert_called_once()
+        self.assertEqual(runner.call_args.kwargs["question"], "AI data center risk")
+        self.assertEqual(runner.call_args.kwargs["mode"], "m")
+        self.assertFalse(runner.call_args.kwargs["write_report"])
+
+    def test_flagship_handoff_wraps_runner_with_defaults(self):
+        with patch(
+            "canon.product.flagship_handoff.run_flagship_handoff",
+            return_value={"status": "automated_pass_human_review_required"},
+        ) as runner:
+            report = service.flagship_handoff({"write_report": "false"})
+
+        self.assertEqual(report["status"], "automated_pass_human_review_required")
+        runner.assert_called_once()
+        self.assertEqual(runner.call_args.kwargs["mode"], "ai_infra_geo_risk_demo")
+        self.assertIn("AI data center expansion", runner.call_args.kwargs["question"])
+        self.assertFalse(runner.call_args.kwargs["write_report"])
+
+    def test_flagship_handoff_accepts_query_and_fixture_alias(self):
+        with patch(
+            "canon.product.flagship_handoff.run_flagship_handoff",
+            return_value={"status": "automated_pass_human_review_required"},
+        ) as runner:
+            service.flagship_handoff(
+                {
+                    "query": "custom question",
+                    "mode": "custom_mode",
+                    "fixture": "data/fixtures/ai_infra_geo_risk_sample.jsonl",
+                    "queries_path": "gold/ai_infra_geo_risk_seed_queries.json",
+                    "write_report": "false",
+                }
+            )
+
+        self.assertEqual(runner.call_args.kwargs["question"], "custom question")
+        self.assertEqual(runner.call_args.kwargs["mode"], "custom_mode")
+        self.assertEqual(str(runner.call_args.kwargs["fixture_path"]).replace("\\", "/"), "data/fixtures/ai_infra_geo_risk_sample.jsonl")
+        self.assertEqual(str(runner.call_args.kwargs["queries_path"]).replace("\\", "/"), "gold/ai_infra_geo_risk_seed_queries.json")
+
     def test_invalid_freedom_level_raises_product_error(self):
         with self.assertRaises(service.ProductError):
             service.query_diagnostics({"query": "q", "freedom_level": "wild"})

@@ -44,6 +44,21 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-brief -Cont
 The response includes `grounding_report`, `red_team`, `report_quality`, and the
 final `brief`.
 
+Generate an alert digest through the same product API:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/alert-digest -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","policy":"rag","write_report":true}'
+```
+
+Run the full flagship demo handoff through the API:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/flagship-handoff -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","write_report":true}'
+```
+
+The flagship handoff returns `automated_pass_human_review_required` when the
+offline workflow passes automated gates and still needs human labels.
+
 ## Evaluation Gate
 
 Run the intelligence-brief gate over seed questions:
