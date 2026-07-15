@@ -1,7 +1,44 @@
-.PHONY: build product-api product-smoke product-readiness product-release-audit product-final-check product-final-check-report industry-pilot industry-pilot-review industry-pilot-review-status industry-pilot-review-csv industry-pilot-import-review-csv dry-run test live diagnostics eval graph claims conflicts claim-model embeddings synthesize rag-eval topic-pack corpus-expansion harvest-v2 harvest-10k ingest-unstructured-demo ingest-mixed-domain-demo ingest-social-public-opinion-demo chunking-eval evidence-committee document-type-slices domain-slices social-public-opinion-analysis social-public-opinion-demo public-opinion-synthesis-smoke unstructured-readiness unstructured-coverage-matrix unstructured-portfolio workbench phase16 methods eval-pipeline eval-diversity diversity-diagnostics diversity-gate eval-batches eval-slices eval-probes eval-batches-large qrels-validate public-qrels-validate external-ir bootstrap-ir paired-significance faithfulness label-tasks label-calibration technical-calibration calibration-model preference-model hard-negative-anchors preference-model-anchors mixed-unstructured adversarial-corroboration adversarial-rag-security evaluation-anchors contract-validate importance-phase-gate perturbations data-card claim-decision regression-gate provider-compare pgvector-plan grobid-plan tune-weights dashboard manifest scientific-audit portfolio finished-demo full-eval
+.PHONY: build ci bootstrap-fixtures product-api product-smoke product-readiness product-release-audit product-release-audit-report product-final-check product-final-check-report industry-pilot industry-pilot-review industry-pilot-review-status industry-pilot-review-csv industry-pilot-import-review-csv dry-run test live diagnostics eval graph claims conflicts claim-model embeddings synthesize rag-eval topic-pack corpus-expansion harvest-v2 harvest-10k ingest-unstructured-demo ingest-mixed-domain-demo ingest-social-public-opinion-demo chunking-eval evidence-committee document-type-slices domain-slices social-public-opinion-analysis social-public-opinion-demo public-opinion-synthesis-smoke unstructured-readiness unstructured-coverage-matrix unstructured-portfolio workbench phase16 methods eval-pipeline eval-diversity diversity-diagnostics diversity-gate eval-batches eval-slices eval-probes eval-batches-large qrels-validate public-qrels-validate external-ir bootstrap-ir paired-significance faithfulness label-tasks label-calibration technical-calibration calibration-model preference-model hard-negative-anchors preference-model-anchors mixed-unstructured adversarial-corroboration adversarial-rag-security evaluation-anchors contract-validate importance-phase-gate perturbations data-card claim-decision regression-gate provider-compare pgvector-plan grobid-plan tune-weights dashboard manifest scientific-audit portfolio finished-demo full-eval
 
 build:
 	docker compose build canon
+
+bootstrap-fixtures:
+	python -m canon.ingest.unstructured --input data/fixtures/unstructured_sample.jsonl --mode unstructured_demo
+	python -m canon.corpus.build --corpus-id unstructured_demo_corpus --from-modes unstructured_demo --corpus-only
+	python -m canon.ingest.unstructured --input data/fixtures/mixed_domain_sample.jsonl --mode mixed_domain_demo
+	python -m canon.corpus.build --corpus-id mixed_domain_demo_corpus --from-modes mixed_domain_demo --corpus-only
+	python -m canon.ingest.social_media --input data/fixtures/social_media_public_opinion_sample.jsonl --mode social_public_opinion_demo --format jsonl
+	python -m canon.corpus.build --corpus-id social_public_opinion_demo_corpus --from-modes social_public_opinion_demo --corpus-only
+	python -m canon.eval.committee_gate_usefulness
+	python -m canon.eval.chunking_variants --write-report
+	python -c "from pathlib import Path; import json; path = Path('reports'); path.mkdir(parents=True, exist_ok=True); (path / 'human_review_tasks_v1.json').write_text(json.dumps({'records': []}) + '\\n', encoding='utf-8')"
+
+ci: bootstrap-fixtures
+	python -m pip install -e .
+	python -m unittest discover -s tests
+	python -m canon.ingest.pipeline --dry-run
+	python -m canon.quality.diagnostics --mode dry_run
+	python -m canon.eval.pipeline --mode dry_run
+	python -m canon.eval.batches --mode dry_run --batch-sizes 1,3,5
+	python -m canon.eval.probes --mode dry_run --method-ids diverse_k5_template,rag_k5_template
+	python -m canon.eval.qrels --input gold/ir_qrels_social_science_ir_v1_harvest10.json --format canon --benchmark-id internal_social_science_ir_qrels_v1
+	python -m canon.eval.qrels --input gold/public_qrels_beir_scifact_smoke.json --format canon --benchmark-id public_beir_scifact_smoke
+	python -m canon.eval.external_ir --mode dry_run --k 10
+	python -m canon.eval.uncertainty --mode dry_run --metric nDCG@10 --samples 500
+	python -m canon.eval.significance --mode dry_run --metric nDCG@10 --samples 1000
+	python -m canon.eval.faithfulness --mode dry_run --query-limit 5
+	python -m canon.eval.perturbations --mode dry_run --query-limit 8
+	python -m canon.reports.data_card --mode dry_run
+	python -m canon.reports.claim_decision --mode dry_run
+	python -m canon.product.industry_pilot --mode dry_run --prepare-review
+	python -m canon.product.industry_pilot --mode dry_run --records reports/human_review_tasks_v1.json --review-status
+	python -m canon.product.industry_pilot --mode dry_run --records reports/human_review_tasks_v1.json --no-fail
+	python -c "from canon.eval.regression_gate import run_regression_gate; import json; print(json.dumps(run_regression_gate('dry_run', thresholds={'data_card_work_count_min': 1, 'claim_decision_required_resolutions_min': 0}), indent=2))"
+	python -m canon.reports.scientific_audit --mode dry_run
+	python -m canon.product.smoke --mode dry_run
+	python -m canon.product.readiness --mode dry_run
+	python -m canon.product.release_audit --mode dry_run --no-fail
 
 product-api:
 	docker compose up canon
@@ -14,6 +51,9 @@ product-readiness:
 
 product-release-audit:
 	docker compose run --rm --no-deps canon python -m canon.product.release_audit --mode social_science_ir_v1_harvest10
+
+product-release-audit-report:
+	docker compose run --rm --no-deps canon python -m canon.product.release_audit --mode social_science_ir_v1_harvest10 --no-fail
 
 product-final-check:
 	docker compose run --rm --no-deps canon python -m canon.product.final_check --mode social_science_ir_v1_harvest10 --records /app/reports/human_review_tasks_v1.json

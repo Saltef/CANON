@@ -28,6 +28,19 @@ CANON is designed for evidence triage and reviewable first drafts. Human review
 is required before using outputs for final conclusions, publication, legal,
 medical, financial, policy, or other high-stakes decisions.
 
+## Quick Local Check
+
+```powershell
+python -m pip install -e .
+make test
+make ci
+```
+
+`make ci` runs install, unit tests, dry-run ingestion, report generation, and the product smoke/readiness gates with the same command path used in CI.
+
+Human review is required for final conclusions, citation validity, domain
+interpretation, corpus representativeness, and any high-stakes use.
+
 Automated checks can say "ready for human review." They should not be used to
 claim final model quality, factual correctness, or release-level unsupported
 claim rates without reviewed qrels and reviewed answer/report labels.

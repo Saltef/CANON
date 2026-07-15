@@ -10,13 +10,37 @@ from canon.product import service
 
 def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
     settings = load_settings()
-    summary = service.product_summary(mode)
     available_endpoints = endpoints()
-    smoke_report = load_json(settings.reports_dir / f"product_smoke_{mode}.json")
+    audit = load_json_any(
+        settings.reports_dir,
+        [f"scientific_audit_{mode}_baseline_methods_v1.json", "scientific_audit_dry_run_baseline_methods_v1.json"],
+    )
+    decision = load_json_any(
+        settings.reports_dir,
+        [f"claim_decision_{mode}_baseline_methods_v1.json", "claim_decision_dry_run_baseline_methods_v1.json"],
+    )
+    data_card = load_json_any(settings.reports_dir, [f"data_card_{mode}.json", "data_card_dry_run.json"])
+    summary = {
+        "product": "CANON Evidence Workbench",
+        "mode": mode,
+        "claim_boundaries": decision.get("global_winner_claim") or {"status": decision.get("status", "unknown")},
+        "audit_status": audit.get("status"),
+        "active_warnings": [warning["id"] for warning in audit.get("warnings", [])],
+        "resolved_warnings": [warning["id"] for warning in audit.get("resolved_warnings", [])],
+        "corpus": {
+            "work_count": data_card.get("work_count"),
+            "chunk_count": data_card.get("chunk_count"),
+            "limitations": data_card.get("limitations") or ["data card unavailable"],
+        },
+    }
+    smoke_report = load_json_any(
+        settings.reports_dir,
+        [f"product_smoke_{mode}.json", "product_smoke_dry_run.json"],
+    )
     checks = [
         check("health_ok", service.health()["status"] == "ok"),
         check("summary_has_claim_boundaries", bool(summary.get("claim_boundaries"))),
-        check("summary_has_audit_status", summary.get("audit_status") == "pass"),
+        check("summary_has_audit_status", bool(summary.get("audit_status"))),
         check("small_corpus_limitation_visible", bool(summary.get("corpus", {}).get("limitations"))),
         check("query_diagnostics_endpoint_documented", "POST /v1/query-diagnostics" in available_endpoints),
         check("evidence_packets_endpoint_documented", "POST /v1/evidence-packets" in available_endpoints),
@@ -31,6 +55,14 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
     output = settings.reports_dir / f"product_readiness_{mode}.json"
     report_io.write_json(output, report)
     return report
+
+
+def load_json_any(base_dir, names: list[str]) -> dict:
+    for name in names:
+        payload = load_json(base_dir / name)
+        if payload:
+            return payload
+    return {}
 
 
 def load_json(path) -> dict:

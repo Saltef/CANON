@@ -48,9 +48,15 @@ def health() -> dict:
 
 def product_summary(mode: str = DEFAULT_MODE) -> dict:
     settings = load_settings()
-    audit = load_report(settings.reports_dir / f"scientific_audit_{mode}_baseline_methods_v1.json")
-    decision = load_report(settings.reports_dir / f"claim_decision_{mode}_baseline_methods_v1.json")
-    data_card = load_report(settings.reports_dir / f"data_card_{mode}.json")
+    audit = load_report_any(
+        settings.reports_dir,
+        [f"scientific_audit_{mode}_baseline_methods_v1.json", "scientific_audit_dry_run_baseline_methods_v1.json"],
+    )
+    decision = load_report_any(
+        settings.reports_dir,
+        [f"claim_decision_{mode}_baseline_methods_v1.json", "claim_decision_dry_run_baseline_methods_v1.json"],
+    )
+    data_card = load_report_any(settings.reports_dir, [f"data_card_{mode}.json", "data_card_dry_run.json"])
     return {
         "product": "CANON Evidence Workbench",
         "mode": mode,
@@ -71,6 +77,14 @@ def product_summary(mode: str = DEFAULT_MODE) -> dict:
             "limitations": data_card.get("limitations", []),
         },
     }
+
+
+def load_report_any(reports_dir, names: list[str]) -> dict:
+    for name in names:
+        report = load_report(reports_dir / name)
+        if report:
+            return report
+    return {}
 
 
 def answer(payload: dict[str, Any]) -> dict:
