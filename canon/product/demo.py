@@ -73,6 +73,9 @@ def key_artifacts(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
         "intelligence_brief_json",
         "alert_digest_json",
         "intelligence_review_tasks_json",
+        "intelligence_review_tasks_review_csv",
+        "intelligence_review_handoff_json",
+        "intelligence_review_handoff_markdown",
     }
     return [
         {
@@ -82,8 +85,25 @@ def key_artifacts(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "sha256": artifact.get("sha256"),
         }
         for artifact in artifacts
-        if artifact.get("id") in wanted
+        if artifact_is_key(artifact, wanted)
     ]
+
+
+def artifact_is_key(artifact: dict[str, Any], wanted: set[str]) -> bool:
+    identifier = str(artifact.get("id") or "")
+    path = str(artifact.get("path") or "")
+    name = path.replace("\\", "/").rsplit("/", 1)[-1]
+    if identifier in wanted:
+        return True
+    return (
+        name.startswith("flagship_handoff_")
+        or name.startswith("intelligence_brief_review_tasks_")
+        or name.startswith("intelligence_brief_review_handoff_")
+        or name.startswith("intelligence_brief_eval_")
+        or name.startswith("alert_digest_eval_")
+        or name.startswith("intelligence_brief_")
+        or name.startswith("alert_digest_")
+    )
 
 
 def main() -> None:

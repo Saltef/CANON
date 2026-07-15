@@ -14,8 +14,9 @@ class ProductDemoTests(unittest.TestCase):
         self.assertEqual(summary["human_review"]["status"], "incomplete")
         self.assertEqual(summary["human_review"]["question_count"], 5)
         self.assertEqual(summary["automated_steps"][0]["id"], "ingest_fixture")
-        self.assertEqual(len(summary["key_artifacts"]), 2)
+        self.assertEqual(len(summary["key_artifacts"]), 3)
         self.assertTrue(all("path" in artifact for artifact in summary["key_artifacts"]))
+        self.assertTrue(any("review_handoff" in artifact["path"] for artifact in summary["key_artifacts"]))
 
     def test_run_demo_wraps_flagship_handoff(self):
         with patch("canon.product.demo.run_flagship_handoff", return_value=handoff_report()) as handoff:
@@ -57,16 +58,22 @@ def handoff_report():
         },
         "artifacts": [
             {
-                "id": "flagship_handoff_json",
+                "id": "flagship_handoff_ai_infra_geo_risk_demo_json",
                 "path": "reports/flagship_handoff_ai_infra_geo_risk_demo.json",
                 "exists": True,
                 "sha256": "abc",
             },
             {
-                "id": "intelligence_review_tasks_json",
+                "id": "intelligence_brief_review_tasks_ai_infra_geo_risk_demo_json",
                 "path": "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json",
                 "exists": True,
                 "sha256": "def",
+            },
+            {
+                "id": "intelligence_brief_review_handoff_v1_json",
+                "path": "reports/intelligence_brief_review_handoff_v1.json",
+                "exists": True,
+                "sha256": "jkl",
             },
             {
                 "id": "non_key_artifact",

@@ -48,7 +48,8 @@ python -m canon.product.demo
 
 The demo ingests the fixture corpus, runs the grounded intelligence brief,
 alert digest, automated gates, and review-packet preparation, then prints the
-next human-review action. Installed packages also expose this as `canon-demo`.
+next human-review action plus key artifact paths. Installed packages also
+expose this as `canon-demo`.
 
 Create a scoped intelligence project before connecting private sources:
 

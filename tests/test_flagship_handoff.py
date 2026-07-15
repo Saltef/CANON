@@ -58,10 +58,12 @@ class FlagshipHandoffTests(unittest.TestCase):
                             with patch("canon.product.flagship_handoff.run_alert_digest", return_value={"status": "ready_for_human_review", "alert_count": 2, "duplicate_alerts": {"duplicate_alert_rate": 0.0}}):
                                 with patch("canon.product.flagship_handoff.evaluate_alert_digests", return_value={"status": "pass", "summary": {"pass_rate": 1.0}}):
                                     with patch("canon.product.flagship_handoff.build_review_tasks", return_value={"records": [{"id": "q1"}]}):
-                                        report = run_flagship_handoff(write_report=True)
+                                        with patch("canon.product.flagship_handoff.build_review_handoff", return_value={"status": "ready_for_human_review"}):
+                                            report = run_flagship_handoff(write_report=True)
 
         self_artifact = next(item for item in report["artifacts"] if item["path"].endswith("flagship_handoff_ai_infra_geo_risk_demo.json"))
         self.assertTrue(self_artifact["exists"])
+        self.assertEqual(self_artifact["id"], "flagship_handoff_ai_infra_geo_risk_demo_json")
         self.assertEqual(len(self_artifact["sha256"]), 64)
 
 

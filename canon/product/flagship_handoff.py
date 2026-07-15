@@ -12,7 +12,7 @@ from canon.eval.intelligence_brief import DEFAULT_QUERY_PATH, evaluate_intellige
 from canon.ingest.unstructured import ingest_unstructured_jsonl
 from canon.intelligence.alerts import run_alert_digest
 from canon.intelligence.evidence_runner import run_intelligence_brief
-from canon.product.intelligence_review import build_review_status_report, build_review_tasks
+from canon.product.intelligence_review import build_review_handoff, build_review_status_report, build_review_tasks
 from canon.product.report_io import write_json, write_markdown
 
 
@@ -76,6 +76,8 @@ def run_flagship_handoff(
         if write_report
         else review_status_from_packet(review_packet)
     )
+    if write_report:
+        build_review_handoff(review_records_path, write_report=write_report)
     steps = step_results(
         ingest_report=ingest_report,
         brief_report=brief_report,
@@ -226,7 +228,10 @@ def artifact_manifest(reports_dir: Path, mode: str, question: str, policy: str) 
         reports_dir / f"intelligence_brief_eval_{mode}_{policy}.json",
         reports_dir / f"alert_digest_eval_{mode}_{policy}.json",
         reports_dir / f"intelligence_brief_review_tasks_{mode}.json",
+        reports_dir / f"intelligence_brief_review_tasks_{mode}.review.csv",
         reports_dir / f"intelligence_brief_review_status_v1.json",
+        reports_dir / f"intelligence_brief_review_handoff_v1.json",
+        reports_dir / f"intelligence_brief_review_handoff_v1.md",
     ]
     paths.extend(sorted(reports_dir.glob(f"intelligence_brief_{mode}_*.json"))[:1])
     paths.extend(sorted(reports_dir.glob(f"alert_digest_{mode}_*.json"))[:1])
@@ -235,14 +240,25 @@ def artifact_manifest(reports_dir: Path, mode: str, question: str, policy: str) 
 
 def fingerprint(path: Path, reports_dir: Path) -> dict[str, Any]:
     if not path.exists():
-        return {"path": relative_path(path, reports_dir), "exists": False, "size_bytes": 0, "sha256": None}
+        return {
+            "id": artifact_id(path),
+            "path": relative_path(path, reports_dir),
+            "exists": False,
+            "size_bytes": 0,
+            "sha256": None,
+        }
     data = path.read_bytes()
     return {
+        "id": artifact_id(path),
         "path": relative_path(path, reports_dir),
         "exists": True,
         "size_bytes": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),
     }
+
+
+def artifact_id(path: Path) -> str:
+    return path.name.replace(".", "_").replace("-", "_")
 
 
 def relative_path(path: Path, reports_dir: Path) -> str:
