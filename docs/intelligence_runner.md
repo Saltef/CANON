@@ -111,6 +111,7 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/prep
 Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/export-csv -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json","output_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv"}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/import-csv -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json","csv_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv","output_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/status -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/feedback -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
 ```
 
 The import endpoint validates human-entered labels. It does not create labels or
@@ -199,6 +200,12 @@ Then check completion:
 
 ```powershell
 python -m canon.product.intelligence_review --review-status --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json
+```
+
+Summarize completed labels and identify regression candidates:
+
+```powershell
+python -m canon.product.intelligence_review --feedback-report --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json
 ```
 
 Review labels include usefulness, actionability, evidence trust, uncertainty

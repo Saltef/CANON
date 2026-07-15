@@ -457,6 +457,16 @@ def intelligence_review_status(payload: dict[str, Any]) -> dict:
     )
 
 
+def intelligence_review_feedback(payload: dict[str, Any]) -> dict:
+    from canon.product.intelligence_review import build_feedback_report
+
+    records_path = intelligence_review_records_path(payload)
+    return build_feedback_report(
+        records_path,
+        write_report=optional_bool(payload.get("write_report"), default=True),
+    )
+
+
 def intelligence_review_export_csv(payload: dict[str, Any]) -> dict:
     from canon.product.intelligence_review import export_review_csv
 

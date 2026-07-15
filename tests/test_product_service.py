@@ -403,6 +403,14 @@ class ProductServiceTests(unittest.TestCase):
         self.assertTrue(str(status.call_args.args[0]).replace("\\", "/").endswith("reports/intelligence_brief_review_tasks_m.json"))
         self.assertFalse(status.call_args.kwargs["write_report"])
 
+    def test_intelligence_review_feedback_uses_mode_default_records_path(self):
+        with patch("canon.product.intelligence_review.build_feedback_report", return_value={"status": "ready"}) as feedback:
+            report = service.intelligence_review_feedback({"mode": "m", "write_report": "false"})
+
+        self.assertEqual(report["status"], "ready")
+        self.assertTrue(str(feedback.call_args.args[0]).replace("\\", "/").endswith("reports/intelligence_brief_review_tasks_m.json"))
+        self.assertFalse(feedback.call_args.kwargs["write_report"])
+
     def test_intelligence_review_export_csv_returns_written_path(self):
         with patch("canon.product.intelligence_review.export_review_csv", return_value=service.Path("reports/review.csv")) as exporter:
             report = service.intelligence_review_export_csv(

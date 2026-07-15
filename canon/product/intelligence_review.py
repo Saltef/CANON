@@ -137,6 +137,33 @@ def build_review_status_report(
     return report
 
 
+def build_feedback_report(records_path: Path, write_report: bool = True) -> dict[str, Any]:
+    settings = load_settings()
+    records = load_records(records_path)
+    completed = [record for record in records if not missing_review_fields(record) and not validate_review_record(record)]
+    report = {
+        "report_id": "intelligence_brief_feedback_v1",
+        "records_path": relative(settings.root, resolve_path(settings.root, records_path)),
+        "status": "ready" if completed else "needs_review_labels",
+        "record_count": len(records),
+        "reviewed_record_count": len(completed),
+        "metrics": feedback_metrics(completed),
+        "issue_counts": feedback_issue_counts(completed),
+        "regression_candidates": regression_candidates(completed),
+        "human_review_boundary": (
+            "This report summarizes reviewer labels and proposes regression candidates. "
+            "It does not change acceptance status or create qrels automatically."
+        ),
+    }
+    if write_report:
+        write_json(settings.reports_dir / "intelligence_brief_feedback_v1.json", report)
+        write_markdown(
+            settings.reports_dir / "intelligence_brief_feedback_v1.md",
+            render_feedback_report(report),
+        )
+    return report
+
+
 def export_review_csv(records_path: Path, output_path: Path | None = None) -> Path:
     records = load_records(records_path)
     output = output_path or records_path.with_suffix(".review.csv")
@@ -196,6 +223,83 @@ def import_review_csv(records_path: Path, csv_path: Path, output_path: Path | No
         "record_count": len(records),
         "validation_errors": [],
     }
+
+
+def feedback_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "average_usefulness_1_5": average_review_field(records, "usefulness_1_5"),
+        "average_actionability_1_5": average_review_field(records, "actionability_1_5"),
+        "average_evidence_trust_1_5": average_review_field(records, "evidence_trust_1_5"),
+        "average_uncertainty_clarity_1_5": average_review_field(records, "uncertainty_clarity_1_5"),
+        "final_review_status_counts": value_counts(records, "final_review_status"),
+    }
+
+
+def feedback_issue_counts(records: list[dict[str, Any]]) -> dict[str, int]:
+    return {
+        "missing_perspective_yes": count_review_value(records, "missing_perspective", "yes"),
+        "unsupported_claim_yes": count_review_value(records, "unsupported_claim", "yes"),
+        "overclaim_risk_medium_or_high": sum(
+            1
+            for record in records
+            if (record.get("review") or {}).get("overclaim_risk") in {"medium", "high"}
+        ),
+        "needs_more_evidence_or_rejected": sum(
+            1
+            for record in records
+            if (record.get("review") or {}).get("final_review_status") in {"needs_more_evidence", "rejected"}
+        ),
+    }
+
+
+def regression_candidates(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    candidates = []
+    for record in records:
+        review = record.get("review") or {}
+        reasons = []
+        if review.get("unsupported_claim") == "yes":
+            reasons.append("unsupported_claim")
+        if review.get("missing_perspective") == "yes":
+            reasons.append("missing_perspective")
+        if review.get("overclaim_risk") in {"medium", "high"}:
+            reasons.append(f"overclaim_risk_{review.get('overclaim_risk')}")
+        if review.get("final_review_status") in {"needs_more_evidence", "rejected"}:
+            reasons.append(str(review.get("final_review_status")))
+        if reasons:
+            candidates.append(
+                {
+                    "id": record.get("id"),
+                    "query": record.get("query"),
+                    "reasons": reasons,
+                    "reviewer_notes": review.get("reviewer_notes", ""),
+                    "suggested_regression": "Keep this query in the acceptance set and verify the same issue does not recur.",
+                }
+            )
+    return candidates
+
+
+def average_review_field(records: list[dict[str, Any]], field: str) -> float | None:
+    values = [
+        (record.get("review") or {}).get(field)
+        for record in records
+        if isinstance((record.get("review") or {}).get(field), int)
+    ]
+    if not values:
+        return None
+    return round(sum(values) / len(values), 4)
+
+
+def value_counts(records: list[dict[str, Any]], field: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        value = (record.get("review") or {}).get(field)
+        if value:
+            counts[str(value)] = counts.get(str(value), 0) + 1
+    return counts
+
+
+def count_review_value(records: list[dict[str, Any]], field: str, expected: str) -> int:
+    return sum(1 for record in records if (record.get("review") or {}).get(field) == expected)
 
 
 def compact_brief_report(report: dict[str, Any]) -> dict[str, Any]:
@@ -477,6 +581,50 @@ Missing fields: {report['missing_field_count']}
 """
 
 
+def render_feedback_report(report: dict[str, Any]) -> str:
+    status_counts = "\n".join(
+        f"- `{status}`: {count}"
+        for status, count in report["metrics"]["final_review_status_counts"].items()
+    ) or "- None"
+    issues = "\n".join(
+        f"- `{key}`: {value}"
+        for key, value in report["issue_counts"].items()
+    )
+    regressions = "\n".join(
+        f"- `{item['id']}`: {', '.join(item['reasons'])} - {item['query']}"
+        for item in report["regression_candidates"]
+    ) or "- None"
+    return f"""# Intelligence Brief Human Feedback
+
+Status: **{report['status']}**
+
+Reviewed records: {report['reviewed_record_count']} / {report['record_count']}
+
+## Averages
+
+- usefulness: {report['metrics']['average_usefulness_1_5']}
+- actionability: {report['metrics']['average_actionability_1_5']}
+- evidence trust: {report['metrics']['average_evidence_trust_1_5']}
+- uncertainty clarity: {report['metrics']['average_uncertainty_clarity_1_5']}
+
+## Final Status Counts
+
+{status_counts}
+
+## Issue Counts
+
+{issues}
+
+## Regression Candidates
+
+{regressions}
+
+## Boundary
+
+{report['human_review_boundary']}
+"""
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Prepare and score human review packets for intelligence briefs.")
     parser.add_argument("--mode", default="ai_infra_geo_risk_demo")
@@ -487,6 +635,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--prepare-review", action="store_true")
     parser.add_argument("--review-status", action="store_true")
+    parser.add_argument("--feedback-report", action="store_true")
     parser.add_argument("--export-review-csv", action="store_true")
     parser.add_argument("--import-review-csv", type=Path)
     parser.add_argument("--reset-review-labels", action="store_true")
@@ -508,6 +657,11 @@ def main() -> None:
             raise SystemExit("--records is required with --review-status")
         print(json.dumps(build_review_status_report(args.records), indent=2))
         return
+    if args.feedback_report:
+        if not args.records:
+            raise SystemExit("--records is required with --feedback-report")
+        print(json.dumps(build_feedback_report(args.records), indent=2))
+        return
     if args.export_review_csv:
         if not args.records:
             raise SystemExit("--records is required with --export-review-csv")
@@ -519,7 +673,7 @@ def main() -> None:
             raise SystemExit("--records is required with --import-review-csv")
         print(json.dumps(import_review_csv(args.records, args.import_review_csv, args.output), indent=2))
         return
-    raise SystemExit("Choose --prepare-review, --review-status, --export-review-csv, or --import-review-csv.")
+    raise SystemExit("Choose --prepare-review, --review-status, --feedback-report, --export-review-csv, or --import-review-csv.")
 
 
 if __name__ == "__main__":

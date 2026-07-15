@@ -75,6 +75,8 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.intelligence_review_prepare(payload))
             elif parsed.path == "/v1/intelligence-review/status":
                 self.send_json(service.intelligence_review_status(payload))
+            elif parsed.path == "/v1/intelligence-review/feedback":
+                self.send_json(service.intelligence_review_feedback(payload))
             elif parsed.path == "/v1/intelligence-review/export-csv":
                 self.send_json(service.intelligence_review_export_csv(payload))
             elif parsed.path == "/v1/intelligence-review/import-csv":
@@ -170,6 +172,7 @@ def api_index() -> dict:
             "/v1/acceptance-scenario",
             "/v1/intelligence-review/prepare",
             "/v1/intelligence-review/status",
+            "/v1/intelligence-review/feedback",
             "/v1/intelligence-review/export-csv",
             "/v1/intelligence-review/import-csv",
             "/v1/compare",
@@ -361,6 +364,14 @@ def api_routes() -> dict:
                 "POST",
                 "/v1/intelligence-review/status",
                 "Check whether required human review fields are complete and valid.",
+                ["records_path or mode"],
+                ["write_report"],
+                {"records_path": "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"},
+            ),
+            route(
+                "POST",
+                "/v1/intelligence-review/feedback",
+                "Summarize completed human labels and propose regression candidates.",
                 ["records_path or mode"],
                 ["write_report"],
                 {"records_path": "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"},

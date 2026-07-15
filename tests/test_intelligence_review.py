@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from canon.product.intelligence_review import (
+    build_feedback_report,
     build_review_status_report,
     build_review_tasks,
     export_review_csv,
@@ -111,6 +112,34 @@ class IntelligenceReviewTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed_validation")
         self.assertFalse(output_path.exists())
         self.assertTrue(any(error["message"] == "CSV review id does not exist in the review packet" for error in result["validation_errors"]))
+
+    def test_feedback_report_summarizes_labels_and_regression_candidates(self):
+        record = review_record()
+        record["review"] = complete_review()
+        risky = review_record()
+        risky["id"] = "q2"
+        risky["query"] = "Water risk"
+        risky["review"] = {
+            **complete_review(),
+            "usefulness_1_5": 2,
+            "missing_perspective": "yes",
+            "unsupported_claim": "yes",
+            "overclaim_risk": "high",
+            "final_review_status": "needs_more_evidence",
+            "reviewer_notes": "Needs local evidence.",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "records.json"
+            path.write_text(json.dumps({"records": [record, risky]}), encoding="utf-8")
+            report = build_feedback_report(path, write_report=False)
+
+        self.assertEqual(report["report_id"], "intelligence_brief_feedback_v1")
+        self.assertEqual(report["status"], "ready")
+        self.assertEqual(report["metrics"]["average_usefulness_1_5"], 3.5)
+        self.assertEqual(report["issue_counts"]["unsupported_claim_yes"], 1)
+        self.assertEqual(report["metrics"]["final_review_status_counts"]["needs_more_evidence"], 1)
+        self.assertEqual(report["regression_candidates"][0]["id"], "q2")
+        self.assertIn("unsupported_claim", report["regression_candidates"][0]["reasons"])
 
 
 def review_record():

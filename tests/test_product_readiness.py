@@ -26,6 +26,7 @@ class ProductReadinessTests(unittest.TestCase):
         self.assertIn("POST /v1/flagship-handoff", report["endpoints"])
         self.assertIn("POST /v1/acceptance-scenario", report["endpoints"])
         self.assertIn("POST /v1/intelligence-review/prepare", report["endpoints"])
+        self.assertIn("POST /v1/intelligence-review/feedback", report["endpoints"])
         self.assertGreater(report["route_metadata"]["route_count"], 0)
         self.assertTrue(report["route_metadata"]["human_review_boundary"])
         self.assertIn("project_start_endpoint_documented", [check["id"] for check in report["checks"]])
@@ -33,6 +34,7 @@ class ProductReadinessTests(unittest.TestCase):
         self.assertIn("frame_coverage_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("report_quality_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("acceptance_scenario_endpoint_documented", [check["id"] for check in report["checks"]])
+        self.assertIn("intelligence_feedback_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("routes_metadata_examples_present", [check["id"] for check in report["checks"]])
         self.assertIn("product_smoke_passed", [check["id"] for check in report["checks"]])
 

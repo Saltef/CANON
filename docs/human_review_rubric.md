@@ -24,6 +24,17 @@ For every question, complete:
 The industry gate treats a question as unreviewed until all required fields are
 present and valid.
 
+After importing labels, generate the feedback summary:
+
+```powershell
+python -m canon.product.intelligence_review --feedback-report --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json
+```
+
+The feedback report aggregates reviewer scores, counts rejected or
+needs-more-evidence outcomes, and proposes regression candidates for unsupported
+claims, missing perspectives, and overclaim risk. It does not automatically
+change qrels or release status.
+
 ## Evidence Relevance
 
 - `irrelevant`: the retrieved evidence does not help answer the query.
