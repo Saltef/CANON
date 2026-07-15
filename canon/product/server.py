@@ -51,6 +51,8 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.answer(payload))
             elif parsed.path == "/v1/evidence-packets":
                 self.send_json(service.evidence_packets(payload))
+            elif parsed.path == "/v1/intelligence-brief":
+                self.send_json(service.intelligence_brief(payload))
             elif parsed.path == "/v1/compare":
                 self.send_json(service.compare_retrieval(payload))
             elif parsed.path == "/v1/query-diagnostics":
@@ -129,6 +131,7 @@ def api_index() -> dict:
         "post": [
             "/v1/answer",
             "/v1/evidence-packets",
+            "/v1/intelligence-brief",
             "/v1/compare",
             "/v1/query-diagnostics",
             "/v1/sources/profile",

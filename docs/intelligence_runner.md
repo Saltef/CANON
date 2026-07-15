@@ -27,6 +27,23 @@ python -m canon.intelligence.evidence_runner "What are the emerging geopolitical
 
 The command writes JSON and Markdown reports under `reports/`.
 
+## Product API
+
+Start the local API:
+
+```powershell
+python -m canon.product.server --host 127.0.0.1 --port 8000
+```
+
+Then request a grounded brief:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-brief -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","policy":"rag","write_report":true}'
+```
+
+The response includes `grounding_report`, `red_team`, `report_quality`, and the
+final `brief`.
+
 ## Human Review Boundary
 
 The output status `ready_for_human_review` means the grounding checks passed.

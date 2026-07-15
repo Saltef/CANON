@@ -15,6 +15,7 @@ class ProductServerRouteTests(unittest.TestCase):
         payload = handler.send_json.call_args.args[0]
         self.assertEqual(payload["service"], "canon")
         self.assertIn("/v1/evidence-packets", payload["post"])
+        self.assertIn("/v1/intelligence-brief", payload["post"])
 
     def test_favicon_route_returns_empty_success(self):
         handler = object.__new__(CanonHandler)
@@ -32,6 +33,7 @@ class ProductServerRouteTests(unittest.TestCase):
             "/v1/corpora/build": ("corpus_build", {"corpus": {"corpus_id": "c"}}),
             "/v1/model-evaluation": ("model_evaluation", {"report_id": "semantic_model_evaluation_v1"}),
             "/v1/evidence-packets": ("evidence_packets", {"status": "complete"}),
+            "/v1/intelligence-brief": ("intelligence_brief", {"status": "ready_for_human_review"}),
         }
         for path, (service_name, response) in routes.items():
             with self.subTest(path=path):

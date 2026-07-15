@@ -180,6 +180,22 @@ class ProductServiceTests(unittest.TestCase):
         with self.assertRaises(service.ProductError):
             service.evidence_packets({"query": "q", "evidence_requirements": "top 10"})
 
+    def test_intelligence_brief_wraps_runner(self):
+        with patch("canon.intelligence.evidence_runner.run_intelligence_brief", return_value={"status": "ready_for_human_review"}) as runner:
+            report = service.intelligence_brief(
+                {
+                    "query": "AI data center risk",
+                    "mode": "m",
+                    "policy": "rag",
+                    "project_id": "ai_infra_geo_risk",
+                    "write_report": "false",
+                }
+            )
+
+        self.assertEqual(report["status"], "ready_for_human_review")
+        runner.assert_called_once()
+        self.assertFalse(runner.call_args.kwargs["write_report"])
+
     def test_invalid_freedom_level_raises_product_error(self):
         with self.assertRaises(service.ProductError):
             service.query_diagnostics({"query": "q", "freedom_level": "wild"})

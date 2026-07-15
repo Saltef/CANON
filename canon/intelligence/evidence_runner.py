@@ -134,19 +134,27 @@ def run_from_packet_response(
         red_team=red_team,
         duplicate_report=duplicate_report,
     )
+    report_quality = assess_report_quality(
+        brief=brief,
+        agent_outputs=outputs,
+        grounding=grounding,
+        red_team=red_team,
+        duplicate_report=duplicate_report,
+    )
     report = {
         "report_id": REPORT_ID,
         "project_id": project_id or packet_response.get("project_id", ""),
         "mode": mode or packet_response.get("mode", ""),
         "policy": policy or packet_response.get("policy", ""),
         "question": question or packet_response.get("query", ""),
-        "status": "blocked" if red_team["blocking_issue_count"] else "ready_for_human_review",
+        "status": "blocked" if red_team["blocking_issue_count"] or report_quality["status"] == "fail" else "ready_for_human_review",
         "evidence_packet_request_id": packet_response.get("request_id", ""),
         "agent_plan": [agent_to_dict(agent) for agent in plan],
         "agent_outputs": outputs,
         "grounding_report": grounding,
         "duplicate_agent_output": duplicate_report,
         "red_team": red_team,
+        "report_quality": report_quality,
         "brief": brief,
         "human_review_status": "not_reviewed",
         "claim_boundaries": [
@@ -158,6 +166,63 @@ def run_from_packet_response(
     if write_report:
         write_intelligence_report(report)
     return report
+
+
+def assess_report_quality(
+    brief: dict[str, Any],
+    agent_outputs: list[dict[str, Any]],
+    grounding: dict[str, Any],
+    red_team: dict[str, Any],
+    duplicate_report: dict[str, Any],
+) -> dict[str, Any]:
+    required_sections = {
+        "executive_summary": bool(brief.get("executive_summary")),
+        "what_changed": bool(brief.get("what_changed")),
+        "evidence_backed_developments": bool(brief.get("evidence_backed_developments")),
+        "contradictions_and_uncertainty": bool(brief.get("contradictions_and_uncertainty")),
+        "source_gaps": "source_gaps" in brief,
+        "next_signals_to_watch": bool(brief.get("next_signals_to_watch")),
+        "citation_appendix": bool(brief.get("citation_appendix")),
+    }
+    completed_agents = sum(1 for output in agent_outputs if output.get("status") == "complete")
+    claim_count = int(grounding.get("claim_count") or 0)
+    grounded_ratio = float(grounding.get("grounded_claim_ratio") or 0.0)
+    citation_coverage = grounded_ratio if claim_count else 0.0
+    checks = [
+        quality_check("required_sections_present", all(required_sections.values()), required_sections),
+        quality_check("minimum_agent_contribution", completed_agents >= 5, {"completed_agents": completed_agents, "threshold": 5}),
+        quality_check("grounded_claim_ratio", grounded_ratio >= 0.95, {"observed": grounded_ratio, "threshold": 0.95}),
+        quality_check("citation_coverage", citation_coverage >= 0.95, {"observed": citation_coverage, "threshold": 0.95}),
+        quality_check(
+            "duplicate_agent_output_rate",
+            float(duplicate_report.get("duplicate_agent_output_rate") or 0.0) <= 0.2,
+            {"observed": duplicate_report.get("duplicate_agent_output_rate"), "threshold": 0.2},
+        ),
+        quality_check(
+            "no_red_team_blockers",
+            int(red_team.get("blocking_issue_count") or 0) == 0,
+            {"blocking_issue_count": red_team.get("blocking_issue_count")},
+        ),
+    ]
+    failed = [check for check in checks if check["status"] == "fail"]
+    return {
+        "status": "pass" if not failed else "fail",
+        "checks": checks,
+        "failed_check_count": len(failed),
+        "human_review_status": "not_reviewed",
+        "limitations": [
+            "Automated report-quality checks verify structure and grounding only.",
+            "Human review is still required for usefulness, factual correctness, and missing perspectives.",
+        ],
+    }
+
+
+def quality_check(check_id: str, passed: bool, details: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": check_id,
+        "status": "pass" if passed else "fail",
+        "details": details,
+    }
 
 
 def build_agent_plan(packet_response: dict[str, Any]) -> list[AgentSpec]:

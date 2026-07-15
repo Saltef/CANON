@@ -19,6 +19,7 @@ class EvidenceRunnerTests(unittest.TestCase):
         self.assertEqual(len(report["agent_outputs"]), 5)
         self.assertEqual(report["grounding_report"]["status"], "pass")
         self.assertGreaterEqual(report["grounding_report"]["grounded_claim_ratio"], 0.95)
+        self.assertEqual(report["report_quality"]["status"], "pass")
         self.assertTrue(report["brief"]["citation_appendix"])
 
     def test_grounding_fails_claims_without_evidence_ids(self):
@@ -48,6 +49,26 @@ class EvidenceRunnerTests(unittest.TestCase):
 
         self.assertEqual(review["status"], "block")
         self.assertEqual(review["blocking_issue_count"], 1)
+
+    def test_report_quality_fails_missing_sections_or_low_grounding(self):
+        quality = evidence_runner.assess_report_quality(
+            brief={
+                "executive_summary": "",
+                "what_changed": [],
+                "evidence_backed_developments": [],
+                "contradictions_and_uncertainty": "",
+                "source_gaps": [],
+                "next_signals_to_watch": [],
+                "citation_appendix": [],
+            },
+            agent_outputs=[{"status": "complete"}],
+            grounding={"claim_count": 2, "grounded_claim_ratio": 0.5},
+            red_team={"blocking_issue_count": 0},
+            duplicate_report={"duplicate_agent_output_rate": 0.0},
+        )
+
+        self.assertEqual(quality["status"], "fail")
+        self.assertGreater(quality["failed_check_count"], 0)
 
     def test_duplicate_agent_output_rate_is_measured(self):
         report = evidence_runner.duplicate_agent_output_report(

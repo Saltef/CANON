@@ -176,6 +176,26 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
     }
 
 
+def intelligence_brief(payload: dict[str, Any]) -> dict:
+    from canon.intelligence.evidence_runner import run_intelligence_brief
+
+    question = optional_text(payload, "question") or require_text(payload, "query")
+    mode = str(payload.get("mode") or DEFAULT_MODE)
+    policy = str(payload.get("policy") or DEFAULT_POLICY)
+    project_id = str(payload.get("project_id") or "ai_infra_geo_risk")
+    research_frame = optional_dict(payload.get("research_frame"), "research_frame")
+    requirements = optional_dict(payload.get("evidence_requirements"), "evidence_requirements")
+    return run_intelligence_brief(
+        question=question,
+        mode=mode,
+        policy=policy,
+        project_id=project_id,
+        research_frame=research_frame or None,
+        evidence_requirements=requirements or None,
+        write_report=optional_bool(payload.get("write_report"), default=True),
+    )
+
+
 def enrich_evidence_metadata(evidence: list[dict[str, Any]], mode: str) -> list[dict[str, Any]]:
     work_metadata = load_work_metadata(mode)
     enriched = []
