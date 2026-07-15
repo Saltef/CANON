@@ -17,6 +17,10 @@ class MountedCorpusTests(unittest.TestCase):
             (root / "Dockerfile").write_text("FROM python:3.12-slim", encoding="utf-8")
             (root / "slides.pptx").write_text("presentation placeholder", encoding="utf-8")
             (root / "legacy.ppt").write_text("legacy presentation placeholder", encoding="utf-8")
+            (root / ".git").mkdir()
+            (root / ".git" / "config").write_text("ignored git metadata", encoding="utf-8")
+            (root / "node_modules").mkdir()
+            (root / "node_modules" / "dependency.js").write_text("ignored dependency", encoding="utf-8")
             (root / "archive.bin").write_text("unsupported binary placeholder", encoding="utf-8")
 
             summary = supported_file_summary(root)
@@ -31,6 +35,7 @@ class MountedCorpusTests(unittest.TestCase):
         self.assertIn(".ppt", summary["supported_extensions"])
         self.assertIn("<none>", summary["supported_extensions"])
         self.assertIn(".bin", summary["unsupported_extensions"])
+        self.assertNotIn(str(root / ".git" / "config"), summary["sample_supported_files"])
 
     def test_run_mounted_corpus_profiles_only(self):
         with tempfile.TemporaryDirectory() as directory:

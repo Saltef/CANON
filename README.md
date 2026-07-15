@@ -66,9 +66,11 @@ JSON, JSONL, CSV, TXT, Markdown, PDF, DOCX, XLSX, PPTX, HTML, notebooks, common
 source-code/config files, and folders containing those files. Google native
 pointer files (`.gdoc`, `.gsheet`, `.gslides`), images, legacy `.ppt`, and
 `.odp` files are detected and reported, but they are not treated as evidence
-text unless exported or OCR-extracted first. Do not ingest folders containing
-secrets such as `.env` files or private keys. Raw and processed corpus outputs
-go under `data/`, which is gitignored by default.
+text unless exported or OCR-extracted first. Local git repositories can be used
+as corpus folders; CANON indexes source and documentation files while skipping
+`.git`, dependency directories, build outputs, and common cache folders. Do not
+ingest folders containing secrets such as `.env` files or private keys. Raw and
+processed corpus outputs go under `data/`, which is gitignored by default.
 
 Semantic model evaluation:
 

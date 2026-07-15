@@ -7,7 +7,14 @@ from typing import Any
 
 from canon.config import load_settings
 from canon.corpus.build import run_phase16
-from canon.ingest.flexible import SUPPORTED_FILE_EXTENSIONS, ingest_flexible_source, is_supported_file, profile_source
+from canon.ingest.flexible import (
+    IGNORED_CORPUS_DIR_NAMES,
+    SUPPORTED_FILE_EXTENSIONS,
+    ingest_flexible_source,
+    is_supported_file,
+    iter_corpus_files,
+    profile_source,
+)
 from canon.product import report_io
 from canon.product.prehuman_check import run_prehuman_check
 
@@ -99,7 +106,7 @@ def resolve_mounted_path(path: Path) -> Path:
 
 
 def supported_file_summary(path: Path) -> dict[str, Any]:
-    files = [path] if path.is_file() else [child for child in path.rglob("*") if child.is_file()]
+    files = [path] if path.is_file() else iter_corpus_files(path)
     supported = [child for child in files if is_supported_file(child)]
     unsupported = [child for child in files if not is_supported_file(child)]
     return {
@@ -111,6 +118,7 @@ def supported_file_summary(path: Path) -> dict[str, Any]:
         "limitations": [
             "Text-extractable mounted files include JSON, JSONL, CSV, TXT, Markdown, PDF, DOCX, XLSX, PPTX, HTML, notebooks, source code, and folders containing those files.",
             "Google native pointer files, images, and legacy presentations are detected but not treated as evidence text unless exported or OCR-extracted first.",
+            f"Git and dependency/build internals are skipped by default: {', '.join(sorted(IGNORED_CORPUS_DIR_NAMES))}.",
         ],
     }
 

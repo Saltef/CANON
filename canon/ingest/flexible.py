@@ -71,6 +71,33 @@ CODE_FILE_NAMES = {
     "jenkinsfile",
     "makefile",
 }
+DOCUMENT_FILE_NAMES = {
+    "authors",
+    "changelog",
+    "code_of_conduct",
+    "contributing",
+    "copying",
+    "license",
+    "notice",
+    "readme",
+    "security",
+}
+IGNORED_CORPUS_DIR_NAMES = {
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "node_modules",
+    "target",
+    "vendor",
+}
 NON_TEXT_FILE_EXTENSIONS = {
     ".gdoc",
     ".gsheet",
@@ -192,8 +219,8 @@ def load_source_records(
 ) -> list[dict[str, Any]]:
     if path.is_dir():
         records = []
-        for child in sorted(path.rglob("*")):
-            if child.is_file() and is_supported_file(child):
+        for child in iter_corpus_files(path):
+            if is_supported_file(child):
                 records.extend(load_source_records(child, profile_only=profile_only))
         return records
     fmt = detect_format(path, input_format)
@@ -220,6 +247,8 @@ def load_source_records(
         return [record_from_html_file(path)]
     if path.suffix.lower() in CODE_FILE_EXTENSIONS or path.name.lower() in CODE_FILE_NAMES:
         return [record_from_code_file(path)]
+    if path.name.lower() in DOCUMENT_FILE_NAMES:
+        return [record_from_text_file(path)]
     if fmt in {"gdoc", "gsheet", "gslides"}:
         return [record_from_google_pointer_file(path)]
     if fmt in {"odp", "ppt"}:
@@ -230,7 +259,29 @@ def load_source_records(
 
 
 def is_supported_file(path: Path) -> bool:
-    return path.suffix.lower() in SUPPORTED_FILE_EXTENSIONS or path.name.lower() in CODE_FILE_NAMES
+    return (
+        path.suffix.lower() in SUPPORTED_FILE_EXTENSIONS
+        or path.name.lower() in CODE_FILE_NAMES
+        or path.name.lower() in DOCUMENT_FILE_NAMES
+    )
+
+
+def iter_corpus_files(path: Path) -> list[Path]:
+    files = []
+    stack = [path]
+    while stack:
+        current = stack.pop()
+        try:
+            children = sorted(current.iterdir(), key=lambda child: child.name.lower())
+        except OSError:
+            continue
+        for child in children:
+            if child.is_dir():
+                if child.name.lower() not in IGNORED_CORPUS_DIR_NAMES:
+                    stack.append(child)
+            elif child.is_file():
+                files.append(child)
+    return files
 
 
 def detect_format(path: Path, input_format: str | None = None) -> str:
@@ -521,6 +572,8 @@ def infer_source_shape(path: Path, records: list[dict[str, Any]], field_counts: 
     if path.suffix.lower() in TEXT_EXTRACTABLE_FILE_EXTENSIONS | CODE_FILE_EXTENSIONS | NOTEBOOK_FILE_EXTENSIONS:
         return "document_file"
     if path.name.lower() in CODE_FILE_NAMES:
+        return "document_file"
+    if path.name.lower() in DOCUMENT_FILE_NAMES:
         return "document_file"
     if path.suffix.lower() in NON_TEXT_FILE_EXTENSIONS:
         return "non_text_file"

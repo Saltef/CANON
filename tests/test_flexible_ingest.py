@@ -158,6 +158,26 @@ class FlexibleIngestTests(unittest.TestCase):
         self.assertIn("source_code", document_types)
         self.assertIn("notebook", document_types)
 
+    def test_ingest_git_repo_skips_vcs_and_dependency_internals(self):
+        settings = load_settings()
+        mode = "unit_flexible_git_repo"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".git").mkdir()
+            (root / ".git" / "config").write_text("secret remote metadata", encoding="utf-8")
+            (root / "node_modules").mkdir()
+            (root / "node_modules" / "package.js").write_text("vendored dependency text", encoding="utf-8")
+            (root / "README").write_text("This repo studies evidence retrieval.", encoding="utf-8")
+            (root / "canon.py").write_text("def retrieve():\n    return 'cited evidence'\n", encoding="utf-8")
+
+            report = ingest_flexible_source(root, mode=mode, chunk_tokens=24, overlap_tokens=4)
+
+        self.assertEqual(report["normalized_record_count"], 2)
+        works_path = settings.data_dir / "processed" / f"works_{mode}.json"
+        works = json.loads(works_path.read_text(encoding="utf-8"))
+        source_files = {Path(work["raw"]["source_file"]).name for work in works}
+        self.assertEqual(source_files, {"README", "canon.py"})
+
     def test_ingest_pptx_presentation_files(self):
         try:
             from pptx import Presentation
