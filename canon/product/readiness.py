@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import tomllib
+from pathlib import Path
 
 from canon.config import load_settings
 from canon.product import report_io
@@ -13,9 +15,14 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
     summary = service.product_summary(mode)
     available_endpoints = endpoints()
     route_metadata = routes_metadata()
+    package_metadata = load_package_metadata()
     smoke_report = load_json(settings.reports_dir / f"product_smoke_{mode}.json")
     checks = [
         check("health_ok", service.health()["status"] == "ok"),
+        check("package_metadata_has_readme", bool(package_metadata.get("readme"))),
+        check("package_metadata_has_public_urls", package_metadata_has_public_urls(package_metadata)),
+        check("package_metadata_has_classifiers", bool(package_metadata.get("classifiers"))),
+        check("package_metadata_has_keywords", bool(package_metadata.get("keywords"))),
         check("summary_has_claim_boundaries", bool(summary.get("claim_boundaries"))),
         check("summary_has_audit_status", summary.get("audit_status") == "pass"),
         check("small_corpus_limitation_visible", bool(summary.get("corpus", {}).get("limitations"))),
@@ -45,6 +52,12 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
             "route_count": len(route_metadata.get("routes", [])),
             "human_review_boundary": route_metadata.get("human_review_boundary"),
         },
+        "package_metadata": {
+            "name": package_metadata.get("name"),
+            "version": package_metadata.get("version"),
+            "readme": package_metadata.get("readme"),
+            "urls": package_metadata.get("urls", {}),
+        },
     }
     output = settings.reports_dir / f"product_readiness_{mode}.json"
     report_io.write_json(output, report)
@@ -55,6 +68,31 @@ def load_json(path) -> dict:
     if not path.exists():
         return {}
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_package_metadata() -> dict:
+    settings = load_settings()
+    root = getattr(settings, "root", None)
+    path = (root / "pyproject.toml") if root else Path("pyproject.toml")
+    if not path.exists():
+        return {}
+    project = tomllib.loads(path.read_text(encoding="utf-8")).get("project", {})
+    return {
+        "name": project.get("name"),
+        "version": project.get("version"),
+        "readme": project.get("readme"),
+        "urls": project.get("urls", {}),
+        "classifiers": project.get("classifiers", []),
+        "keywords": project.get("keywords", []),
+    }
+
+
+def package_metadata_has_public_urls(metadata: dict) -> bool:
+    urls = metadata.get("urls") or {}
+    return all(
+        urls.get(key, "").startswith("https://github.com/Saltef/CANON")
+        for key in ["Homepage", "Repository", "Documentation", "Issues"]
+    )
 
 
 def check(identifier: str, passed: bool) -> dict:

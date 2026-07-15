@@ -11,7 +11,8 @@ from canon.product.readiness import build_readiness_report, endpoints
 class ProductReadinessTests(unittest.TestCase):
     def test_readiness_report_passes_for_current_bundle(self):
         with TemporaryDirectory() as temp_dir:
-            with patch("canon.product.readiness.load_settings", return_value=SimpleNamespace(reports_dir=Path(temp_dir))):
+            settings = SimpleNamespace(root=Path.cwd(), reports_dir=Path(temp_dir))
+            with patch("canon.product.readiness.load_settings", return_value=settings):
                 with patch("canon.product.readiness.load_json", return_value={"status": "pass"}):
                     report = build_readiness_report("social_science_ir_v1_harvest10")
         self.assertEqual(report["status"], "pass")
@@ -39,6 +40,13 @@ class ProductReadinessTests(unittest.TestCase):
         self.assertIn("intelligence_feedback_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("routes_metadata_examples_present", [check["id"] for check in report["checks"]])
         self.assertIn("product_smoke_passed", [check["id"] for check in report["checks"]])
+        self.assertEqual(report["package_metadata"]["name"], "canon-rag")
+        self.assertEqual(report["package_metadata"]["readme"], "README.md")
+        self.assertEqual(report["package_metadata"]["urls"]["Repository"], "https://github.com/Saltef/CANON")
+        self.assertIn(
+            "package_metadata_has_public_urls",
+            [check["id"] for check in report["checks"]],
+        )
 
     def test_readiness_requires_passing_smoke_report(self):
         with TemporaryDirectory() as temp_dir:
@@ -67,6 +75,16 @@ class ProductReadinessTests(unittest.TestCase):
         self.assertEqual(scripts["canon-readiness"], "canon.product.readiness:main")
         self.assertEqual(scripts["canon-release-audit"], "canon.product.release_audit:main")
         self.assertEqual(scripts["canon-product-final-check"], "canon.product.final_check:main")
+
+    def test_public_package_metadata_is_registered(self):
+        pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+        project = pyproject["project"]
+        self.assertEqual(project["readme"], "README.md")
+        self.assertEqual(project["urls"]["Repository"], "https://github.com/Saltef/CANON")
+        self.assertEqual(project["urls"]["Documentation"], "https://github.com/Saltef/CANON#readme")
+        self.assertIn("human-review", project["keywords"])
+        self.assertIn("Programming Language :: Python :: 3.12", project["classifiers"])
+        self.assertIn("Development Status :: 3 - Alpha", project["classifiers"])
 
 
 if __name__ == "__main__":

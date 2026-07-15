@@ -1,9 +1,32 @@
 [project]
 name = "canon-rag"
 version = "0.1.0"
-description = "Importance-aware scholarly RAG ingestion and evaluation workbench"
+description = "Human-governed evidence packet and intelligence briefing workbench"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+keywords = [
+  "rag",
+  "retrieval",
+  "evidence",
+  "human-review",
+  "intelligence-analysis",
+  "evaluation",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Text Processing :: Indexing",
+]
+
+[project.urls]
+Homepage = "https://github.com/Saltef/CANON"
+Repository = "https://github.com/Saltef/CANON"
+Documentation = "https://github.com/Saltef/CANON#readme"
+Issues = "https://github.com/Saltef/CANON/issues"
 
 [project.optional-dependencies]
 docs = [
