@@ -109,8 +109,8 @@ def supported_file_summary(path: Path) -> dict[str, Any]:
         "unsupported_extensions": sorted({child.suffix.lower() or "<none>" for child in unsupported})[:25],
         "sample_supported_files": [str(child) for child in supported[:10]],
         "limitations": [
-            "Supported mounted files are JSON, JSONL, CSV, TXT, Markdown, and folders containing those files.",
-            "PDF, DOCX, Google Docs native files, images, and spreadsheets should be exported to supported formats before ingest.",
+            "Text-extractable mounted files include JSON, JSONL, CSV, TXT, Markdown, PDF, DOCX, XLSX, HTML, and folders containing those files.",
+            "Google native pointer files and images are detected but not treated as evidence text unless exported or OCR-extracted first.",
         ],
     }
 

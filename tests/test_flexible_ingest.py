@@ -89,6 +89,63 @@ class FlexibleIngestTests(unittest.TestCase):
         self.assertEqual(profile["proposed_mapping"]["document_type"], "academic_article")
         self.assertEqual(profile["proposed_mapping"]["confidence"], "high")
 
+    def test_ingest_docx_html_and_xlsx_files(self):
+        try:
+            from docx import Document
+            from openpyxl import Workbook
+        except ImportError as exc:
+            self.skipTest(f"Optional document parser missing: {exc}")
+        settings = load_settings()
+        mode = "unit_flexible_rich_files"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = Document()
+            document.add_paragraph("AI data centers can affect local water demand.")
+            document.save(root / "brief.docx")
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.title = "projects"
+            sheet.append(["region", "risk"])
+            sheet.append(["Chile", "water stress"])
+            workbook.save(root / "projects.xlsx")
+            (root / "page.html").write_text(
+                "<html><head><title>Grid Memo</title></head><body><p>Grid interconnection delays affect data center buildout.</p></body></html>",
+                encoding="utf-8",
+            )
+
+            report = ingest_flexible_source(root, mode=mode, chunk_tokens=24, overlap_tokens=4)
+
+        self.assertEqual(report["normalized_record_count"], 3)
+        self.assertGreaterEqual(report["chunk_count"], 3)
+        works_path = settings.data_dir / "processed" / f"works_{mode}.json"
+        works = json.loads(works_path.read_text(encoding="utf-8"))
+        document_types = {work["raw"]["document_type"] for work in works}
+        self.assertIn("word_document", document_types)
+        self.assertIn("spreadsheet", document_types)
+        self.assertIn("html_document", document_types)
+
+    def test_google_pointer_and_image_are_detected_but_not_ingested_as_text(self):
+        try:
+            from PIL import Image
+        except ImportError as exc:
+            self.skipTest(f"Optional image parser missing: {exc}")
+        mode = "unit_flexible_non_text_files"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "doc.gdoc").write_text(
+                json.dumps({"name": "Native Doc", "url": "https://docs.google.com/document/d/example"}),
+                encoding="utf-8",
+            )
+            Image.new("RGB", (10, 10), color="white").save(root / "scan.png")
+
+            profile = profile_source(root)
+            report = ingest_flexible_source(root, mode=mode, chunk_tokens=24, overlap_tokens=4)
+
+        self.assertIn("Some files were detected", " ".join(profile["warnings"]))
+        self.assertEqual(report["raw_record_count"], 2)
+        self.assertEqual(report["normalized_record_count"], 0)
+        self.assertEqual(report["skipped_reasons"]["missing_text"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

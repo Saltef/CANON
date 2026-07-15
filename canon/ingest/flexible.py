@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import html
 import json
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,33 @@ from canon.ingest.unstructured import sections_from_record, serialize_work, work
 from canon.reports.data_card import document_type_profile_summary
 
 
-SUPPORTED_FILE_EXTENSIONS = {".jsonl", ".json", ".csv", ".txt", ".md", ".markdown"}
+TEXT_EXTRACTABLE_FILE_EXTENSIONS = {
+    ".jsonl",
+    ".json",
+    ".csv",
+    ".txt",
+    ".md",
+    ".markdown",
+    ".pdf",
+    ".docx",
+    ".xlsx",
+    ".html",
+    ".htm",
+}
+NON_TEXT_FILE_EXTENSIONS = {
+    ".gdoc",
+    ".gsheet",
+    ".gslides",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".gif",
+    ".bmp",
+    ".tif",
+    ".tiff",
+}
+SUPPORTED_FILE_EXTENSIONS = TEXT_EXTRACTABLE_FILE_EXTENSIONS | NON_TEXT_FILE_EXTENSIONS
 TEXT_FIELDS = ["text", "content", "body", "abstract", "description", "notes", "message", "comment"]
 TITLE_FIELDS = ["title", "name", "subject", "headline", "file_name"]
 DATE_FIELDS = ["year", "date", "created_at", "updated_at", "timestamp", "published_at"]
@@ -131,6 +158,18 @@ def load_source_records(
             return [add_file_metadata(dict(row), path, index) for index, row in enumerate(csv.DictReader(handle), start=1)]
     if fmt in {"txt", "md", "markdown"}:
         return [record_from_text_file(path)]
+    if fmt == "pdf":
+        return [record_from_pdf_file(path)]
+    if fmt == "docx":
+        return [record_from_docx_file(path)]
+    if fmt == "xlsx":
+        return records_from_xlsx_file(path)
+    if fmt in {"html", "htm"}:
+        return [record_from_html_file(path)]
+    if fmt in {"gdoc", "gsheet", "gslides"}:
+        return [record_from_google_pointer_file(path)]
+    if fmt in {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff"}:
+        return [record_from_image_file(path)]
     raise ValueError(f"Unsupported flexible ingest format: {fmt}")
 
 
@@ -195,6 +234,141 @@ def record_from_text_file(path: Path) -> dict[str, Any]:
     }
 
 
+def record_from_pdf_file(path: Path) -> dict[str, Any]:
+    try:
+        from pypdf import PdfReader
+    except ImportError as exc:
+        raise ValueError("PDF ingest requires the optional pypdf package.") from exc
+    reader = PdfReader(str(path))
+    sections = []
+    for index, page in enumerate(reader.pages, start=1):
+        text = page.extract_text() or ""
+        if text.strip():
+            sections.append({"section": f"page_{index}", "text": text.strip()})
+    return file_record(path, document_type="pdf_document", sections=sections)
+
+
+def record_from_docx_file(path: Path) -> dict[str, Any]:
+    try:
+        from docx import Document
+    except ImportError as exc:
+        raise ValueError("DOCX ingest requires the optional python-docx package.") from exc
+    document = Document(str(path))
+    paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
+    sections = [{"section": "body", "text": "\n".join(paragraphs)}] if paragraphs else []
+    return file_record(path, document_type="word_document", sections=sections)
+
+
+def records_from_xlsx_file(path: Path) -> list[dict[str, Any]]:
+    try:
+        from openpyxl import load_workbook
+    except ImportError as exc:
+        raise ValueError("XLSX ingest requires the optional openpyxl package.") from exc
+    workbook = load_workbook(filename=str(path), read_only=True, data_only=True)
+    try:
+        records = []
+        for sheet in workbook.worksheets:
+            rows = []
+            for row in sheet.iter_rows(values_only=True):
+                values = [str(value).strip() for value in row if value is not None and str(value).strip()]
+                if values:
+                    rows.append(" | ".join(values))
+            if rows:
+                records.append(
+                    file_record(
+                        path,
+                        title=f"{path.stem} - {sheet.title}",
+                        document_type="spreadsheet",
+                        sections=[{"section": sheet.title, "text": "\n".join(rows)}],
+                        extra_metadata={"sheet_name": sheet.title},
+                    )
+                )
+        return records or [file_record(path, document_type="spreadsheet", sections=[])]
+    finally:
+        workbook.close()
+
+
+def record_from_html_file(path: Path) -> dict[str, Any]:
+    raw = path.read_text(encoding="utf-8", errors="ignore")
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(raw, "html.parser")
+        for element in soup(["script", "style"]):
+            element.decompose()
+        title = soup.title.string.strip() if soup.title and soup.title.string else path.stem
+        text = soup.get_text("\n")
+    except ImportError:
+        title = path.stem
+        text = html.unescape(raw)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return file_record(
+        path,
+        title=title,
+        document_type="html_document",
+        sections=[{"section": "body", "text": "\n".join(lines)}] if lines else [],
+    )
+
+
+def record_from_google_pointer_file(path: Path) -> dict[str, Any]:
+    payload = {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        payload = {}
+    return file_record(
+        path,
+        title=payload.get("name") or path.stem,
+        document_type=f"google_{path.suffix.lower().lstrip('.')}_pointer",
+        sections=[],
+        url=payload.get("url") or payload.get("doc_id"),
+        extra_metadata={
+            "extraction_status": "native_google_drive_pointer",
+            "extraction_limitation": "Export this Google native file to a supported text or structured format before ingest.",
+        },
+    )
+
+
+def record_from_image_file(path: Path) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "extraction_status": "image_without_ocr",
+        "extraction_limitation": "Image files are detected but not OCR-extracted by CANON's default local ingest.",
+    }
+    try:
+        from PIL import Image
+        with Image.open(path) as image:
+            metadata.update({"image_width": image.width, "image_height": image.height, "image_mode": image.mode})
+    except Exception:
+        pass
+    return file_record(path, document_type="image", sections=[], extra_metadata=metadata)
+
+
+def file_record(
+    path: Path,
+    document_type: str,
+    sections: list[dict[str, str]],
+    title: str | None = None,
+    url: str | None = None,
+    extra_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    text = "\n\n".join(section["text"] for section in sections if section.get("text"))
+    return {
+        "id": f"file:{stable_digest(str(path))}",
+        "title": title or path.stem.replace("_", " ").replace("-", " ").strip() or path.name,
+        "source_name": path.parent.name or "local_file",
+        "document_type": document_type,
+        "provenance": "user_file",
+        "domain": "user_supplied",
+        "text": text,
+        "sections": sections,
+        "url": url,
+        "metadata": {
+            "source_file": str(path),
+            "file_extension": path.suffix.lower(),
+            **(extra_metadata or {}),
+        },
+    }
+
+
 def add_file_metadata(record: dict[str, Any], path: Path, index: int) -> dict[str, Any]:
     enriched = dict(record)
     metadata = dict(enriched.get("metadata") or {})
@@ -229,8 +403,10 @@ def infer_source_shape(path: Path, records: list[dict[str, Any]], field_counts: 
         return "sectioned_document"
     if path.suffix.lower() == ".csv":
         return "table_record"
-    if path.suffix.lower() in {".txt", ".md", ".markdown"}:
+    if path.suffix.lower() in TEXT_EXTRACTABLE_FILE_EXTENSIONS:
         return "document_file"
+    if path.suffix.lower() in NON_TEXT_FILE_EXTENSIONS:
+        return "non_text_file"
     if len(field_counts) >= 8 and any(field in keys for field in TEXT_FIELDS):
         return "structured_records"
     return "unstructured_records"
@@ -280,6 +456,7 @@ def chunking_strategy_for_shape(shape: str) -> str:
         "research_paper": "section_sentence_boundary",
         "sectioned_document": "section_sentence_boundary",
         "document_file": "conservative_boundary",
+        "non_text_file": "metadata_only",
         "table_record": "field_aware_record",
         "mixed_source": "per_record_profile",
     }.get(shape, "conservative_boundary")
@@ -291,6 +468,8 @@ def profile_warnings(records: list[dict[str, Any]], mapping: dict[str, Any]) -> 
         warnings.append("No records were detected.")
     if not mapping.get("text_fields"):
         warnings.append("No obvious text field was detected; rows may be skipped.")
+    if any((record.get("metadata") or {}).get("extraction_status") for record in records):
+        warnings.append("Some files were detected but do not provide extractable text without export or OCR.")
     if not mapping.get("source_field"):
         warnings.append("No source field was detected; source_name will be inferred.")
     if not any("provenance" in record for record in records):
@@ -405,6 +584,7 @@ def default_document_type(source_shape: str) -> str:
         "research_paper": "academic_article",
         "sectioned_document": "unknown_unstructured_text",
         "document_file": "note",
+        "non_text_file": "metadata_only",
         "table_record": "record",
         "structured_records": "record",
         "mixed_source": "unknown_unstructured_text",

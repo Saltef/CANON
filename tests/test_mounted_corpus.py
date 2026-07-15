@@ -11,14 +11,18 @@ class MountedCorpusTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "note.md").write_text("AI infrastructure risk", encoding="utf-8")
-            (root / "scan.pdf").write_text("not parsed by flexible ingest", encoding="utf-8")
+            (root / "scan.pdf").write_text("parsed when it contains extractable PDF text", encoding="utf-8")
+            (root / "scan.png").write_text("image placeholder", encoding="utf-8")
+            (root / "archive.bin").write_text("unsupported binary placeholder", encoding="utf-8")
 
             summary = supported_file_summary(root)
 
-        self.assertEqual(summary["supported_count"], 1)
+        self.assertEqual(summary["supported_count"], 3)
         self.assertEqual(summary["unsupported_count"], 1)
         self.assertIn(".md", summary["supported_extensions"])
-        self.assertIn(".pdf", summary["unsupported_extensions"])
+        self.assertIn(".pdf", summary["supported_extensions"])
+        self.assertIn(".png", summary["supported_extensions"])
+        self.assertIn(".bin", summary["unsupported_extensions"])
 
     def test_run_mounted_corpus_profiles_only(self):
         with tempfile.TemporaryDirectory() as directory:
