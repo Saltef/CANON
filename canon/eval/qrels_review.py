@@ -152,6 +152,7 @@ def qrels_from_review_csv(
     output_path: Path | None = None,
     benchmark_kind: str = "human_reviewed_qrels",
     description: str = "Human-reviewed CANON qrels from pooled retrieval candidates.",
+    allow_missing_relevance: bool = False,
 ) -> dict[str, Any]:
     rows = read_review_csv(csv_path)
     queries: dict[str, dict[str, Any]] = {}
@@ -189,6 +190,21 @@ def qrels_from_review_csv(
         "description": description,
         "queries": sorted(queries.values(), key=lambda item: item["id"]),
     }
+    dropped_queries = []
+    if allow_missing_relevance:
+        kept = []
+        for query in qrels["queries"]:
+            if query.get("relevant"):
+                kept.append(query)
+            else:
+                dropped_queries.append(
+                    {
+                        "id": query.get("id"),
+                        "query": query.get("query"),
+                        "reason": "no_positive_judge_relevance",
+                    }
+                )
+        qrels["queries"] = kept
     validation_errors.extend(validate_qrels(qrels))
     if validation_errors:
         return {
@@ -196,6 +212,8 @@ def qrels_from_review_csv(
             "benchmark_id": benchmark_id,
             "csv_path": str(csv_path),
             "validation_errors": validation_errors,
+            "dropped_query_count": len(dropped_queries),
+            "dropped_queries": dropped_queries,
             "qrels": qrels,
         }
     if output_path:
@@ -207,6 +225,8 @@ def qrels_from_review_csv(
         "output_path": str(output_path) if output_path else None,
         "query_count": len(qrels["queries"]),
         "judgment_count": sum(len(query["relevant"]) for query in qrels["queries"]),
+        "dropped_query_count": len(dropped_queries),
+        "dropped_queries": dropped_queries,
         "validation_errors": [],
         "qrels": qrels,
     }
@@ -320,6 +340,12 @@ def main() -> None:
     import_csv.add_argument("--csv", required=True)
     import_csv.add_argument("--benchmark-id", required=True)
     import_csv.add_argument("--output", required=True)
+    import_csv.add_argument("--benchmark-kind", default="human_reviewed_qrels")
+    import_csv.add_argument("--allow-missing-relevance", action="store_true")
+    import_csv.add_argument(
+        "--description",
+        default="Human-reviewed CANON qrels from pooled retrieval candidates.",
+    )
     args = parser.parse_args()
     if args.command == "prepare":
         report = build_qrels_review_packet(
@@ -334,6 +360,9 @@ def main() -> None:
         csv_path=Path(args.csv),
         benchmark_id=args.benchmark_id,
         output_path=Path(args.output),
+        benchmark_kind=args.benchmark_kind,
+        description=args.description,
+        allow_missing_relevance=args.allow_missing_relevance,
     )
     print(json.dumps({key: value for key, value in result.items() if key != "qrels"}, indent=2))
 

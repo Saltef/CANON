@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from canon.secrets import load_local_env
 from canon.config import load_settings
 from canon.eval.external_ir import load_qrels
 from canon.eval.ir_metrics import evaluate_ranking, mean_metric
@@ -51,6 +52,7 @@ class CohereRerankProvider:
     provider = "cohere"
 
     def __init__(self, model: str = "rerank-v4.0-pro", api_key: str | None = None) -> None:
+        load_local_env()
         self.model = model
         self.api_key = api_key or os.getenv("COHERE_API_KEY")
         if not self.api_key:

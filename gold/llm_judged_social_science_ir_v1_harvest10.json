@@ -1,0 +1,311 @@
+{
+  "benchmark_id": "llm_judged_social_science_ir_v1_harvest10",
+  "benchmark_kind": "llm_judged_qrels",
+  "description": "LLM/heuristic-judged provisional CANON qrels. Use for automated triage only; re-run against human-reviewed qrels before release claims.",
+  "queries": [
+    {
+      "id": "ir-author-score-001",
+      "query": "How does author prominence change retrieval for democratic peace and civil war evidence?",
+      "relevant": {
+        "chunk:d53cfac3890b1579": 2.0,
+        "chunk:3f981229d2f15afd": 1.0,
+        "chunk:b725a54218eada94": 2.0,
+        "chunk:a63771f24f242b6c": 1.0,
+        "chunk:e1e062d2bdbed6fb": 1.0,
+        "chunk:76c9b2506eeb3cad": 1.0,
+        "chunk:1f8f2349733f9d41": 1.0,
+        "chunk:0b040e2d9bcf12f6": 1.0,
+        "chunk:1f805ecbd6ba6565": 1.0,
+        "chunk:3851e8c2c13c8f9e": 1.0,
+        "chunk:30971ae20d5acedc": 1.0,
+        "chunk:9b4b848b9711c82d": 1.0,
+        "chunk:2b2c3f841190f303": 1.0
+      }
+    },
+    {
+      "id": "ir-civil-war-001",
+      "query": "What methods dominate research on civil war onset, and what are their main critiques?",
+      "relevant": {
+        "chunk:a63771f24f242b6c": 1.0,
+        "chunk:d53cfac3890b1579": 1.0,
+        "chunk:8b654e8a7bab157a": 2.0,
+        "chunk:e1e062d2bdbed6fb": 2.0,
+        "chunk:76c9b2506eeb3cad": 1.0,
+        "chunk:b725a54218eada94": 2.0,
+        "chunk:9b4b848b9711c82d": 2.0,
+        "chunk:ade37be7fb8a87d1": 2.0,
+        "chunk:db6ddfb3756fe5ff": 1.0
+      }
+    },
+    {
+      "id": "ir-civil-war-002",
+      "query": "How do ethnic exclusion and transborder kin affect civil war dynamics?",
+      "relevant": {
+        "chunk:9b4b848b9711c82d": 2.0,
+        "chunk:a63771f24f242b6c": 1.0,
+        "chunk:db6ddfb3756fe5ff": 3.0,
+        "chunk:76c9b2506eeb3cad": 2.0,
+        "chunk:d53cfac3890b1579": 1.0,
+        "chunk:8b654e8a7bab157a": 1.0,
+        "chunk:e1e062d2bdbed6fb": 2.0,
+        "chunk:ade37be7fb8a87d1": 1.0
+      }
+    },
+    {
+      "id": "ir-civil-war-003",
+      "query": "Where do civil war studies disagree about grievances, resources, and recurrence?",
+      "relevant": {
+        "chunk:a63771f24f242b6c": 2.0,
+        "chunk:ade37be7fb8a87d1": 2.0,
+        "chunk:e1e062d2bdbed6fb": 2.0,
+        "chunk:8b654e8a7bab157a": 2.0,
+        "chunk:76c9b2506eeb3cad": 1.0,
+        "chunk:d53cfac3890b1579": 1.0,
+        "chunk:9b4b848b9711c82d": 1.0,
+        "chunk:db6ddfb3756fe5ff": 2.0
+      }
+    },
+    {
+      "id": "ir-climate-conflict-001",
+      "query": "What does the corpus say about climate change and the Syrian civil war?",
+      "relevant": {
+        "chunk:d53cfac3890b1579": 3.0,
+        "chunk:a63771f24f242b6c": 1.0,
+        "chunk:76c9b2506eeb3cad": 1.0,
+        "chunk:c116eb6da685dc66": 1.0,
+        "chunk:e1e062d2bdbed6fb": 1.0,
+        "chunk:9b4b848b9711c82d": 1.0,
+        "chunk:8b654e8a7bab157a": 1.0
+      }
+    },
+    {
+      "id": "ir-cross-topic-001",
+      "query": "Compare causal mechanisms in sanctions, institutions, and human rights treaty research.",
+      "relevant": {
+        "chunk:8944bc79b53d9d04": 1.0,
+        "chunk:2bc9ad1cff909b93": 2.0,
+        "chunk:0f1caaffa3b88e17": 2.0,
+        "chunk:8f1d9f416388654c": 2.0,
+        "chunk:5cb1b054ccfa51c6": 1.0,
+        "chunk:bea62470904bc0db": 1.0,
+        "chunk:c116eb6da685dc66": 1.0,
+        "chunk:421c2d5faa0acf57": 1.0,
+        "chunk:edeb38fac499acbe": 1.0,
+        "chunk:c1b601f85d2f6db1": 1.0,
+        "chunk:3da033ef43c2896d": 1.0,
+        "chunk:66022f2314fd93f8": 1.0
+      }
+    },
+    {
+      "id": "ir-cross-topic-002",
+      "query": "Which areas of the corpus rely most on observational causal inference?",
+      "relevant": {
+        "chunk:1f805ecbd6ba6565": 1.0
+      }
+    },
+    {
+      "id": "ir-democratic-peace-001",
+      "query": "What does the literature say about whether democracies are less likely to go to war with each other?",
+      "relevant": {
+        "chunk:0b040e2d9bcf12f6": 1.0,
+        "chunk:9b6e223f95694f03": 1.0,
+        "chunk:e1e062d2bdbed6fb": 1.0,
+        "chunk:c0574e5d3fd413cc": 1.0,
+        "chunk:1f805ecbd6ba6565": 2.0
+      }
+    },
+    {
+      "id": "ir-democratic-peace-002",
+      "query": "What are the strongest critiques of democratic peace findings?",
+      "relevant": {
+        "chunk:b725a54218eada94": 3.0,
+        "chunk:2b2c3f841190f303": 2.0,
+        "chunk:1f805ecbd6ba6565": 3.0,
+        "chunk:9b6e223f95694f03": 3.0,
+        "chunk:30971ae20d5acedc": 2.0,
+        "chunk:3851e8c2c13c8f9e": 2.0,
+        "chunk:0b040e2d9bcf12f6": 3.0,
+        "chunk:3f981229d2f15afd": 2.0,
+        "chunk:1f8f2349733f9d41": 2.0,
+        "chunk:a63771f24f242b6c": 1.0,
+        "chunk:9b8b99aa26529dc5": 2.0
+      }
+    },
+    {
+      "id": "ir-democratic-peace-003",
+      "query": "How do public opinion accounts of democratic peace differ from covert intervention evidence?",
+      "relevant": {
+        "chunk:3f981229d2f15afd": 2.0,
+        "chunk:9b6e223f95694f03": 2.0,
+        "chunk:1f8f2349733f9d41": 1.0,
+        "chunk:0b040e2d9bcf12f6": 2.0,
+        "chunk:3851e8c2c13c8f9e": 1.0,
+        "chunk:1f805ecbd6ba6565": 1.0,
+        "chunk:2b2c3f841190f303": 1.0,
+        "chunk:30971ae20d5acedc": 1.0,
+        "chunk:b725a54218eada94": 1.0
+      }
+    },
+    {
+      "id": "ir-human-rights-001",
+      "query": "Do international human rights treaties improve state human rights practices?",
+      "relevant": {
+        "chunk:edeb38fac499acbe": 3.0,
+        "chunk:8944bc79b53d9d04": 1.0,
+        "chunk:2bc9ad1cff909b93": 2.0,
+        "chunk:5cb1b054ccfa51c6": 3.0,
+        "chunk:c116eb6da685dc66": 2.0,
+        "chunk:3da033ef43c2896d": 2.0,
+        "chunk:c1b601f85d2f6db1": 2.0,
+        "chunk:0f1caaffa3b88e17": 2.0,
+        "chunk:bea62470904bc0db": 1.0,
+        "chunk:8f1d9f416388654c": 2.0
+      }
+    },
+    {
+      "id": "ir-human-rights-002",
+      "query": "What newer research changes conclusions about UN treaty bodies and human rights compliance?",
+      "relevant": {
+        "chunk:8f1d9f416388654c": 2.0,
+        "chunk:5cb1b054ccfa51c6": 1.0,
+        "chunk:0f1caaffa3b88e17": 2.0,
+        "chunk:8944bc79b53d9d04": 1.0,
+        "chunk:bea62470904bc0db": 1.0,
+        "chunk:c116eb6da685dc66": 1.0,
+        "chunk:c1b601f85d2f6db1": 1.0,
+        "chunk:2bc9ad1cff909b93": 2.0,
+        "chunk:3da033ef43c2896d": 1.0,
+        "chunk:edeb38fac499acbe": 1.0
+      }
+    },
+    {
+      "id": "ir-human-rights-003",
+      "query": "How do naming and shaming mechanisms affect human rights practices?",
+      "relevant": {
+        "chunk:edeb38fac499acbe": 2.0,
+        "chunk:2bc9ad1cff909b93": 3.0,
+        "chunk:8944bc79b53d9d04": 1.0,
+        "chunk:5cb1b054ccfa51c6": 1.0,
+        "chunk:8f1d9f416388654c": 2.0,
+        "chunk:3da033ef43c2896d": 1.0,
+        "chunk:0f1caaffa3b88e17": 2.0,
+        "chunk:c1b601f85d2f6db1": 1.0,
+        "chunk:c116eb6da685dc66": 1.0,
+        "chunk:bea62470904bc0db": 1.0
+      }
+    },
+    {
+      "id": "ir-institutions-001",
+      "query": "Map the main disagreements about whether international institutions independently affect state behavior.",
+      "relevant": {
+        "chunk:2bc9ad1cff909b93": 3.0,
+        "chunk:edeb38fac499acbe": 2.0,
+        "chunk:76c9b2506eeb3cad": 1.0,
+        "chunk:8c6429a3884be936": 1.0,
+        "chunk:5cb1b054ccfa51c6": 1.0,
+        "chunk:9b4b848b9711c82d": 1.0
+      }
+    },
+    {
+      "id": "ir-institutions-002",
+      "query": "How do institutional voids affect social entrepreneurship and international business?",
+      "relevant": {
+        "chunk:77ffa35c1f995623": 2.0,
+        "chunk:c1b601f85d2f6db1": 1.0,
+        "chunk:2bc9ad1cff909b93": 1.0,
+        "chunk:76c9b2506eeb3cad": 1.0
+      }
+    },
+    {
+      "id": "ir-institutions-003",
+      "query": "Which highly cited or high-quality sources discuss institutions and cooperation?",
+      "relevant": {
+        "chunk:0707af9fe6c27a66": 1.0
+      }
+    },
+    {
+      "id": "ir-off-topic-001",
+      "query": "What does this corpus say about quantum computing hardware?",
+      "relevant": {
+        "chunk:3da033ef43c2896d": 1.0
+      }
+    },
+    {
+      "id": "ir-off-topic-002",
+      "query": "What does this corpus say about randomized cancer drug trials?",
+      "relevant": {
+        "chunk:3da033ef43c2896d": 1.0
+      }
+    },
+    {
+      "id": "ir-rag-failure-001",
+      "query": "Which retrieved claims are least relevant to the question even when they have high importance scores?",
+      "relevant": {
+        "chunk:ade37be7fb8a87d1": 1.0
+      }
+    },
+    {
+      "id": "ir-rag-failure-002",
+      "query": "Where does diversity-first retrieval add useful breadth, and where does it add noise?",
+      "relevant": {
+        "chunk:2b2c3f841190f303": 1.0
+      }
+    },
+    {
+      "id": "ir-recency-001",
+      "query": "Which post-2020 works in the corpus should affect conclusions most?",
+      "relevant": {
+        "chunk:2bc9ad1cff909b93": 1.0
+      }
+    },
+    {
+      "id": "ir-sanctions-001",
+      "query": "How effective are economic sanctions at changing state behavior?",
+      "relevant": {
+        "chunk:421c2d5faa0acf57": 2.0,
+        "chunk:3970aa7b3d9721d9": 1.0,
+        "chunk:e8c9a61fccd3ce89": 1.0,
+        "chunk:8d81616fbc37240a": 1.0,
+        "chunk:edeb38fac499acbe": 1.0,
+        "chunk:a779ab5a29f147ab": 1.0,
+        "chunk:db6ddfb3756fe5ff": 1.0,
+        "chunk:2bc9ad1cff909b93": 1.0,
+        "chunk:88a020d33820a3c5": 1.0,
+        "chunk:c00072bd11cb1585": 1.0,
+        "chunk:8f1d9f416388654c": 1.0
+      }
+    },
+    {
+      "id": "ir-sanctions-002",
+      "query": "Which research designs are used to estimate the effects of economic sanctions?",
+      "relevant": {
+        "chunk:421c2d5faa0acf57": 2.0,
+        "chunk:8b654e8a7bab157a": 1.0,
+        "chunk:8d81616fbc37240a": 1.0,
+        "chunk:e8c9a61fccd3ce89": 1.0,
+        "chunk:c00072bd11cb1585": 1.0,
+        "chunk:a779ab5a29f147ab": 1.0,
+        "chunk:3970aa7b3d9721d9": 1.0,
+        "chunk:ade37be7fb8a87d1": 1.0
+      }
+    },
+    {
+      "id": "ir-sanctions-003",
+      "query": "What are the humanitarian or distributional consequences of economic sanctions?",
+      "relevant": {
+        "chunk:421c2d5faa0acf57": 2.0,
+        "chunk:c00072bd11cb1585": 1.0,
+        "chunk:e8c9a61fccd3ce89": 2.0,
+        "chunk:8d81616fbc37240a": 2.0,
+        "chunk:a779ab5a29f147ab": 2.0,
+        "chunk:3970aa7b3d9721d9": 1.0,
+        "chunk:ade37be7fb8a87d1": 1.0,
+        "chunk:8944bc79b53d9d04": 1.0,
+        "chunk:8b654e8a7bab157a": 1.0,
+        "chunk:4218550968ea2513": 1.0,
+        "chunk:ef197e130dbedc08": 1.0,
+        "chunk:16b3c83bf886d5d8": 1.0
+      }
+    }
+  ]
+}

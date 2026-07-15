@@ -6,6 +6,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Protocol
 
+from canon.secrets import load_local_env
+
 
 @dataclass(frozen=True)
 class GenerationResult:
@@ -35,6 +37,7 @@ class OpenAIGenerationProvider:
     provider = "openai"
 
     def __init__(self, model: str = "gpt-4.1-mini", api_key: str | None = None) -> None:
+        load_local_env()
         self.model = model
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:

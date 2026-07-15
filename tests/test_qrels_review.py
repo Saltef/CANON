@@ -109,6 +109,33 @@ class QrelsReviewTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed_validation")
         self.assertTrue(result["validation_errors"])
 
+    def test_qrels_from_review_csv_can_drop_empty_provisional_queries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "review.csv"
+            output_path = Path(directory) / "qrels.json"
+            with csv_path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=["query_id", "query", "chunk_id", "relevance"],
+                )
+                writer.writeheader()
+                writer.writerow({"query_id": "q1", "query": "battery risk", "chunk_id": "chunk:a", "relevance": "0"})
+                writer.writerow({"query_id": "q2", "query": "grid risk", "chunk_id": "chunk:b", "relevance": "2"})
+
+            strict = qrels_from_review_csv(csv_path=csv_path, benchmark_id="unit_qrels")
+            relaxed = qrels_from_review_csv(
+                csv_path=csv_path,
+                benchmark_id="unit_qrels",
+                output_path=output_path,
+                benchmark_kind="llm_judged_qrels",
+                allow_missing_relevance=True,
+            )
+
+        self.assertEqual(strict["status"], "failed_validation")
+        self.assertEqual(relaxed["status"], "qrels_written")
+        self.assertEqual(relaxed["dropped_query_count"], 1)
+        self.assertEqual(relaxed["qrels"]["queries"][0]["id"], "q2")
+
 
 def retrieval(policy, results):
     return {

@@ -69,6 +69,33 @@ python -m canon.eval.llm_judge answers --records reports/human_review_tasks_v1.j
 python -m canon.eval.llm_judge qrels --csv reports/qrels_review_tasks_my_topic_v1_corpus.csv --output reports/qrels_review_tasks_my_topic_v1_corpus.openai_judged.csv --provider openai --model gpt-4.1-mini
 ```
 
+Local API keys are optional and must stay out of Git. Copy `.env.example` to
+`.env` and add keys there only if you want OpenAI or Cohere-backed judges,
+embeddings, or rerankers:
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+Never paste API keys into prompts, reports, docs, tests, or committed files.
+
+Pre-human automated product check:
+
+```powershell
+python -m canon.product.prehuman_check --mode social_science_ir_v1_harvest10 --benchmark-id llm_judged_social_science_ir_v1_harvest10 --judge-provider heuristic --model-providers local,openai,cohere --rerankers heuristic,cohere --top-k 10 --candidate-k 25
+```
+
+This prepares qrels review candidates, fills provisional judge relevance labels,
+exports `gold/llm_judged_social_science_ir_v1_harvest10.json`, runs semantic
+model evaluation, rerank evaluation, source diversity, smoke, and readiness, and
+writes `reports/prehuman_product_check_<mode>.json/.md`.
+
+The pre-human check can pass only as `automated_pass_human_review_required`.
+It is suitable for automated triage and packaging confidence, but not for
+declaring model winners or release-quality unsupported-claim rates. Re-run the
+same evaluations later against human-reviewed qrels.
+
 Rerank evaluation:
 
 ```powershell

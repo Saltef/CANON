@@ -6,6 +6,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Protocol
 
+from canon.secrets import load_local_env
 from canon.retrieval.semantic import HashedSemanticEncoder
 
 
@@ -54,6 +55,7 @@ class OpenAIEmbeddingProvider:
     provider = "openai"
 
     def __init__(self, model: str = "text-embedding-3-small", api_key: str | None = None) -> None:
+        load_local_env()
         self.model = model
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
@@ -91,6 +93,7 @@ class CohereEmbeddingProvider:
         api_key: str | None = None,
         input_type: str = "search_document",
     ) -> None:
+        load_local_env()
         self.model = model
         self.input_type = input_type
         self.api_key = api_key or os.getenv("COHERE_API_KEY")
