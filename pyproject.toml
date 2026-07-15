@@ -33,6 +33,9 @@ canon-intelligence-eval = "canon.eval.intelligence_brief:main"
 canon-intelligence-review = "canon.product.intelligence_review:main"
 canon-mounted-corpus = "canon.product.mounted_corpus:main"
 canon-prehuman-check = "canon.product.prehuman_check:main"
+canon-product-final-check = "canon.product.final_check:main"
+canon-readiness = "canon.product.readiness:main"
+canon-release-audit = "canon.product.release_audit:main"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]

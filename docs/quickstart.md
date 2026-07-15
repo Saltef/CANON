@@ -116,3 +116,13 @@ python -m canon.product.prehuman_check --mode my_topic_v1_corpus --benchmark-id 
 
 This is an automated triage gate. It does not replace human qrels or final
 answer review.
+
+## 8. Check Product Readiness
+
+```powershell
+python -m canon.product.readiness --mode social_science_ir_v1_harvest10
+python -m canon.product.final_check --mode ai_infra_geo_risk_demo --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json --no-fail
+```
+
+`blocked_human_review` is an expected final-check status before human labels are
+complete. It means the automated gates are separate from final acceptance.

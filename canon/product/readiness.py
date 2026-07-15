@@ -12,14 +12,22 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
     settings = load_settings()
     summary = service.product_summary(mode)
     available_endpoints = endpoints()
+    route_metadata = routes_metadata()
     smoke_report = load_json(settings.reports_dir / f"product_smoke_{mode}.json")
     checks = [
         check("health_ok", service.health()["status"] == "ok"),
         check("summary_has_claim_boundaries", bool(summary.get("claim_boundaries"))),
         check("summary_has_audit_status", summary.get("audit_status") == "pass"),
         check("small_corpus_limitation_visible", bool(summary.get("corpus", {}).get("limitations"))),
+        check("routes_metadata_endpoint_documented", "GET /v1/routes" in available_endpoints),
+        check("routes_metadata_has_human_review_boundary", bool(route_metadata.get("human_review_boundary"))),
+        check("routes_metadata_examples_present", all_post_routes_have_examples(route_metadata)),
         check("query_diagnostics_endpoint_documented", "POST /v1/query-diagnostics" in available_endpoints),
         check("evidence_packets_endpoint_documented", "POST /v1/evidence-packets" in available_endpoints),
+        check("intelligence_brief_endpoint_documented", "POST /v1/intelligence-brief" in available_endpoints),
+        check("alert_digest_endpoint_documented", "POST /v1/alert-digest" in available_endpoints),
+        check("flagship_handoff_endpoint_documented", "POST /v1/flagship-handoff" in available_endpoints),
+        check("intelligence_review_endpoint_documented", "POST /v1/intelligence-review/prepare" in available_endpoints),
         check("product_smoke_passed", smoke_report.get("status") == "pass"),
     ]
     report = {
@@ -27,6 +35,10 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
         "status": "pass" if all(item["passed"] for item in checks) else "fail",
         "checks": checks,
         "endpoints": available_endpoints,
+        "route_metadata": {
+            "route_count": len(route_metadata.get("routes", [])),
+            "human_review_boundary": route_metadata.get("human_review_boundary"),
+        },
     }
     output = settings.reports_dir / f"product_readiness_{mode}.json"
     report_io.write_json(output, report)
@@ -45,22 +57,23 @@ def check(identifier: str, passed: bool) -> dict:
 
 def endpoints() -> list[str]:
     return [
-        "GET /health",
-        "GET /v1/summary",
-        "GET /v1/reports/audit",
-        "GET /v1/reports/claim-decision",
-        "GET /v1/reports/data-card",
-        "GET /v1/reports/diversity",
-        "GET /v1/reports/diversity-gate",
-        "GET /v1/diversity/queries",
-        "GET /v1/diversity/queries/{query_id}",
-        "GET /v1/reports/regression-gate",
-        "POST /v1/answer",
-        "POST /v1/evidence-packets",
-        "POST /v1/compare",
-        "POST /v1/query-diagnostics",
-        "POST /v1/diversity-audit",
+        f"{route['method']} {route['path']}"
+        for route in routes_metadata().get("routes", [])
     ]
+
+
+def routes_metadata() -> dict:
+    from canon.product.server import api_routes
+
+    return api_routes()
+
+
+def all_post_routes_have_examples(metadata: dict) -> bool:
+    return all(
+        route.get("example") is not None
+        for route in metadata.get("routes", [])
+        if route.get("method") == "POST"
+    )
 
 
 def main() -> None:

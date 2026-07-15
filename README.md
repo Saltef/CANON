@@ -128,6 +128,16 @@ Run the automated pre-human gate:
 python -m canon.product.prehuman_check --mode my_topic_v1_corpus --benchmark-id llm_judged_my_topic_v1 --judge-provider heuristic --model-providers local --rerankers heuristic --top-k 10 --candidate-k 25
 ```
 
+Check package/product readiness:
+
+```powershell
+python -m canon.product.readiness --mode social_science_ir_v1_harvest10
+python -m canon.product.final_check --mode ai_infra_geo_risk_demo --records reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json --no-fail
+```
+
+Installed packages expose these as `canon-readiness` and
+`canon-product-final-check`.
+
 See [docs/evaluation.md](docs/evaluation.md) and
 [docs/human_review_rubric.md](docs/human_review_rubric.md).
 
