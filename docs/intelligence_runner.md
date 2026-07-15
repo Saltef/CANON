@@ -81,6 +81,28 @@ affected region/entity/issue, confidence, uncertainty, and recommended
 follow-up. The automated gate checks structure and duplicate rate only; human
 review is still required for usefulness and severity calibration.
 
+## Flagship Handoff
+
+Run the offline flagship workflow as one handoff report:
+
+```powershell
+python -m canon.product.flagship_handoff --mode ai_infra_geo_risk_demo
+```
+
+The handoff runner ingests the fixture corpus, generates a grounded intelligence
+brief, evaluates brief quality, generates an alert digest, evaluates alert
+structure, prepares human review tasks, and reports whether the workflow is
+blocked only by human review.
+
+Expected pre-human status for the fixture is:
+
+```text
+automated_pass_human_review_required
+```
+
+That status is intentional. It means the automated workflow is runnable and
+review-ready, while final acceptance still belongs to the human reviewer.
+
 ## Human Review Packet
 
 Prepare review tasks from the seed questions:

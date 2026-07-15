@@ -25,6 +25,7 @@ dev = [
 canon-api = "canon.product.server:main"
 canon-alert-digest = "canon.intelligence.alerts:main"
 canon-alert-eval = "canon.eval.alert_digest:main"
+canon-flagship-handoff = "canon.product.flagship_handoff:main"
 canon-ingest = "canon.ingest.flexible:main"
 canon-intelligence-brief = "canon.intelligence.evidence_runner:main"
 canon-intelligence-eval = "canon.eval.intelligence_brief:main"
