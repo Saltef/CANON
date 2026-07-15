@@ -47,6 +47,22 @@ def build_smoke_report(
                 "freedom_level": "balanced",
             }
         ),
+        "evidence_packets": service.evidence_packets(
+            {
+                "request_id": "smoke",
+                "query": query,
+                "mode": mode,
+                "policy": service.DEFAULT_POLICY,
+                "evidence_requirements": {
+                    "top_k": 5,
+                    "external_expansion": {
+                        "enabled": True,
+                        "allowed_source_types": ["official", "academic", "news"],
+                        "max_external_queries": 3,
+                    },
+                },
+            }
+        ),
     }
     checks = smoke_checks(results)
     report = {
@@ -61,6 +77,7 @@ def build_smoke_report(
             "POST /v1/answer",
             "POST /v1/compare",
             "POST /v1/query-diagnostics",
+            "POST /v1/evidence-packets",
         ],
         "result_summary": compact_results(results),
     }
@@ -81,6 +98,15 @@ def smoke_checks(results: dict[str, Any]) -> list[dict[str, Any]]:
         check("compare_has_rank_table", "rank_table" in results["compare"]),
         check("query_diagnostics_has_terms", "query_to_corpus" in results["query_diagnostics"]),
         check("query_diagnostics_has_variants", "query_variants" in results["query_diagnostics"]),
+        check("evidence_packets_have_packets", bool(results["evidence_packets"].get("evidence_packets"))),
+        check(
+            "evidence_packets_contract_passed",
+            (results["evidence_packets"].get("contract_validation") or {}).get("status") == "pass",
+        ),
+        check(
+            "evidence_packets_expansion_not_executed",
+            not results["evidence_packets"].get("external_expansion", {}).get("executed"),
+        ),
     ]
 
 
@@ -91,6 +117,7 @@ def check(identifier: str, passed: bool) -> dict[str, Any]:
 def compact_results(results: dict[str, Any]) -> dict[str, Any]:
     answer = results["answer"]
     diagnostics = results["query_diagnostics"]
+    packets = results["evidence_packets"]
     return {
         "health_status": results["health"].get("status"),
         "summary_product": results["summary"].get("product"),
@@ -101,6 +128,9 @@ def compact_results(results: dict[str, Any]) -> dict[str, Any]:
         "compare_run_count": len(results["compare"].get("runs") or []),
         "query_diagnostics_stability": (diagnostics.get("stability") or {}).get("status"),
         "query_diagnostics_variant_count": len(diagnostics.get("query_variants") or []),
+        "evidence_packet_count": len(packets.get("evidence_packets") or []),
+        "evidence_packet_contract_status": (packets.get("contract_validation") or {}).get("status"),
+        "external_expansion_status": (packets.get("external_expansion") or {}).get("status"),
     }
 
 
