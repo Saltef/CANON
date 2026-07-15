@@ -153,6 +153,7 @@ def build_feedback_report(records_path: Path, write_report: bool = True) -> dict
         "reviewed_record_count": len(completed),
         "metrics": feedback_metrics(completed),
         "issue_counts": feedback_issue_counts(completed),
+        "packet_metadata_summary": packet_metadata_summary(completed),
         "regression_candidates": regression_candidates(completed),
         "human_review_boundary": (
             "This report summarizes reviewer labels and proposes regression candidates. "
@@ -256,10 +257,44 @@ def feedback_issue_counts(records: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
+def packet_metadata_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    evidence_scope_totals: dict[str, int] = {"private_corpus": 0, "external_source": 0}
+    packet_contract_status_counts: dict[str, int] = {}
+    external_expansion_status_counts: dict[str, int] = {}
+    external_expansion_executed_count = 0
+    for record in records:
+        report = record.get("brief_report") or {}
+        for scope, count in (report.get("evidence_scope_summary") or {}).items():
+            scope_key = str(scope)
+            evidence_scope_totals[scope_key] = (
+                evidence_scope_totals.get(scope_key, 0) + safe_int(count)
+            )
+        packet_status = (
+            (report.get("evidence_packet_contract_validation") or {}).get("status") or "missing"
+        )
+        packet_contract_status_counts[str(packet_status)] = (
+            packet_contract_status_counts.get(str(packet_status), 0) + 1
+        )
+        expansion = report.get("external_expansion") or {}
+        expansion_status = expansion.get("status") or "missing"
+        external_expansion_status_counts[str(expansion_status)] = (
+            external_expansion_status_counts.get(str(expansion_status), 0) + 1
+        )
+        if bool(expansion.get("executed")):
+            external_expansion_executed_count += 1
+    return {
+        "evidence_scope_totals": evidence_scope_totals,
+        "packet_contract_status_counts": packet_contract_status_counts,
+        "external_expansion_status_counts": external_expansion_status_counts,
+        "external_expansion_executed_count": external_expansion_executed_count,
+    }
+
+
 def regression_candidates(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     candidates = []
     for record in records:
         review = record.get("review") or {}
+        report = record.get("brief_report") or {}
         reasons = []
         if review.get("unsupported_claim") == "yes":
             reasons.append("unsupported_claim")
@@ -269,6 +304,11 @@ def regression_candidates(records: list[dict[str, Any]]) -> list[dict[str, Any]]
             reasons.append(f"overclaim_risk_{review.get('overclaim_risk')}")
         if review.get("final_review_status") in {"needs_more_evidence", "rejected"}:
             reasons.append(str(review.get("final_review_status")))
+        packet_status = (report.get("evidence_packet_contract_validation") or {}).get("status")
+        if packet_status not in {None, "pass"}:
+            reasons.append("packet_contract_not_passed")
+        if bool((report.get("external_expansion") or {}).get("executed")):
+            reasons.append("external_expansion_executed")
         if reasons:
             candidates.append(
                 {
@@ -304,6 +344,17 @@ def value_counts(records: list[dict[str, Any]], field: str) -> dict[str, int]:
 
 def count_review_value(records: list[dict[str, Any]], field: str, expected: str) -> int:
     return sum(1 for record in records if (record.get("review") or {}).get(field) == expected)
+
+
+def safe_int(value: Any) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def compact_brief_report(report: dict[str, Any]) -> dict[str, Any]:
@@ -606,6 +657,14 @@ def render_feedback_report(report: dict[str, Any]) -> str:
         f"- `{item['id']}`: {', '.join(item['reasons'])} - {item['query']}"
         for item in report["regression_candidates"]
     ) or "- None"
+    packet_metadata = report.get("packet_metadata_summary") or {}
+    evidence_scope_totals = render_counts(packet_metadata.get("evidence_scope_totals") or {})
+    packet_contract_status_counts = render_counts(
+        packet_metadata.get("packet_contract_status_counts") or {}
+    )
+    external_expansion_status_counts = render_counts(
+        packet_metadata.get("external_expansion_status_counts") or {}
+    )
     return f"""# Intelligence Brief Human Feedback
 
 Status: **{report['status']}**
@@ -627,6 +686,22 @@ Reviewed records: {report['reviewed_record_count']} / {report['record_count']}
 
 {issues}
 
+## Packet Metadata
+
+Evidence scope totals:
+
+{evidence_scope_totals}
+
+Packet contract status:
+
+{packet_contract_status_counts}
+
+External expansion status:
+
+{external_expansion_status_counts}
+
+External expansion executed count: {packet_metadata.get('external_expansion_executed_count', 0)}
+
 ## Regression Candidates
 
 {regressions}
@@ -635,6 +710,10 @@ Reviewed records: {report['reviewed_record_count']} / {report['record_count']}
 
 {report['human_review_boundary']}
 """
+
+
+def render_counts(counts: dict[str, Any]) -> str:
+    return "\n".join(f"- `{key}`: {value}" for key, value in counts.items()) or "- None"
 
 
 def main() -> None:

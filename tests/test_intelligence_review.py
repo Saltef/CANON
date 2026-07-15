@@ -131,6 +131,9 @@ class IntelligenceReviewTests(unittest.TestCase):
         risky = review_record()
         risky["id"] = "q2"
         risky["query"] = "Water risk"
+        risky["brief_report"]["evidence_packet_contract_validation"] = {"status": "fail"}
+        risky["brief_report"]["evidence_scope_summary"] = {"private_corpus": 1, "external_source": 1}
+        risky["brief_report"]["external_expansion"] = {"status": "planned", "executed": True}
         risky["review"] = {
             **complete_review(),
             "usefulness_1_5": 2,
@@ -150,8 +153,17 @@ class IntelligenceReviewTests(unittest.TestCase):
         self.assertEqual(report["metrics"]["average_usefulness_1_5"], 3.5)
         self.assertEqual(report["issue_counts"]["unsupported_claim_yes"], 1)
         self.assertEqual(report["metrics"]["final_review_status_counts"]["needs_more_evidence"], 1)
+        self.assertEqual(
+            report["packet_metadata_summary"]["evidence_scope_totals"],
+            {"private_corpus": 2, "external_source": 1},
+        )
+        self.assertEqual(report["packet_metadata_summary"]["packet_contract_status_counts"], {"pass": 1, "fail": 1})
+        self.assertEqual(report["packet_metadata_summary"]["external_expansion_status_counts"], {"planned": 2})
+        self.assertEqual(report["packet_metadata_summary"]["external_expansion_executed_count"], 1)
         self.assertEqual(report["regression_candidates"][0]["id"], "q2")
         self.assertIn("unsupported_claim", report["regression_candidates"][0]["reasons"])
+        self.assertIn("packet_contract_not_passed", report["regression_candidates"][0]["reasons"])
+        self.assertIn("external_expansion_executed", report["regression_candidates"][0]["reasons"])
 
 
 def review_record():
