@@ -44,6 +44,24 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-brief -Cont
 The response includes `grounding_report`, `red_team`, `report_quality`, and the
 final `brief`.
 
+## Evaluation Gate
+
+Run the intelligence-brief gate over seed questions:
+
+```powershell
+python -m canon.eval.intelligence_brief --mode ai_infra_geo_risk_demo --queries-path gold/ai_infra_geo_risk_seed_queries.json --policy rag
+```
+
+The evaluation report checks:
+
+- grounded claim ratio >= 0.95
+- at least five completed agents
+- duplicate agent output rate <= 0.20
+- no red-team blockers
+- required report sections and citation appendix present
+
+It writes `reports/intelligence_brief_eval_<mode>_<policy>.json` and `.md`.
+
 ## Human Review Boundary
 
 The output status `ready_for_human_review` means the grounding checks passed.

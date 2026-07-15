@@ -61,6 +61,7 @@ Try the built-in AI infrastructure geopolitical risk fixture:
 python -m canon.ingest.unstructured --input data/fixtures/ai_infra_geo_risk_sample.jsonl --mode ai_infra_geo_risk_demo --chunk-tokens 80 --overlap-tokens 10
 python -m canon.synthesis.answer "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag --top-k 5
 python -m canon.intelligence.evidence_runner "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag
+python -m canon.eval.intelligence_brief --mode ai_infra_geo_risk_demo --queries-path gold/ai_infra_geo_risk_seed_queries.json --policy rag
 ```
 
 Start the product API:
