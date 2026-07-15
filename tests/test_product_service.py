@@ -145,6 +145,8 @@ class ProductServiceTests(unittest.TestCase):
                 )
 
         packet = report["evidence_packets"][0]
+        self.assertEqual(report["report_id"], "evidence_packet_response_v1")
+        self.assertEqual(report["contract_validation"]["status"], "pass")
         self.assertEqual(report["request_id"], "req_001")
         self.assertEqual(packet["support_level"], "mixed")
         self.assertEqual(packet["confidence"], "medium")

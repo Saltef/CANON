@@ -77,6 +77,29 @@ class ContractTests(unittest.TestCase):
 
         self.assertEqual(validation["status"], "pass")
 
+    def test_evidence_packet_response_contract_accepts_scope_and_expansion_boundary(self):
+        validation = validate_report(evidence_packet_response(), "evidence_packet_response")
+
+        self.assertEqual(validation["status"], "pass")
+        self.assertEqual(validation["checked_counts"]["evidence_packets"], 1)
+        self.assertEqual(validation["checked_counts"]["packet_supporting_evidence"], 2)
+
+    def test_evidence_packet_response_contract_rejects_executed_expansion(self):
+        report = evidence_packet_response()
+        report["external_expansion"]["executed"] = True
+        validation = validate_report(report, "evidence_packet_response")
+
+        self.assertEqual(validation["status"], "fail")
+        self.assertTrue(any("execution must be false" in error for error in validation["errors"]))
+
+    def test_evidence_packet_response_contract_rejects_scope_summary_mismatch(self):
+        report = evidence_packet_response()
+        report["evidence_packets"][0]["evidence_scope_summary"]["external_source"] = 0
+        validation = validate_report(report, "evidence_packet_response")
+
+        self.assertEqual(validation["status"], "fail")
+        self.assertTrue(any("evidence_scope_summary.external_source" in error for error in validation["errors"]))
+
 
 def retrieval_report():
     return {
@@ -160,6 +183,80 @@ def retrieval_report():
                 "explanation": {"summary": "ok"},
             }
         ],
+    }
+
+
+def evidence_packet_response():
+    return {
+        "report_id": "evidence_packet_response_v1",
+        "contract_version": CONTRACT_VERSION,
+        "request_id": "req_001",
+        "project_id": "ai_infra_geo_risk",
+        "status": "complete",
+        "query": "AI data center risk",
+        "mode": "m",
+        "policy": "rag",
+        "research_frame": {},
+        "evidence_packets": [
+            {
+                "packet_id": "packet_req_001",
+                "claim": "Retrieved evidence addresses: AI data center risk",
+                "support_level": "mixed",
+                "confidence": "medium",
+                "supporting_evidence": [
+                    {
+                        "evidence_id": "C1",
+                        "chunk_id": "chunk:1",
+                        "document_id": "doc:1",
+                        "citation": "C1",
+                        "title": "Internal memo",
+                        "source_name": "Team Drive",
+                        "text": "Private corpus text.",
+                        "evidence_scope": "private_corpus",
+                        "retrieval_stage": "private_corpus_retrieval",
+                    },
+                    {
+                        "evidence_id": "E1",
+                        "chunk_id": "external:1",
+                        "document_id": "external-doc:1",
+                        "citation": "E1",
+                        "title": "External filing",
+                        "source_name": "Regulator",
+                        "text": "External source text.",
+                        "evidence_scope": "external_source",
+                        "retrieval_stage": "external_expansion",
+                    },
+                ],
+                "evidence_scope_summary": {"private_corpus": 1, "external_source": 1},
+                "source_diversity": {
+                    "distinct_sources": 2,
+                    "distinct_clusters": 2,
+                    "dominant_source_share": 0.5,
+                    "warnings": [],
+                },
+            }
+        ],
+        "query_diagnostics": {},
+        "frame_coverage": {},
+        "coverage_gaps": [],
+        "external_expansion": {
+            "status": "planned",
+            "enabled": True,
+            "executed": False,
+            "allowed_source_types": ["official"],
+            "suggested_queries": [
+                {
+                    "query": "AI data center risk filing",
+                    "reason": "Corroborate source.",
+                    "allowed_source_types": ["official"],
+                    "priority": "medium",
+                    "review_status": "needs_human_approval",
+                }
+            ],
+            "boundary": "No external source was queried.",
+            "human_review_required": True,
+        },
+        "retrieval_metrics": {"estimated_confidence": "medium"},
     }
 
 

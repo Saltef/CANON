@@ -31,6 +31,7 @@ REPORT_TYPES = {
     "unstructured_label_calibration",
     "chunking_strategy_eval",
     "chunking_variant_eval",
+    "evidence_packet_response",
 }
 SIGNAL_FAMILIES = {
     "query_text_relevance",
@@ -128,6 +129,8 @@ def validate_report(report: dict[str, Any], report_type: str | None = None) -> d
         validate_chunking_strategy_eval_report(report, audit)
     elif resolved_type == "chunking_variant_eval":
         validate_chunking_variant_eval_report(report, audit)
+    elif resolved_type == "evidence_packet_response":
+        validate_evidence_packet_response(report, audit)
     return audit.to_report()
 
 
@@ -154,6 +157,8 @@ def infer_report_type(report: dict[str, Any]) -> str:
         return "chunking_strategy_eval"
     if report.get("report_id") == "chunking_variant_eval_v1":
         return "chunking_variant_eval"
+    if report.get("report_id") == "evidence_packet_response_v1":
+        return "evidence_packet_response"
     if report.get("benchmark_id") == "mixed_unstructured_document_routing_v1":
         return "mixed_unstructured"
     if report.get("report_id") == "document_type_slices_v1":
@@ -221,6 +226,117 @@ def validate_synthesis_report(report: dict[str, Any], audit: ContractAudit) -> N
         audit.error("$.post_generation_verification.status", "must be pass or fail")
     audit.count("evidence_items", len(evidence))
     audit.count("citations", len(citations))
+
+
+def validate_evidence_packet_response(report: dict[str, Any], audit: ContractAudit) -> None:
+    require_keys(
+        report,
+        "$",
+        [
+            "request_id",
+            "status",
+            "query",
+            "mode",
+            "policy",
+            "evidence_packets",
+            "coverage_gaps",
+            "external_expansion",
+            "retrieval_metrics",
+        ],
+        audit,
+    )
+    if report.get("status") not in {"complete", "partial", "failed"}:
+        audit.error("$.status", "must be complete, partial, or failed")
+    packets = expect_list(report.get("evidence_packets"), "$.evidence_packets", audit)
+    for index, packet in enumerate(packets):
+        validate_evidence_packet(packet, f"$.evidence_packets[{index}]", audit)
+    expect_list(report.get("coverage_gaps"), "$.coverage_gaps", audit)
+    validate_external_expansion(report.get("external_expansion"), "$.external_expansion", audit)
+    expect_dict(report.get("retrieval_metrics"), "$.retrieval_metrics", audit)
+    audit.count("evidence_packets", len(packets))
+
+
+def validate_evidence_packet(packet_value: Any, path: str, audit: ContractAudit) -> None:
+    packet = expect_dict(packet_value, path, audit)
+    if not packet:
+        return
+    require_keys(
+        packet,
+        path,
+        [
+            "packet_id",
+            "claim",
+            "support_level",
+            "confidence",
+            "supporting_evidence",
+            "evidence_scope_summary",
+            "source_diversity",
+        ],
+        audit,
+    )
+    evidence = expect_list(packet.get("supporting_evidence"), f"{path}.supporting_evidence", audit)
+    summary = expect_dict(packet.get("evidence_scope_summary"), f"{path}.evidence_scope_summary", audit)
+    observed = {"private_corpus": 0, "external_source": 0}
+    for index, item in enumerate(evidence):
+        scope = validate_packet_evidence_item(item, f"{path}.supporting_evidence[{index}]", audit)
+        if scope:
+            observed[scope] = observed.get(scope, 0) + 1
+    for scope, count in observed.items():
+        if int(summary.get(scope) or 0) != count:
+            audit.error(f"{path}.evidence_scope_summary.{scope}", f"expected {count}")
+    expect_dict(packet.get("source_diversity"), f"{path}.source_diversity", audit)
+    audit.count("packet_supporting_evidence", len(evidence))
+
+
+def validate_packet_evidence_item(item_value: Any, path: str, audit: ContractAudit) -> str | None:
+    item = expect_dict(item_value, path, audit)
+    if not item:
+        return None
+    require_keys(
+        item,
+        path,
+        ["evidence_id", "chunk_id", "document_id", "citation", "evidence_scope", "retrieval_stage"],
+        audit,
+    )
+    scope = item.get("evidence_scope")
+    if scope not in {"private_corpus", "external_source"}:
+        audit.error(f"{path}.evidence_scope", "must be private_corpus or external_source")
+        return None
+    stage = item.get("retrieval_stage")
+    if scope == "private_corpus" and stage != "private_corpus_retrieval":
+        audit.error(f"{path}.retrieval_stage", "private corpus evidence must use private_corpus_retrieval")
+    if scope == "external_source" and not str(stage or "").startswith("external"):
+        audit.error(f"{path}.retrieval_stage", "external evidence must use an external retrieval stage")
+    if item.get("citation") != item.get("evidence_id"):
+        audit.error(f"{path}.citation", "must match evidence_id")
+    return str(scope)
+
+
+def validate_external_expansion(expansion_value: Any, path: str, audit: ContractAudit) -> None:
+    expansion = expect_dict(expansion_value, path, audit)
+    if not expansion:
+        return
+    status = expansion.get("status")
+    if status not in {"disabled", "planned", "no_action"}:
+        audit.error(f"{path}.status", "must be disabled, planned, or no_action")
+    if bool(expansion.get("executed")):
+        audit.error(f"{path}.executed", "contract only allows reviewable plans; execution must be false")
+    suggestions = expect_list(expansion.get("suggested_queries", []), f"{path}.suggested_queries", audit)
+    for index, suggestion_value in enumerate(suggestions):
+        suggestion = expect_dict(suggestion_value, f"{path}.suggested_queries[{index}]", audit)
+        if not suggestion:
+            continue
+        require_keys(
+            suggestion,
+            f"{path}.suggested_queries[{index}]",
+            ["query", "reason", "allowed_source_types", "priority", "review_status"],
+            audit,
+        )
+        if suggestion.get("review_status") != "needs_human_approval":
+            audit.error(
+                f"{path}.suggested_queries[{index}].review_status",
+                "must be needs_human_approval",
+            )
 
 
 def validate_security_report(report: dict[str, Any], audit: ContractAudit) -> None:

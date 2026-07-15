@@ -7,6 +7,7 @@ from typing import Any
 
 from canon.config import load_settings
 from canon.corpus.build import run_phase16
+from canon.eval.contracts import CONTRACT_VERSION, validate_report
 from canon.eval.model_evaluation import evaluate_semantic_models, parse_providers
 from canon.eval.diversity import run_diversity_audit
 from canon.product import report_io
@@ -161,7 +162,9 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
         research_frame=research_frame,
         preferences=expansion_preferences,
     )
-    return {
+    response = {
+        "report_id": "evidence_packet_response_v1",
+        "contract_version": CONTRACT_VERSION,
         "request_id": str(payload.get("request_id") or ""),
         "project_id": str(payload.get("project_id") or ""),
         "status": "complete",
@@ -186,6 +189,8 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
             "support_assessment": support,
         },
     }
+    response["contract_validation"] = validate_report(response, "evidence_packet_response")
+    return response
 
 
 def frame_coverage_report(payload: dict[str, Any]) -> dict:
