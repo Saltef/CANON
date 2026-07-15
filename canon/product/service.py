@@ -109,6 +109,7 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
     policy = str(payload.get("policy") or DEFAULT_POLICY)
     research_frame = optional_dict(payload.get("research_frame"), "research_frame")
     requirements = optional_dict(payload.get("evidence_requirements"), "evidence_requirements")
+    expansion_preferences = expansion_preferences_from_requirements(requirements)
     top_k = optional_positive_int(requirements.get("top_k"), "top_k") if requirements else None
     top_k = top_k or optional_int(payload.get("top_k"))
     freedom_level = optional_freedom_level(payload.get("freedom_level"))
@@ -152,6 +153,13 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
         "frame_coverage": frame_coverage,
     }
     gaps = coverage_gaps(diagnostics, diversity, report.get("limitations", []), frame_coverage)
+    expansion_plan = build_external_expansion_plan(
+        query=query,
+        evidence=evidence,
+        coverage_gaps=gaps,
+        research_frame=research_frame,
+        preferences=expansion_preferences,
+    )
     return {
         "request_id": str(payload.get("request_id") or ""),
         "project_id": str(payload.get("project_id") or ""),
@@ -164,6 +172,7 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
         "query_diagnostics": compact_packet_diagnostics(diagnostics),
         "frame_coverage": frame_coverage,
         "coverage_gaps": gaps,
+        "external_expansion": expansion_plan,
         "retrieval_metrics": {
             "estimated_confidence": packet["confidence"],
             "source_diversity_status": "pass" if not diversity["warnings"] else "review",
@@ -696,6 +705,142 @@ def coverage_gaps(
     for limitation in limitations[:3]:
         gaps.append({"gap": limitation, "severity": "low", "suggested_next_query": ""})
     return gaps
+
+
+def expansion_preferences_from_requirements(requirements: dict[str, Any]) -> dict[str, Any]:
+    raw = requirements.get("external_expansion") if requirements else None
+    if raw is None:
+        return {"enabled": False}
+    if not isinstance(raw, dict):
+        raise ProductError("external_expansion must be an object.")
+    enabled = optional_bool(raw.get("enabled"), default=False)
+    allowed_source_types = optional_string_list(
+        raw.get("allowed_source_types"),
+        "allowed_source_types",
+    ) or []
+    max_external_queries = optional_positive_int(
+        raw.get("max_external_queries"),
+        "max_external_queries",
+    ) or 5
+    return {
+        "enabled": enabled,
+        "allowed_source_types": allowed_source_types,
+        "max_external_queries": max_external_queries,
+    }
+
+
+def build_external_expansion_plan(
+    query: str,
+    evidence: list[dict[str, Any]],
+    coverage_gaps: list[dict[str, Any]],
+    research_frame: dict[str, Any],
+    preferences: dict[str, Any],
+) -> dict[str, Any]:
+    enabled = bool(preferences.get("enabled"))
+    if not enabled:
+        return {
+            "status": "disabled",
+            "enabled": False,
+            "executed": False,
+            "suggested_queries": [],
+            "boundary": "External expansion is opt-in and was not requested.",
+        }
+    max_queries = int(preferences.get("max_external_queries") or 5)
+    allowed_source_types = preferences.get("allowed_source_types") or []
+    suggestions = expansion_query_suggestions(
+        query=query,
+        evidence=evidence,
+        coverage_gaps=coverage_gaps,
+        research_frame=research_frame,
+        allowed_source_types=allowed_source_types,
+        max_queries=max_queries,
+    )
+    return {
+        "status": "planned" if suggestions else "no_action",
+        "enabled": True,
+        "executed": False,
+        "allowed_source_types": allowed_source_types,
+        "suggested_queries": suggestions,
+        "boundary": (
+            "CANON generated reviewable external-search suggestions only. "
+            "No external source was queried and no private corpus text was sent to a hosted provider."
+        ),
+        "human_review_required": True,
+    }
+
+
+def expansion_query_suggestions(
+    query: str,
+    evidence: list[dict[str, Any]],
+    coverage_gaps: list[dict[str, Any]],
+    research_frame: dict[str, Any],
+    allowed_source_types: list[str],
+    max_queries: int,
+) -> list[dict[str, Any]]:
+    candidates = []
+    for gap in coverage_gaps:
+        suggested = str(gap.get("suggested_next_query") or "").strip()
+        if suggested:
+            candidates.append(
+                expansion_query(
+                    suggested,
+                    reason=gap.get("gap") or "Coverage gap.",
+                    source_types=allowed_source_types,
+                    priority="high" if gap.get("severity") == "high" else "medium",
+                )
+            )
+    for region in optional_string_list(research_frame.get("regions"), "regions") or []:
+        candidates.append(
+            expansion_query(
+                f"{query} {region}",
+                reason=f"Check external coverage for requested region: {region}.",
+                source_types=allowed_source_types,
+                priority="medium",
+            )
+        )
+    for item in evidence[:3]:
+        title = str(item.get("title") or item.get("source_name") or "").strip()
+        if title:
+            candidates.append(
+                expansion_query(
+                    f"{query} {title}",
+                    reason="Corroborate or update a cited private-corpus source.",
+                    source_types=allowed_source_types,
+                    priority="low",
+                )
+            )
+    return dedupe_expansion_queries(candidates)[:max_queries]
+
+
+def expansion_query(
+    query: str,
+    reason: str,
+    source_types: list[str],
+    priority: str,
+) -> dict[str, Any]:
+    return {
+        "query": collapse_spaces(query),
+        "reason": reason,
+        "allowed_source_types": source_types,
+        "priority": priority,
+        "review_status": "needs_human_approval",
+    }
+
+
+def dedupe_expansion_queries(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen = set()
+    deduped = []
+    for candidate in candidates:
+        key = normalized_term(candidate.get("query"))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(candidate)
+    return deduped
+
+
+def collapse_spaces(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip()
 
 
 def analyze_frame_coverage(

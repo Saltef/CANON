@@ -264,7 +264,14 @@ def api_routes() -> dict:
                 {
                     "question": "What does the corpus say about grid risk?",
                     "mode": "my_topic_v1_corpus",
-                    "evidence_requirements": {"top_k": 10},
+                    "evidence_requirements": {
+                        "top_k": 10,
+                        "external_expansion": {
+                            "enabled": True,
+                            "allowed_source_types": ["official", "filing", "news"],
+                            "max_external_queries": 5,
+                        },
+                    },
                 },
             ),
             route(

@@ -98,6 +98,11 @@ Each evidence item should carry:
 The answer should make it obvious which claims are supported by the user's
 documents, which are supported externally, and which remain uncertain.
 
+In the current implementation, `/v1/evidence-packets` produces an
+`external_expansion` planning object when expansion is enabled. This object
+contains reviewable suggested queries and allowed source types, but it does not
+execute web search or send private corpus text to an external provider.
+
 ## Evidence Packet Shape
 
 The `/v1/evidence-packets` API is the natural integration point. A Drive-first
@@ -122,6 +127,13 @@ request should include the private corpus mode and expansion preferences:
   }
 }
 ```
+
+The response includes:
+
+- `external_expansion.status`: `disabled`, `planned`, or `no_action`
+- `external_expansion.executed`: always `false` for the current safe planner
+- `external_expansion.suggested_queries`: reviewer-approved candidate searches
+- `external_expansion.boundary`: the safety statement for private-corpus use
 
 ## Safety Rules
 

@@ -135,6 +135,11 @@ class ProductServiceTests(unittest.TestCase):
                         "evidence_requirements": {
                             "top_k": 5,
                             "minimum_source_types": ["official", "local_media"],
+                            "external_expansion": {
+                                "enabled": True,
+                                "allowed_source_types": ["official", "filing"],
+                                "max_external_queries": 3,
+                            },
                         },
                     }
                 )
@@ -149,6 +154,37 @@ class ProductServiceTests(unittest.TestCase):
         self.assertEqual(report["query_diagnostics"]["weak_terms"], ["permitting"])
         self.assertEqual(report["retrieval_metrics"]["source_diversity_status"], "pass")
         self.assertTrue(report["frame_coverage"]["human_review_required"])
+        self.assertEqual(report["external_expansion"]["status"], "planned")
+        self.assertFalse(report["external_expansion"]["executed"])
+        self.assertEqual(report["external_expansion"]["allowed_source_types"], ["official", "filing"])
+        self.assertLessEqual(len(report["external_expansion"]["suggested_queries"]), 3)
+        self.assertTrue(
+            all(
+                row["review_status"] == "needs_human_approval"
+                for row in report["external_expansion"]["suggested_queries"]
+            )
+        )
+
+    def test_evidence_packets_external_expansion_is_disabled_by_default(self):
+        with patch("canon.product.service.build_query_diagnostics", return_value={"query_to_corpus": {}}):
+            with patch("canon.product.service.synthesize") as synthesize:
+                synthesize.return_value = {
+                    "query": "q",
+                    "mode": "m",
+                    "policy": "rag",
+                    "top_k": 5,
+                    "answer": "Answer.",
+                    "citations": [],
+                    "evidence": [],
+                    "support_assessment": {"support_level": "none"},
+                    "limitations": [],
+                    "conflict_notes": [],
+                }
+                report = service.evidence_packets({"query": "q", "mode": "m"})
+
+        self.assertEqual(report["external_expansion"]["status"], "disabled")
+        self.assertFalse(report["external_expansion"]["enabled"])
+        self.assertEqual(report["external_expansion"]["suggested_queries"], [])
 
     def test_frame_coverage_reports_requested_missing_dimensions(self):
         report = service.analyze_frame_coverage(
@@ -243,6 +279,15 @@ class ProductServiceTests(unittest.TestCase):
     def test_evidence_packets_rejects_non_object_requirements(self):
         with self.assertRaises(service.ProductError):
             service.evidence_packets({"query": "q", "evidence_requirements": "top 10"})
+
+    def test_evidence_packets_rejects_non_object_external_expansion(self):
+        with self.assertRaises(service.ProductError):
+            service.evidence_packets(
+                {
+                    "query": "q",
+                    "evidence_requirements": {"external_expansion": "yes"},
+                }
+            )
 
     def test_intelligence_brief_wraps_runner(self):
         with patch("canon.intelligence.evidence_runner.run_intelligence_brief", return_value={"status": "ready_for_human_review"}) as runner:
