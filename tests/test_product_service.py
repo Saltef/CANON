@@ -5,6 +5,17 @@ from canon.product import service
 
 
 class ProductServiceTests(unittest.TestCase):
+    def test_product_summary_surfaces_missing_demo_artifact_boundaries(self):
+        with patch("canon.product.service.load_report", return_value={}):
+            summary = service.product_summary("ai_infra_geo_risk_demo")
+
+        self.assertEqual(summary["audit_status"], "not_available")
+        self.assertIn("scientific_audit_not_available_for_mode", summary["active_warnings"])
+        self.assertTrue(summary["corpus"]["limitations"])
+        self.assertTrue(
+            any("small fixture/demo corpus" in limitation for limitation in summary["corpus"]["limitations"])
+        )
+
     def test_optional_int_validates_positive_values(self):
         self.assertEqual(service.optional_int("5"), 5)
         with self.assertRaises(service.ProductError):

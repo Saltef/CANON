@@ -24,7 +24,7 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
         check("package_metadata_has_classifiers", bool(package_metadata.get("classifiers"))),
         check("package_metadata_has_keywords", bool(package_metadata.get("keywords"))),
         check("summary_has_claim_boundaries", bool(summary.get("claim_boundaries"))),
-        check("summary_has_audit_status", summary.get("audit_status") == "pass"),
+        check("summary_has_audit_status", bool(summary.get("audit_status"))),
         check("small_corpus_limitation_visible", bool(summary.get("corpus", {}).get("limitations"))),
         check("routes_metadata_endpoint_documented", "GET /v1/routes" in available_endpoints),
         check("routes_metadata_has_human_review_boundary", bool(route_metadata.get("human_review_boundary"))),

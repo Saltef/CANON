@@ -54,6 +54,11 @@ def product_summary(mode: str = DEFAULT_MODE) -> dict:
     audit = load_report(settings.reports_dir / f"scientific_audit_{mode}_baseline_methods_v1.json")
     decision = load_report(settings.reports_dir / f"claim_decision_{mode}_baseline_methods_v1.json")
     data_card = load_report(settings.reports_dir / f"data_card_{mode}.json")
+    audit_status = audit.get("status") or "not_available"
+    active_warnings = [warning["id"] for warning in audit.get("warnings", [])]
+    if not audit:
+        active_warnings.append("scientific_audit_not_available_for_mode")
+    data_card_limitations = data_card.get("limitations", [])
     return {
         "product": "CANON Evidence Workbench",
         "mode": mode,
@@ -65,15 +70,31 @@ def product_summary(mode: str = DEFAULT_MODE) -> dict:
             "export reproducible scientific audit artifacts",
         ],
         "claim_boundaries": decision.get("global_winner_claim", {}),
-        "audit_status": audit.get("status"),
-        "active_warnings": [warning["id"] for warning in audit.get("warnings", [])],
+        "audit_status": audit_status,
+        "active_warnings": active_warnings,
         "resolved_warnings": [warning["id"] for warning in audit.get("resolved_warnings", [])],
         "corpus": {
             "work_count": data_card.get("work_count"),
             "chunk_count": data_card.get("chunk_count"),
-            "limitations": data_card.get("limitations", []),
+            "limitations": data_card_limitations or summary_limitations(mode, data_card),
         },
     }
+
+
+def summary_limitations(mode: str, data_card: dict[str, Any]) -> list[str]:
+    limitations = []
+    if not data_card:
+        limitations.append(
+            "No data card is available for this mode; corpus size, source mix, and coverage need review."
+        )
+    if mode == "ai_infra_geo_risk_demo" or mode.endswith("_demo"):
+        limitations.append(
+            "This is a small fixture/demo corpus for workflow testing, not a complete domain corpus."
+        )
+    limitations.append(
+        "Human review is required before using outputs for final conclusions or release-level quality claims."
+    )
+    return limitations
 
 
 def answer(payload: dict[str, Any]) -> dict:

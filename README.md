@@ -199,6 +199,7 @@ CANON is usable for local corpus testing, evidence-packet experiments, and
 human-reviewed retrieval evaluation. Treat it as a serious workbench under
 active development, not as a finished autonomous research product.
 
-No open-source license has been selected yet. Internal testing can continue,
-but public package release and broad reuse should stay blocked until a `LICENSE`
-file is added and the package metadata declares the chosen license.
+CANON is released under the MIT License. Public release claims are still gated
+by the automated release audit and human-reviewed evaluation requirements; the
+license only clears repository reuse hygiene, not model-quality or factual
+correctness claims.
