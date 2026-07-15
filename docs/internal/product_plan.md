@@ -56,7 +56,7 @@ pilot. CANON is ready for that pilot when an industry reviewer can ask a focused
 question, inspect evidence and query-lingo diagnostics, generate a cautious
 cited brief, revise or reject it, and export an audit trail.
 
-Pass criteria are defined in `docs/industry_release_goal.md`. The short version:
+Pass criteria are defined in `industry_release_goal.md`. The short version:
 
 - 30-question acceptance set
 - at least 80% of questions return three or more reviewer-rated relevant

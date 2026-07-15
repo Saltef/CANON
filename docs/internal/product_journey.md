@@ -104,7 +104,7 @@ Product behavior:
 
 Existing module/doc:
 
-- `docs/research_skill_template.md`
+- `research_skill_template.md`
 
 Needed product object:
 
@@ -349,4 +349,3 @@ CANON is working if a reviewer can:
 - use judge suggestions to reduce review workload
 - complete final labels with human authority
 - export an audit trail another reviewer can inspect
-
