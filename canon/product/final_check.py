@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from canon.config import load_settings
-from canon.product import industry_pilot, readiness, release_audit, report_io, service, smoke
+from canon.product import industry_pilot, intelligence_review, readiness, release_audit, report_io, service, smoke
 
 
 DEFAULT_RECORDS = Path("reports") / "human_review_tasks_v1.json"
@@ -22,13 +22,7 @@ def run_final_check(
 ) -> dict[str, Any]:
     runners = steps or default_steps(mode, records_path)
     results = []
-    for identifier in [
-        "product_smoke",
-        "human_review_status",
-        "industry_pilot",
-        "product_readiness",
-        "product_release_audit",
-    ]:
+    for identifier in step_order(runners):
         report = runners[identifier]()
         if identifier == "product_release_audit":
             audit = report
@@ -57,13 +51,42 @@ def run_final_check(
 
 
 def default_steps(mode: str, records_path: Path) -> dict[str, Callable[[], dict[str, Any]]]:
+    track = review_track(records_path)
+    if track == "intelligence":
+        acceptance_step = {
+            "intelligence_feedback": lambda: intelligence_review.build_feedback_report(records_path)
+        }
+        human_review_status = lambda: intelligence_review.build_review_status_report(records_path)
+    else:
+        acceptance_step = {
+            "industry_pilot": lambda: industry_pilot.build_industry_pilot_report(mode, records_path)
+        }
+        human_review_status = lambda: industry_pilot.build_review_status_report(mode, records_path)
     return {
         "product_smoke": lambda: smoke.build_smoke_report(mode=mode),
-        "human_review_status": lambda: industry_pilot.build_review_status_report(mode, records_path),
-        "industry_pilot": lambda: industry_pilot.build_industry_pilot_report(mode, records_path),
+        "human_review_status": human_review_status,
+        **acceptance_step,
         "product_readiness": lambda: readiness.build_readiness_report(mode),
-        "product_release_audit": lambda: release_audit.build_release_audit(mode),
+        "product_release_audit": lambda: release_audit.build_release_audit(mode, acceptance_track=track),
     }
+
+
+def step_order(runners: dict[str, Callable[[], dict[str, Any]]]) -> list[str]:
+    return [
+        "product_smoke",
+        "human_review_status",
+        "intelligence_feedback" if "intelligence_feedback" in runners else "industry_pilot",
+        "product_readiness",
+        "product_release_audit",
+    ]
+
+
+def review_track(records_path: Path) -> str:
+    try:
+        payload = json.loads(records_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "industry"
+    return "intelligence" if payload.get("report_id") == intelligence_review.REVIEW_PACKET_ID else "industry"
 
 
 def step_result(identifier: str, report: dict[str, Any]) -> dict[str, Any]:
@@ -99,6 +122,13 @@ def compact_step_summary(identifier: str, report: dict[str, Any]) -> dict[str, A
             "minimum_question_count": report.get("minimum_question_count", 30),
             "release_blockers": report.get("release_blockers", []),
             "failed_checks": failed_check_ids(report),
+        }
+    if identifier == "intelligence_feedback":
+        return {
+            "record_count": report.get("record_count", 0),
+            "reviewed_record_count": report.get("reviewed_record_count", 0),
+            "regression_candidate_count": len(report.get("regression_candidates") or []),
+            "status": report.get("status"),
         }
     if identifier == "product_readiness":
         return {
@@ -138,8 +168,10 @@ def release_blocking_reason(audit: dict[str, Any]) -> str:
         return "product_readiness"
     if not components.get("human_review_status", {}).get("passed"):
         return "human_review_required"
-    if not components.get("industry_pilot", {}).get("passed"):
+    if not components.get("industry_pilot", {}).get("passed", True):
         return "industry_pilot"
+    if not components.get("intelligence_feedback", {}).get("passed", True):
+        return "human_review_required"
     return "none"
 
 
@@ -190,11 +222,22 @@ def review_task_packet_integrity(path: Path) -> list[dict[str, Any]]:
 
 
 def source_artifacts(mode: str, reports_dir: Path, records_path: Path) -> list[dict[str, Any]]:
+    track = review_track(resolve_records_path(records_path, reports_dir))
+    review_paths = (
+        [
+            reports_dir / "intelligence_brief_review_status_v1.json",
+            reports_dir / "intelligence_brief_feedback_v1.json",
+        ]
+        if track == "intelligence"
+        else [
+            reports_dir / "human_review_status_v1.json",
+            reports_dir / "industry_pilot_acceptance_v1.json",
+        ]
+    )
     paths = [
         resolve_records_path(records_path, reports_dir),
         reports_dir / f"product_smoke_{mode}.json",
-        reports_dir / "human_review_status_v1.json",
-        reports_dir / "industry_pilot_acceptance_v1.json",
+        *review_paths,
         reports_dir / f"product_readiness_{mode}.json",
         reports_dir / f"product_release_audit_{mode}.json",
         reports_dir / f"product_release_audit_{mode}.md",

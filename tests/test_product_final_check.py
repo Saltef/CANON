@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from canon.product.final_check import run_final_check, should_exit_nonzero
+from canon.product.final_check import review_track, run_final_check, should_exit_nonzero
 
 
 class ProductFinalCheckTests(unittest.TestCase):
@@ -130,6 +130,15 @@ class ProductFinalCheckTests(unittest.TestCase):
         self.assertEqual(report["status"], "fail")
         self.assertEqual(report["blocking_reason"], "review_task_packet_integrity")
         self.assertEqual(report["integrity_errors"][0]["field"], "json")
+
+    def test_final_check_detects_intelligence_review_packet_track(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "intelligence_tasks.json"
+            path.write_text('{"report_id": "intelligence_brief_review_tasks_v1", "records": []}', encoding="utf-8")
+
+            track = review_track(path)
+
+        self.assertEqual(track, "intelligence")
 
 
 def steps_with_audit(audit):

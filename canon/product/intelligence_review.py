@@ -127,6 +127,7 @@ def build_review_status_report(
         "status": "complete" if records and reviewed_count == len(records) and not validation_errors else "incomplete",
         "question_count": len(records),
         "reviewed_question_count": reviewed_count,
+        "minimum_question_count": len(records),
         "missing_field_count": sum(len(row["missing_fields"]) for row in rows),
         "validation_error_count": len(validation_errors),
         "validation_errors": validation_errors,

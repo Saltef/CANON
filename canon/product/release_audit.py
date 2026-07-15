@@ -11,41 +11,25 @@ from canon.product import report_io
 from canon.product import service
 
 
-def build_release_audit(mode: str = service.DEFAULT_MODE, write_report: bool = True) -> dict[str, Any]:
+def build_release_audit(
+    mode: str = service.DEFAULT_MODE,
+    write_report: bool = True,
+    acceptance_track: str | None = None,
+) -> dict[str, Any]:
     settings = load_settings()
     reports_dir = settings.reports_dir
     repo_root = repository_root(settings)
-    source_reports = {
-        "product_smoke": {
-            "path": reports_dir / f"product_smoke_{mode}.json",
-            "expected_report_id": "product_smoke_v1",
-            "expected_mode": mode,
-        },
-        "product_readiness": {
-            "path": reports_dir / f"product_readiness_{mode}.json",
-            "expected_report_id": None,
-            "expected_mode": mode,
-        },
-        "human_review_status": {
-            "path": reports_dir / "human_review_status_v1.json",
-            "expected_report_id": "human_review_status_v1",
-            "expected_mode": mode,
-        },
-        "industry_pilot": {
-            "path": reports_dir / "industry_pilot_acceptance_v1.json",
-            "expected_report_id": "industry_pilot_acceptance_v1",
-            "expected_mode": mode,
-        },
-    }
+    track = acceptance_track or default_acceptance_track(mode)
+    source_reports = acceptance_source_reports(reports_dir, mode, track)
     smoke = load_json(source_reports["product_smoke"]["path"])
     readiness = load_json(source_reports["product_readiness"]["path"])
     review_status = load_json(source_reports["human_review_status"]["path"])
-    industry_pilot = load_json(source_reports["industry_pilot"]["path"])
+    acceptance = load_json(source_reports["acceptance_review"]["path"])
     integrity = source_report_integrity(source_reports, {
         "product_smoke": smoke,
         "product_readiness": readiness,
         "human_review_status": review_status,
-        "industry_pilot": industry_pilot,
+        "acceptance_review": acceptance,
     })
     components = [
         component(
@@ -68,20 +52,12 @@ def build_release_audit(mode: str = service.DEFAULT_MODE, write_report: bool = T
                 "validation_error_count": review_status.get("validation_error_count", 0),
             },
         ),
-        component(
-            "industry_pilot",
-            industry_pilot.get("status") == "pass",
-            industry_pilot.get("status"),
-            {
-                "release_blockers": industry_pilot.get("release_blockers", []),
-                "reviewed_question_count": industry_pilot.get("reviewed_question_count", 0),
-                "minimum_question_count": industry_pilot.get("minimum_question_count", 30),
-            },
-        ),
+        acceptance_component(track, acceptance),
     ]
     report = {
         "report_id": "product_release_audit_v1",
         "mode": mode,
+        "acceptance_track": track,
         "status": "pass" if all(item["passed"] for item in components) else "blocked",
         "claim": release_claim(components),
         "components": components,
@@ -96,6 +72,76 @@ def build_release_audit(mode: str = service.DEFAULT_MODE, write_report: bool = T
         write_json(reports_dir / f"product_release_audit_{mode}.json", report)
         write_markdown(reports_dir / f"product_release_audit_{mode}.md", render_markdown(report))
     return report
+
+
+def acceptance_source_reports(reports_dir: Path, mode: str, track: str) -> dict[str, dict[str, Any]]:
+    source_reports = {
+        "product_smoke": {
+            "path": reports_dir / f"product_smoke_{mode}.json",
+            "expected_report_id": "product_smoke_v1",
+            "expected_mode": mode,
+        },
+        "product_readiness": {
+            "path": reports_dir / f"product_readiness_{mode}.json",
+            "expected_report_id": None,
+            "expected_mode": mode,
+        },
+    }
+    if track == "intelligence":
+        source_reports.update({
+            "human_review_status": {
+                "path": reports_dir / "intelligence_brief_review_status_v1.json",
+                "expected_report_id": "intelligence_brief_review_status_v1",
+                "expected_mode": None,
+            },
+            "acceptance_review": {
+                "path": reports_dir / "intelligence_brief_feedback_v1.json",
+                "expected_report_id": "intelligence_brief_feedback_v1",
+                "expected_mode": None,
+            },
+        })
+        return source_reports
+    source_reports.update({
+        "human_review_status": {
+            "path": reports_dir / "human_review_status_v1.json",
+            "expected_report_id": "human_review_status_v1",
+            "expected_mode": mode,
+        },
+        "acceptance_review": {
+            "path": reports_dir / "industry_pilot_acceptance_v1.json",
+            "expected_report_id": "industry_pilot_acceptance_v1",
+            "expected_mode": mode,
+        },
+    })
+    return source_reports
+
+
+def default_acceptance_track(mode: str) -> str:
+    return "intelligence" if mode == "ai_infra_geo_risk_demo" else "industry"
+
+
+def acceptance_component(track: str, report: dict[str, Any]) -> dict[str, Any]:
+    if track == "intelligence":
+        return component(
+            "intelligence_feedback",
+            report.get("status") == "ready",
+            report.get("status"),
+            {
+                "record_count": report.get("record_count", 0),
+                "reviewed_record_count": report.get("reviewed_record_count", 0),
+                "regression_candidate_count": len(report.get("regression_candidates") or []),
+            },
+        )
+    return component(
+        "industry_pilot",
+        report.get("status") == "pass",
+        report.get("status"),
+        {
+            "release_blockers": report.get("release_blockers", []),
+            "reviewed_question_count": report.get("reviewed_question_count", 0),
+            "minimum_question_count": report.get("minimum_question_count", 30),
+        },
+    )
 
 
 def repository_root(settings: Any) -> Path:
@@ -264,6 +310,8 @@ def release_claim(components: list[dict[str, Any]]) -> str:
         if item["id"] in {"product_smoke", "product_readiness"}
     }
     if all(automated.values()):
+        if next((item for item in components if item["id"] == "intelligence_feedback"), None):
+            return "Automated product gates pass; intelligence review remains blocked on human labels."
         return "Automated product gates pass; industry pilot remains blocked on human-reviewed acceptance evidence."
     return "Product release is not ready: automated gates are incomplete or failing."
 
@@ -292,7 +340,14 @@ def next_required_action(components: list[dict[str, Any]]) -> str:
             f"{details.get('minimum_question_count', 30) - details.get('reviewed_question_count', 0)} "
             "remaining acceptance questions."
         )
-    if not by_id.get("industry_pilot", {}).get("passed"):
+    if not by_id.get("intelligence_feedback", {}).get("passed", True):
+        details = by_id["intelligence_feedback"]["details"]
+        return (
+            "Complete intelligence review labels for "
+            f"{details.get('record_count', 0) - details.get('reviewed_record_count', 0)} "
+            "remaining brief task(s)."
+        )
+    if not by_id.get("industry_pilot", {}).get("passed", True):
         blockers = by_id["industry_pilot"]["details"].get("release_blockers", [])
         return f"Resolve industry pilot release blockers: {', '.join(blockers)}."
     return "No required action remains."

@@ -54,6 +54,46 @@ class ProductReleaseAuditTests(unittest.TestCase):
         self.assertIn("license_file_present", failed)
         self.assertIn("package_license_declared", failed)
 
+    def test_release_audit_uses_intelligence_review_track_for_ai_demo(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            mode = "ai_infra_geo_risk_demo"
+            write_public_repo_files(root)
+            write_json(root / f"product_smoke_{mode}.json", {"report_id": "product_smoke_v1", "mode": mode, "status": "pass"})
+            write_json(root / f"product_readiness_{mode}.json", {"mode": mode, "status": "pass"})
+            write_json(
+                root / "intelligence_brief_review_status_v1.json",
+                {
+                    "report_id": "intelligence_brief_review_status_v1",
+                    "status": "incomplete",
+                    "question_count": 5,
+                    "reviewed_question_count": 0,
+                    "minimum_question_count": 5,
+                    "missing_field_count": 40,
+                    "validation_error_count": 0,
+                },
+            )
+            write_json(
+                root / "intelligence_brief_feedback_v1.json",
+                {
+                    "report_id": "intelligence_brief_feedback_v1",
+                    "status": "needs_review_labels",
+                    "record_count": 5,
+                    "reviewed_record_count": 0,
+                    "regression_candidates": [],
+                },
+            )
+            with patch(
+                "canon.product.release_audit.load_settings",
+                return_value=SimpleNamespace(root=root, reports_dir=root),
+            ):
+                report = build_release_audit(mode=mode, write_report=False)
+
+        self.assertEqual(report["acceptance_track"], "intelligence")
+        self.assertIn("intelligence review", report["claim"])
+        self.assertIn("5 remaining", report["next_required_action"])
+        self.assertTrue(any(item["id"] == "intelligence_feedback" for item in report["components"]))
+
     def test_release_audit_blocks_wrong_mode_source_report(self):
         with TemporaryDirectory() as temp_dir:
             reports_dir = Path(temp_dir)
