@@ -62,6 +62,25 @@ The evaluation report checks:
 
 It writes `reports/intelligence_brief_eval_<mode>_<policy>.json` and `.md`.
 
+## Alert Digest
+
+Generate evidence-triggered alert prompts:
+
+```powershell
+python -m canon.intelligence.alerts "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag
+```
+
+Evaluate alert digests across seed questions:
+
+```powershell
+python -m canon.eval.alert_digest --mode ai_infra_geo_risk_demo --queries-path gold/ai_infra_geo_risk_seed_queries.json --policy rag
+```
+
+Alerts include an evidence trigger, evidence IDs or explicit source-gap status,
+affected region/entity/issue, confidence, uncertainty, and recommended
+follow-up. The automated gate checks structure and duplicate rate only; human
+review is still required for usefulness and severity calibration.
+
 ## Human Review Packet
 
 Prepare review tasks from the seed questions:
