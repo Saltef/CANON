@@ -44,10 +44,22 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-brief -Cont
 The response includes `grounding_report`, `red_team`, `report_quality`, and the
 final `brief`.
 
+Run the automated intelligence-brief evaluation gate through the API:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-brief/evaluate -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","queries_path":"gold/ai_infra_geo_risk_seed_queries.json","policy":"rag","write_report":true}'
+```
+
 Generate an alert digest through the same product API:
 
 ```powershell
 Invoke-RestMethod -Method Post http://localhost:8000/v1/alert-digest -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","policy":"rag","write_report":true}'
+```
+
+Run the automated alert-digest evaluation gate through the API:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/alert-digest/evaluate -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","queries_path":"gold/ai_infra_geo_risk_seed_queries.json","policy":"rag","write_report":true}'
 ```
 
 Run the full flagship demo handoff through the API:

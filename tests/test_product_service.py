@@ -305,6 +305,40 @@ class ProductServiceTests(unittest.TestCase):
         self.assertEqual(str(importer.call_args.args[0]).replace("\\", "/"), "reports/review.json")
         self.assertEqual(str(importer.call_args.args[1]).replace("\\", "/"), "reports/review.csv")
 
+    def test_intelligence_brief_evaluation_wraps_eval_gate(self):
+        with patch("canon.eval.intelligence_brief.evaluate_intelligence_briefs", return_value={"status": "pass"}) as evaluator:
+            report = service.intelligence_brief_evaluation(
+                {
+                    "mode": "m",
+                    "queries_path": "gold/ai_infra_geo_risk_seed_queries.json",
+                    "policy": "rag",
+                    "project_id": "ai_infra_geo_risk",
+                    "write_report": "false",
+                }
+            )
+
+        self.assertEqual(report["status"], "pass")
+        evaluator.assert_called_once()
+        self.assertEqual(evaluator.call_args.kwargs["mode"], "m")
+        self.assertFalse(evaluator.call_args.kwargs["write_report"])
+
+    def test_alert_digest_evaluation_wraps_eval_gate(self):
+        with patch("canon.eval.alert_digest.evaluate_alert_digests", return_value={"status": "pass"}) as evaluator:
+            report = service.alert_digest_evaluation(
+                {
+                    "mode": "m",
+                    "queries_path": "gold/ai_infra_geo_risk_seed_queries.json",
+                    "policy": "rag",
+                    "project_id": "ai_infra_geo_risk",
+                    "write_report": "false",
+                }
+            )
+
+        self.assertEqual(report["status"], "pass")
+        evaluator.assert_called_once()
+        self.assertEqual(evaluator.call_args.kwargs["mode"], "m")
+        self.assertFalse(evaluator.call_args.kwargs["write_report"])
+
     def test_invalid_freedom_level_raises_product_error(self):
         with self.assertRaises(service.ProductError):
             service.query_diagnostics({"query": "q", "freedom_level": "wild"})

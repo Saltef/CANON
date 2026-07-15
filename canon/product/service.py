@@ -310,6 +310,49 @@ def intelligence_review_records_path(payload: dict[str, Any]) -> Path:
     return load_settings().reports_dir / f"intelligence_brief_review_tasks_{mode}.json"
 
 
+def intelligence_brief_evaluation(payload: dict[str, Any]) -> dict:
+    from canon.eval.intelligence_brief import DEFAULT_QUERY_PATH, evaluate_intelligence_briefs
+
+    mode = str(payload.get("mode") or "ai_infra_geo_risk_demo")
+    policy = str(payload.get("policy") or DEFAULT_POLICY)
+    project_id = str(payload.get("project_id") or "ai_infra_geo_risk")
+    queries_path = optional_path(payload.get("queries_path"), "queries_path") or DEFAULT_QUERY_PATH
+    try:
+        return evaluate_intelligence_briefs(
+            mode=mode,
+            queries_path=queries_path,
+            policy=policy,
+            project_id=project_id,
+            write_report=optional_bool(payload.get("write_report"), default=True),
+        )
+    except FileNotFoundError as exc:
+        raise ProductError(str(exc), status_code=404) from exc
+    except ValueError as exc:
+        raise ProductError(str(exc), status_code=400) from exc
+
+
+def alert_digest_evaluation(payload: dict[str, Any]) -> dict:
+    from canon.eval.alert_digest import evaluate_alert_digests
+    from canon.eval.intelligence_brief import DEFAULT_QUERY_PATH
+
+    mode = str(payload.get("mode") or "ai_infra_geo_risk_demo")
+    policy = str(payload.get("policy") or DEFAULT_POLICY)
+    project_id = str(payload.get("project_id") or "ai_infra_geo_risk")
+    queries_path = optional_path(payload.get("queries_path"), "queries_path") or DEFAULT_QUERY_PATH
+    try:
+        return evaluate_alert_digests(
+            mode=mode,
+            queries_path=queries_path,
+            policy=policy,
+            project_id=project_id,
+            write_report=optional_bool(payload.get("write_report"), default=True),
+        )
+    except FileNotFoundError as exc:
+        raise ProductError(str(exc), status_code=404) from exc
+    except ValueError as exc:
+        raise ProductError(str(exc), status_code=400) from exc
+
+
 def enrich_evidence_metadata(evidence: list[dict[str, Any]], mode: str) -> list[dict[str, Any]]:
     work_metadata = load_work_metadata(mode)
     enriched = []

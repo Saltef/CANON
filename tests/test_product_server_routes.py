@@ -16,7 +16,9 @@ class ProductServerRouteTests(unittest.TestCase):
         self.assertEqual(payload["service"], "canon")
         self.assertIn("/v1/evidence-packets", payload["post"])
         self.assertIn("/v1/intelligence-brief", payload["post"])
+        self.assertIn("/v1/intelligence-brief/evaluate", payload["post"])
         self.assertIn("/v1/alert-digest", payload["post"])
+        self.assertIn("/v1/alert-digest/evaluate", payload["post"])
         self.assertIn("/v1/flagship-handoff", payload["post"])
         self.assertIn("/v1/intelligence-review/prepare", payload["post"])
         self.assertIn("/v1/intelligence-review/status", payload["post"])
@@ -40,7 +42,9 @@ class ProductServerRouteTests(unittest.TestCase):
             "/v1/model-evaluation": ("model_evaluation", {"report_id": "semantic_model_evaluation_v1"}),
             "/v1/evidence-packets": ("evidence_packets", {"status": "complete"}),
             "/v1/intelligence-brief": ("intelligence_brief", {"status": "ready_for_human_review"}),
+            "/v1/intelligence-brief/evaluate": ("intelligence_brief_evaluation", {"status": "pass"}),
             "/v1/alert-digest": ("alert_digest", {"status": "ready_for_human_review"}),
+            "/v1/alert-digest/evaluate": ("alert_digest_evaluation", {"status": "pass"}),
             "/v1/flagship-handoff": ("flagship_handoff", {"status": "automated_pass_human_review_required"}),
             "/v1/intelligence-review/prepare": ("intelligence_review_prepare", {"report_id": "intelligence_brief_review_tasks_v1"}),
             "/v1/intelligence-review/status": ("intelligence_review_status", {"status": "incomplete"}),
