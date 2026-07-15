@@ -149,6 +149,9 @@ def run_from_packet_response(
         "question": question or packet_response.get("query", ""),
         "status": "blocked" if red_team["blocking_issue_count"] or report_quality["status"] == "fail" else "ready_for_human_review",
         "evidence_packet_request_id": packet_response.get("request_id", ""),
+        "evidence_packet_contract_validation": packet_response.get("contract_validation", {}),
+        "evidence_scope_summary": packet_scope_summary(packet_response),
+        "external_expansion": packet_response.get("external_expansion", {}),
         "agent_plan": [agent_to_dict(agent) for agent in plan],
         "agent_outputs": outputs,
         "grounding_report": grounding,
@@ -431,6 +434,20 @@ def evidence_index(packet_response: dict[str, Any]) -> dict[str, dict[str, Any]]
             if evidence_id:
                 rows[evidence_id] = item
     return rows
+
+
+def packet_scope_summary(packet_response: dict[str, Any]) -> dict[str, int]:
+    summary = {"private_corpus": 0, "external_source": 0}
+    for packet in packet_response.get("evidence_packets", []):
+        packet_summary = packet.get("evidence_scope_summary") or {}
+        if packet_summary:
+            for key, value in packet_summary.items():
+                summary[str(key)] = summary.get(str(key), 0) + int(value or 0)
+            continue
+        for item in packet.get("supporting_evidence", []):
+            scope = str(item.get("evidence_scope") or "private_corpus")
+            summary[scope] = summary.get(scope, 0) + 1
+    return summary
 
 
 def write_intelligence_report(report: dict[str, Any]) -> None:

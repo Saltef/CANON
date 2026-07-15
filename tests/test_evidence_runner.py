@@ -20,6 +20,10 @@ class EvidenceRunnerTests(unittest.TestCase):
         self.assertEqual(report["grounding_report"]["status"], "pass")
         self.assertGreaterEqual(report["grounding_report"]["grounded_claim_ratio"], 0.95)
         self.assertEqual(report["report_quality"]["status"], "pass")
+        self.assertEqual(report["evidence_packet_contract_validation"]["status"], "pass")
+        self.assertEqual(report["evidence_scope_summary"], {"private_corpus": 5, "external_source": 0})
+        self.assertEqual(report["external_expansion"]["status"], "planned")
+        self.assertFalse(report["external_expansion"]["executed"])
         self.assertTrue(report["brief"]["citation_appendix"])
 
     def test_grounding_fails_claims_without_evidence_ids(self):
@@ -160,8 +164,11 @@ def packet_response():
                 "supporting_evidence": evidence,
                 "conflicting_evidence": [],
                 "limitations": [],
+                "evidence_scope_summary": {"private_corpus": 5, "external_source": 0},
             }
         ],
+        "contract_validation": {"status": "pass"},
+        "external_expansion": {"status": "planned", "executed": False},
         "frame_coverage": {"status": "pass"},
         "coverage_gaps": [],
     }
@@ -180,6 +187,8 @@ def evidence_item(evidence_id, title, source, source_type, provenance, language,
         "jurisdiction": jurisdiction,
         "text": text,
         "rank": int(evidence_id.removeprefix("C")),
+        "evidence_scope": "private_corpus",
+        "retrieval_stage": "private_corpus_retrieval",
     }
 
 

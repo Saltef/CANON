@@ -31,6 +31,14 @@ class IntelligenceReviewTests(unittest.TestCase):
         self.assertEqual(packet["report_id"], "intelligence_brief_review_tasks_v1")
         self.assertEqual(len(packet["records"]), 1)
         self.assertIsNone(packet["records"][0]["review"]["usefulness_1_5"])
+        self.assertEqual(
+            packet["records"][0]["brief_report"]["evidence_packet_contract_validation"]["status"],
+            "pass",
+        )
+        self.assertEqual(
+            packet["records"][0]["brief_report"]["evidence_scope_summary"],
+            {"private_corpus": 1, "external_source": 0},
+        )
         self.assertIn("human-owned", " ".join(packet["instructions"]))
 
     def test_review_status_is_incomplete_until_required_fields_are_present(self):
@@ -66,6 +74,10 @@ class IntelligenceReviewTests(unittest.TestCase):
             with csv_path.open("r", newline="", encoding="utf-8") as handle:
                 rows = list(csv.DictReader(handle))
                 fieldnames = list(rows[0].keys())
+            self.assertEqual(rows[0]["packet_contract_status"], "pass")
+            self.assertEqual(rows[0]["external_expansion_status"], "planned")
+            self.assertEqual(rows[0]["external_expansion_executed"], "False")
+            self.assertEqual(json.loads(rows[0]["evidence_scope_summary"]), {"private_corpus": 1, "external_source": 0})
             rows[0].update(
                 {
                     "usefulness_1_5": "5",
@@ -180,6 +192,10 @@ def brief_report():
     return {
         "status": "ready_for_human_review",
         "question": "AI risk",
+        "evidence_packet_request_id": "req-ai-risk",
+        "evidence_packet_contract_validation": {"status": "pass"},
+        "evidence_scope_summary": {"private_corpus": 1, "external_source": 0},
+        "external_expansion": {"status": "planned", "executed": False},
         "grounding_report": {"grounded_claim_ratio": 1.0},
         "duplicate_agent_output": {"duplicate_agent_output_rate": 0.0},
         "red_team": {"objections": []},
