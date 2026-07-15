@@ -28,6 +28,8 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.health())
             elif parsed.path == "/v1/summary":
                 self.send_json(service.product_summary(mode))
+            elif parsed.path == "/v1/routes":
+                self.send_json(api_routes())
             elif parsed.path == "/v1/diversity/queries":
                 params["mode"] = first(query.get("mode")) or service.DEFAULT_DIVERSITY_MODE
                 self.send_json(service.diversity_queries(params))
@@ -128,12 +130,14 @@ class CanonHTTPServer(ThreadingHTTPServer):
 
 
 def api_index() -> dict:
+    routes = api_routes()
     return {
         "service": "canon",
         "status": "ok",
         "message": "CANON product API is running. Use the listed routes; POST routes require JSON bodies.",
         "get": [
             "/health",
+            "/v1/routes",
             "/v1/summary",
             "/v1/reports/audit",
             "/v1/reports/claim-decision",
@@ -166,8 +170,154 @@ def api_index() -> dict:
         ],
         "examples": {
             "health": "http://127.0.0.1:8000/health",
+            "routes": "http://127.0.0.1:8000/v1/routes",
             "summary": "http://127.0.0.1:8000/v1/summary",
         },
+        "route_count": len(routes["routes"]),
+    }
+
+
+def api_routes() -> dict:
+    return {
+        "service": "canon",
+        "version": "v1",
+        "human_review_boundary": (
+            "Automated routes prepare evidence, reports, and gates for review. "
+            "They do not establish final factual correctness or release-level model quality."
+        ),
+        "routes": [
+            route("GET", "/health", "Check API health.", [], [], None),
+            route("GET", "/v1/summary", "Return compact product and corpus summary.", [], ["mode"], None),
+            route(
+                "POST",
+                "/v1/sources/profile",
+                "Profile a local folder, mounted Drive folder, or git checkout before ingest.",
+                ["input_path"],
+                ["format", "sample_size"],
+                {"input_path": "data/my_docs", "sample_size": 25},
+            ),
+            route(
+                "POST",
+                "/v1/sources/ingest",
+                "Ingest a profiled local source into a named mode.",
+                ["input_path", "mode"],
+                ["format", "domain", "provenance", "source_name", "chunk_tokens", "overlap_tokens"],
+                {"input_path": "data/my_docs", "mode": "my_topic_v1", "chunk_tokens": 160},
+            ),
+            route(
+                "POST",
+                "/v1/evidence-packets",
+                "Generate cited evidence packets for downstream review or intelligence runs.",
+                ["query or question"],
+                ["mode", "policy", "project_id", "research_frame", "evidence_requirements", "top_k"],
+                {
+                    "question": "What does the corpus say about grid risk?",
+                    "mode": "my_topic_v1_corpus",
+                    "evidence_requirements": {"top_k": 10},
+                },
+            ),
+            route(
+                "POST",
+                "/v1/intelligence-brief",
+                "Generate a grounded intelligence brief from evidence packets.",
+                ["query or question"],
+                ["mode", "policy", "project_id", "write_report"],
+                {"query": "What are the emerging geopolitical risks around AI data center expansion in Latin America?", "mode": "ai_infra_geo_risk_demo", "write_report": True},
+            ),
+            route(
+                "POST",
+                "/v1/intelligence-brief/evaluate",
+                "Run automated grounding and report-structure gates over seed questions.",
+                [],
+                ["mode", "queries_path", "policy", "project_id", "write_report"],
+                {"mode": "ai_infra_geo_risk_demo", "queries_path": "gold/ai_infra_geo_risk_seed_queries.json"},
+            ),
+            route(
+                "POST",
+                "/v1/alert-digest",
+                "Generate evidence-triggered alert review prompts.",
+                ["query or question"],
+                ["mode", "policy", "project_id", "write_report"],
+                {"query": "What are the emerging geopolitical risks around AI data center expansion in Latin America?", "mode": "ai_infra_geo_risk_demo"},
+            ),
+            route(
+                "POST",
+                "/v1/alert-digest/evaluate",
+                "Run automated alert structure and duplicate-rate gates over seed questions.",
+                [],
+                ["mode", "queries_path", "policy", "project_id", "write_report"],
+                {"mode": "ai_infra_geo_risk_demo", "queries_path": "gold/ai_infra_geo_risk_seed_queries.json"},
+            ),
+            route(
+                "POST",
+                "/v1/flagship-handoff",
+                "Run the built-in fixture workflow and return automated gate plus human-review status.",
+                [],
+                ["mode", "question", "fixture_path", "queries_path", "policy", "project_id", "write_report"],
+                {"mode": "ai_infra_geo_risk_demo", "write_report": True},
+            ),
+            route(
+                "POST",
+                "/v1/intelligence-review/prepare",
+                "Prepare human review tasks for intelligence brief labels.",
+                [],
+                ["mode", "queries_path", "policy", "project_id", "records_path", "reset_review_labels", "write_report"],
+                {"mode": "ai_infra_geo_risk_demo", "queries_path": "gold/ai_infra_geo_risk_seed_queries.json"},
+            ),
+            route(
+                "POST",
+                "/v1/intelligence-review/export-csv",
+                "Export review tasks to CSV for human labels.",
+                ["records_path or mode"],
+                ["output_path"],
+                {"records_path": "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json"},
+            ),
+            route(
+                "POST",
+                "/v1/intelligence-review/import-csv",
+                "Import and validate human-entered review labels.",
+                ["records_path or mode", "csv_path"],
+                ["output_path"],
+                {
+                    "records_path": "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json",
+                    "csv_path": "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv",
+                },
+            ),
+            route(
+                "POST",
+                "/v1/intelligence-review/status",
+                "Check whether required human review fields are complete and valid.",
+                ["records_path or mode"],
+                ["write_report"],
+                {"records_path": "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"},
+            ),
+            route(
+                "POST",
+                "/v1/model-evaluation",
+                "Evaluate retrieval models against reviewed qrels or query fixtures.",
+                ["mode", "qrels_path or queries_path"],
+                ["providers", "k", "batch_size"],
+                {"mode": "my_topic_v1_corpus", "qrels_path": "gold/my_topic_qrels.json", "providers": ["local"]},
+            ),
+        ],
+    }
+
+
+def route(
+    method: str,
+    path: str,
+    purpose: str,
+    required: list[str],
+    optional: list[str],
+    example: dict | None,
+) -> dict:
+    return {
+        "method": method,
+        "path": path,
+        "purpose": purpose,
+        "required": required,
+        "optional": optional,
+        "example": example,
     }
 
 

@@ -88,6 +88,7 @@ Check the API:
 
 ```powershell
 Invoke-WebRequest http://localhost:8000/health
+Invoke-RestMethod http://localhost:8000/v1/routes
 Invoke-RestMethod -Method Post http://localhost:8000/v1/sources/profile -ContentType "application/json" -Body '{"input_path":"data/my_docs","sample_size":25}'
 ```
 

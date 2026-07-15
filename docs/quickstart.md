@@ -92,6 +92,12 @@ Health check:
 Invoke-WebRequest http://localhost:8000/health
 ```
 
+See available routes and example request bodies:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/v1/routes
+```
+
 Ask for evidence:
 
 ```powershell

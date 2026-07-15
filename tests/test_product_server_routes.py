@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from canon.product.server import CanonHandler
+from canon.product.server import CanonHandler, api_routes
 
 
 class ProductServerRouteTests(unittest.TestCase):
@@ -14,6 +14,8 @@ class ProductServerRouteTests(unittest.TestCase):
 
         payload = handler.send_json.call_args.args[0]
         self.assertEqual(payload["service"], "canon")
+        self.assertIn("/v1/routes", payload["get"])
+        self.assertGreater(payload["route_count"], 0)
         self.assertIn("/v1/evidence-packets", payload["post"])
         self.assertIn("/v1/intelligence-brief", payload["post"])
         self.assertIn("/v1/intelligence-brief/evaluate", payload["post"])
@@ -33,6 +35,29 @@ class ProductServerRouteTests(unittest.TestCase):
         handler.do_GET()
 
         handler.send_empty.assert_called_once()
+
+    def test_routes_endpoint_returns_route_metadata(self):
+        handler = object.__new__(CanonHandler)
+        handler.path = "/v1/routes"
+        handler.send_json = Mock()
+
+        handler.do_GET()
+
+        payload = handler.send_json.call_args.args[0]
+        self.assertIn("human_review_boundary", payload)
+        paths = {route["path"]: route for route in payload["routes"]}
+        self.assertEqual(paths["/v1/flagship-handoff"]["method"], "POST")
+        self.assertIn("mode", paths["/v1/flagship-handoff"]["optional"])
+        self.assertEqual(paths["/v1/intelligence-review/import-csv"]["example"]["csv_path"], "reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv")
+
+    def test_api_routes_include_examples_for_public_post_routes(self):
+        metadata = api_routes()
+        missing_examples = [
+            route["path"]
+            for route in metadata["routes"]
+            if route["method"] == "POST" and route["example"] is None
+        ]
+        self.assertEqual(missing_examples, [])
 
     def test_post_routes_include_integration_endpoints(self):
         routes = {
