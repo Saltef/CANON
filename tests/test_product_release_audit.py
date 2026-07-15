@@ -11,6 +11,7 @@ class ProductReleaseAuditTests(unittest.TestCase):
     def test_release_audit_blocks_when_human_review_is_incomplete(self):
         with TemporaryDirectory() as temp_dir:
             write_source_reports(Path(temp_dir), review_status="incomplete", industry_status="fail")
+            write_public_repo_files(Path(temp_dir))
             with patch(
                 "canon.product.release_audit.load_settings",
                 return_value=SimpleNamespace(reports_dir=Path(temp_dir)),
@@ -25,6 +26,7 @@ class ProductReleaseAuditTests(unittest.TestCase):
     def test_release_audit_passes_when_all_components_pass(self):
         with TemporaryDirectory() as temp_dir:
             write_source_reports(Path(temp_dir), review_status="complete", industry_status="pass")
+            write_public_repo_files(Path(temp_dir))
             with patch(
                 "canon.product.release_audit.load_settings",
                 return_value=SimpleNamespace(reports_dir=Path(temp_dir)),
@@ -33,10 +35,30 @@ class ProductReleaseAuditTests(unittest.TestCase):
         self.assertEqual(report["status"], "pass")
         self.assertEqual(report["next_required_action"], "No required action remains.")
 
+    def test_release_audit_blocks_public_release_when_license_is_missing(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_source_reports(root, review_status="complete", industry_status="pass")
+            write_public_repo_files(root, include_license=False)
+            with patch(
+                "canon.product.release_audit.load_settings",
+                return_value=SimpleNamespace(root=root, reports_dir=root),
+            ):
+                report = build_release_audit(write_report=False)
+        hygiene = next(item for item in report["components"] if item["id"] == "public_repository_hygiene")
+        self.assertEqual(report["status"], "blocked")
+        self.assertFalse(hygiene["passed"])
+        self.assertIn("public repository hygiene", report["claim"])
+        self.assertIn("Choose a license", report["next_required_action"])
+        failed = [item["id"] for item in hygiene["details"]["checks"] if not item["passed"]]
+        self.assertIn("license_file_present", failed)
+        self.assertIn("package_license_declared", failed)
+
     def test_release_audit_blocks_wrong_mode_source_report(self):
         with TemporaryDirectory() as temp_dir:
             reports_dir = Path(temp_dir)
             write_source_reports(reports_dir, review_status="complete", industry_status="pass")
+            write_public_repo_files(reports_dir)
             mode = "social_science_ir_v1_harvest10"
             write_json(
                 reports_dir / f"product_smoke_{mode}.json",
@@ -57,6 +79,7 @@ class ProductReleaseAuditTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             reports_dir = Path(temp_dir)
             write_source_reports(reports_dir, review_status="complete", industry_status="pass")
+            write_public_repo_files(reports_dir)
             (reports_dir / "human_review_status_v1.json").unlink()
             with patch(
                 "canon.product.release_audit.load_settings",
@@ -73,6 +96,7 @@ class ProductReleaseAuditTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             reports_dir = Path(temp_dir)
             write_source_reports(reports_dir, review_status="complete", industry_status="pass")
+            write_public_repo_files(reports_dir)
             mode = "social_science_ir_v1_harvest10"
             (reports_dir / f"product_readiness_{mode}.json").write_text("", encoding="utf-8")
             with patch(
@@ -89,6 +113,7 @@ class ProductReleaseAuditTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             reports_dir = Path(temp_dir)
             write_source_reports(reports_dir, review_status="complete", industry_status="pass")
+            write_public_repo_files(reports_dir)
             mode = "social_science_ir_v1_harvest10"
             write_json(
                 reports_dir / "human_review_status_v1.json",
@@ -116,6 +141,7 @@ class ProductReleaseAuditTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             reports_dir = Path(temp_dir)
             write_source_reports(reports_dir, review_status="complete", industry_status="pass")
+            write_public_repo_files(reports_dir)
             mode = "social_science_ir_v1_harvest10"
             write_json(
                 reports_dir / "human_review_status_v1.json",
@@ -167,6 +193,25 @@ def write_source_reports(path: Path, review_status: str, industry_status: str) -
             "reviewed_question_count": reviewed,
             "minimum_question_count": 30,
         },
+    )
+
+
+def write_public_repo_files(path: Path, include_license: bool = True) -> None:
+    (path / "README.md").write_text("# CANON\n", encoding="utf-8")
+    (path / "SECURITY.md").write_text("# Security Policy\n", encoding="utf-8")
+    (path / ".env.example").write_text("OPENAI_API_KEY=\nCOHERE_API_KEY=\n", encoding="utf-8")
+    (path / ".gitignore").write_text(".env\n.env.*\n!.env.example\n", encoding="utf-8")
+    if include_license:
+        (path / "LICENSE").write_text("Test license fixture.\n", encoding="utf-8")
+        license_metadata = 'license = { text = "Test license fixture" }\n'
+    else:
+        license_metadata = ""
+    (path / "pyproject.toml").write_text(
+        "[project]\n"
+        'name = "canon-rag"\n'
+        'version = "0.1.0"\n'
+        f"{license_metadata}",
+        encoding="utf-8",
     )
 
 

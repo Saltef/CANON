@@ -130,6 +130,9 @@ notepad .env
 
 Never paste API keys into prompts, reports, docs, tests, or committed files.
 
+See [SECURITY.md](SECURITY.md) for the current security policy and private
+corpus handling guidance.
+
 ## Evaluation
 
 CANON includes two evaluation tracks:
@@ -195,3 +198,7 @@ tests/       regression and product tests
 CANON is usable for local corpus testing, evidence-packet experiments, and
 human-reviewed retrieval evaluation. Treat it as a serious workbench under
 active development, not as a finished autonomous research product.
+
+No open-source license has been selected yet. Internal testing can continue,
+but public package release and broad reuse should stay blocked until a `LICENSE`
+file is added and the package metadata declares the chosen license.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ from canon.product import service
 def build_release_audit(mode: str = service.DEFAULT_MODE, write_report: bool = True) -> dict[str, Any]:
     settings = load_settings()
     reports_dir = settings.reports_dir
+    repo_root = repository_root(settings)
     source_reports = {
         "product_smoke": {
             "path": reports_dir / f"product_smoke_{mode}.json",
@@ -52,6 +54,7 @@ def build_release_audit(mode: str = service.DEFAULT_MODE, write_report: bool = T
             "pass" if not integrity else "fail",
             {"errors": integrity},
         ),
+        public_repository_hygiene_component(repo_root),
         component("product_smoke", smoke.get("status") == "pass", smoke.get("status")),
         component("product_readiness", readiness.get("status") == "pass", readiness.get("status")),
         component(
@@ -87,11 +90,20 @@ def build_release_audit(mode: str = service.DEFAULT_MODE, write_report: bool = T
             key: str(value["path"].relative_to(reports_dir.parent))
             for key, value in source_reports.items()
         },
+        "repository_root": str(repo_root),
     }
     if write_report:
         write_json(reports_dir / f"product_release_audit_{mode}.json", report)
         write_markdown(reports_dir / f"product_release_audit_{mode}.md", render_markdown(report))
     return report
+
+
+def repository_root(settings: Any) -> Path:
+    root = getattr(settings, "root", None)
+    if root:
+        return Path(root)
+    reports_dir = Path(settings.reports_dir)
+    return reports_dir.parent if reports_dir.name == "reports" else reports_dir
 
 
 def component(
@@ -159,6 +171,73 @@ def source_report_integrity(
     return errors
 
 
+def public_repository_hygiene_component(root: Path) -> dict[str, Any]:
+    checks = public_repository_hygiene_checks(root)
+    return component(
+        "public_repository_hygiene",
+        all(item["passed"] for item in checks),
+        "pass" if all(item["passed"] for item in checks) else "blocked",
+        {"checks": checks},
+    )
+
+
+def public_repository_hygiene_checks(root: Path) -> list[dict[str, Any]]:
+    pyproject = load_pyproject(root / "pyproject.toml")
+    return [
+        hygiene_check("readme_present", (root / "README.md").exists(), "README.md is present."),
+        hygiene_check(
+            "security_policy_present",
+            (root / "SECURITY.md").exists(),
+            "SECURITY.md is present.",
+        ),
+        hygiene_check("env_example_present", (root / ".env.example").exists(), ".env.example is present."),
+        hygiene_check(
+            "gitignore_blocks_env_files",
+            gitignore_blocks_env_files(root / ".gitignore"),
+            ".gitignore blocks local env files.",
+        ),
+        hygiene_check("license_file_present", license_file_present(root), "A LICENSE file is present."),
+        hygiene_check(
+            "package_license_declared",
+            package_license_declared(pyproject),
+            "Package metadata declares license terms.",
+        ),
+    ]
+
+
+def hygiene_check(identifier: str, passed: bool, description: str) -> dict[str, Any]:
+    return {
+        "id": identifier,
+        "passed": bool(passed),
+        "description": description,
+    }
+
+
+def gitignore_blocks_env_files(path: Path) -> bool:
+    if not path.exists():
+        return False
+    lines = {line.strip() for line in path.read_text(encoding="utf-8").splitlines()}
+    return ".env" in lines and ".env.*" in lines and "!.env.example" in lines
+
+
+def license_file_present(root: Path) -> bool:
+    return any((root / name).exists() for name in ["LICENSE", "LICENSE.md", "LICENSE.txt"])
+
+
+def load_pyproject(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError:
+        return {}
+
+
+def package_license_declared(pyproject: dict[str, Any]) -> bool:
+    project = pyproject.get("project") or {}
+    return bool(project.get("license") or project.get("license-files"))
+
+
 def human_review_status_passes(report: dict[str, Any]) -> bool:
     reviewed = int(report.get("reviewed_question_count") or 0)
     minimum = int(report.get("minimum_question_count") or 30)
@@ -177,6 +256,8 @@ def release_claim(components: list[dict[str, Any]]) -> str:
         return "Product release is not ready: source reports are missing or inconsistent."
     if all(item["passed"] for item in components):
         return "Industry pilot complete: automated gates and human-reviewed acceptance criteria passed."
+    if not next(item for item in components if item["id"] == "public_repository_hygiene")["passed"]:
+        return "Product release is not ready: public repository hygiene is incomplete."
     automated = {
         item["id"]: item["passed"]
         for item in components
@@ -191,6 +272,15 @@ def next_required_action(components: list[dict[str, Any]]) -> str:
     by_id = {item["id"]: item for item in components}
     if not by_id.get("source_report_integrity", {}).get("passed"):
         return "Regenerate missing or inconsistent source reports before auditing release readiness."
+    if not by_id.get("public_repository_hygiene", {}).get("passed"):
+        failed = [
+            item["id"]
+            for item in by_id["public_repository_hygiene"]["details"].get("checks", [])
+            if not item.get("passed")
+        ]
+        if set(failed) & {"license_file_present", "package_license_declared"}:
+            return "Choose a license, add a LICENSE file, and declare the package license before public release."
+        return f"Fix public repository hygiene checks: {', '.join(failed)}."
     if not by_id.get("product_smoke", {}).get("passed"):
         return "Run and fix python -m canon.product.smoke."
     if not by_id.get("product_readiness", {}).get("passed"):

@@ -46,6 +46,22 @@ class ProductFinalCheckTests(unittest.TestCase):
         self.assertEqual(report["status"], "fail")
         self.assertEqual(report["blocking_reason"], "product_smoke")
 
+    def test_final_check_fails_for_public_repository_hygiene_blocker(self):
+        report = run_final_check(
+            steps=steps_with_audit(
+                audit_report(
+                    "blocked",
+                    public_hygiene_passed=False,
+                    next_action="Choose a license before public release.",
+                )
+            ),
+            write_report=False,
+        )
+
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["blocking_reason"], "public_repository_hygiene")
+        self.assertIn("Choose a license", report["next_required_action"])
+
     def test_final_check_exit_policy_fails_blocked_release_by_default(self):
         self.assertFalse(should_exit_nonzero("pass"))
         self.assertTrue(should_exit_nonzero("fail"))
@@ -130,6 +146,7 @@ def audit_report(
     status,
     all_pass=False,
     source_integrity_passed=True,
+    public_hygiene_passed=True,
     smoke_passed=True,
     readiness_passed=True,
     human_review_passed=True,
@@ -138,6 +155,7 @@ def audit_report(
 ):
     if all_pass:
         source_integrity_passed = True
+        public_hygiene_passed = True
         smoke_passed = True
         readiness_passed = True
         human_review_passed = True
@@ -147,6 +165,7 @@ def audit_report(
         "next_required_action": next_action,
         "components": [
             {"id": "source_report_integrity", "passed": source_integrity_passed},
+            {"id": "public_repository_hygiene", "passed": public_hygiene_passed},
             {"id": "product_smoke", "passed": smoke_passed},
             {"id": "product_readiness", "passed": readiness_passed},
             {"id": "human_review_status", "passed": human_review_passed},

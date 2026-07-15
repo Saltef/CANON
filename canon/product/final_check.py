@@ -130,6 +130,8 @@ def release_blocking_reason(audit: dict[str, Any]) -> str:
     components = {item.get("id"): item for item in audit.get("components", [])}
     if not components.get("source_report_integrity", {}).get("passed"):
         return "source_report_integrity"
+    if not components.get("public_repository_hygiene", {}).get("passed"):
+        return "public_repository_hygiene"
     if not components.get("product_smoke", {}).get("passed"):
         return "product_smoke"
     if not components.get("product_readiness", {}).get("passed"):
