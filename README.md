@@ -53,6 +53,20 @@ python -m canon.ingest.flexible --input data/my_docs --mode my_topic_v1
 python -m canon.corpus.build --corpus-id my_topic_v1_corpus --from-modes my_topic_v1 --corpus-only
 ```
 
+Mounted Google Drive or local corpus folder:
+
+```powershell
+python -m canon.product.mounted_corpus --input "G:\My Drive\CANON Corpus" --mode ai_infra_geo_risk_v1 --profile-only
+python -m canon.product.mounted_corpus --input "G:\My Drive\CANON Corpus" --mode ai_infra_geo_risk_v1 --corpus-id ai_infra_geo_risk_v1_corpus --domain ai_infrastructure_geopolitical_risk
+```
+
+The mounted-corpus command treats Drive as a normal local filesystem mount. It
+does not read Google credentials or call Google APIs. Supported files are JSON,
+JSONL, CSV, TXT, Markdown, and folders containing those files. Export Google
+Docs, PDFs, DOCX, sheets, images, or other native formats into supported text or
+structured formats before ingest. Raw and processed corpus outputs go under
+`data/`, which is gitignored by default.
+
 Semantic model evaluation:
 
 ```powershell
