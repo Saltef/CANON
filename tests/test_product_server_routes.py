@@ -5,6 +5,26 @@ from canon.product.server import CanonHandler
 
 
 class ProductServerRouteTests(unittest.TestCase):
+    def test_root_route_returns_api_index(self):
+        handler = object.__new__(CanonHandler)
+        handler.path = "/"
+        handler.send_json = Mock()
+
+        handler.do_GET()
+
+        payload = handler.send_json.call_args.args[0]
+        self.assertEqual(payload["service"], "canon")
+        self.assertIn("/v1/evidence-packets", payload["post"])
+
+    def test_favicon_route_returns_empty_success(self):
+        handler = object.__new__(CanonHandler)
+        handler.path = "/favicon.ico"
+        handler.send_empty = Mock()
+
+        handler.do_GET()
+
+        handler.send_empty.assert_called_once()
+
     def test_post_routes_include_integration_endpoints(self):
         routes = {
             "/v1/sources/profile": ("source_profile", {"source_shape": "document_file"}),

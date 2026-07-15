@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -19,7 +20,11 @@ class CanonHandler(BaseHTTPRequestHandler):
         params = first_values(query)
         params["mode"] = mode
         try:
-            if parsed.path == "/health":
+            if parsed.path == "/":
+                self.send_json(api_index())
+            elif parsed.path == "/favicon.ico":
+                self.send_empty(HTTPStatus.NO_CONTENT)
+            elif parsed.path == "/health":
                 self.send_json(service.health())
             elif parsed.path == "/v1/summary":
                 self.send_json(service.product_summary(mode))
@@ -86,8 +91,57 @@ class CanonHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def send_empty(self, status: int | HTTPStatus = HTTPStatus.NO_CONTENT) -> None:
+        self.send_response(int(status))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def log_message(self, format: str, *args) -> None:
         return
+
+
+class CanonHTTPServer(ThreadingHTTPServer):
+    def handle_error(self, request, client_address) -> None:
+        exception = sys.exc_info()[1]
+        if isinstance(exception, (ConnectionResetError, ConnectionAbortedError)):
+            return
+        return super().handle_error(request, client_address)
+
+
+def api_index() -> dict:
+    return {
+        "service": "canon",
+        "status": "ok",
+        "message": "CANON product API is running. Use the listed routes; POST routes require JSON bodies.",
+        "get": [
+            "/health",
+            "/v1/summary",
+            "/v1/reports/audit",
+            "/v1/reports/claim-decision",
+            "/v1/reports/data-card",
+            "/v1/reports/diversity",
+            "/v1/reports/diversity-gate",
+            "/v1/diversity/queries",
+            "/v1/diversity/queries/{query_id}",
+            "/v1/reports/regression-gate",
+        ],
+        "post": [
+            "/v1/answer",
+            "/v1/evidence-packets",
+            "/v1/compare",
+            "/v1/query-diagnostics",
+            "/v1/sources/profile",
+            "/v1/sources/ingest",
+            "/v1/corpora/build",
+            "/v1/model-evaluation",
+            "/v1/diversity-audit",
+        ],
+        "examples": {
+            "health": "http://127.0.0.1:8000/health",
+            "summary": "http://127.0.0.1:8000/v1/summary",
+        },
+    }
 
 
 def first(values: list[str] | None) -> str | None:
@@ -105,7 +159,7 @@ def first_values(query: dict[str, list[str]]) -> dict[str, str]:
 
 
 def run(host: str = "0.0.0.0", port: int = 8000) -> None:
-    server = ThreadingHTTPServer((host, port), CanonHandler)
+    server = CanonHTTPServer((host, port), CanonHandler)
     print(f"CANON product API listening on http://{host}:{port}", flush=True)
     server.serve_forever()
 
