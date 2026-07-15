@@ -50,6 +50,15 @@ The demo ingests the fixture corpus, runs the grounded intelligence brief,
 alert digest, automated gates, and review-packet preparation, then prints the
 next human-review action. Installed packages also expose this as `canon-demo`.
 
+Create a scoped intelligence project before connecting private sources:
+
+```powershell
+python -m canon.product.project --project-name "AI Infrastructure Geopolitical Risk" --domain "AI infrastructure and geopolitical risk" --regions "Latin America,Brazil,Chile,Mexico" --languages "English,Spanish,Portuguese" --issue-categories "energy demand,water and cooling,cloud dependency,sovereign AI" --report-types "weekly_intelligence_brief,regional_risk_report,alert_digest" --source-boundaries "G:\My Drive\CANON Corpus" --corpus-id ai_infra_geo_risk_corpus
+```
+
+This writes a local `project_config.json` with ontology, source plan, monitor
+boundary, and human-review limits under `reports/projects/<project_id>/`.
+
 Profile and ingest your own local corpus:
 
 ```powershell
@@ -91,6 +100,7 @@ Check the API:
 ```powershell
 Invoke-WebRequest http://localhost:8000/health
 Invoke-RestMethod http://localhost:8000/v1/routes
+Invoke-RestMethod -Method Post http://localhost:8000/v1/projects/start -ContentType "application/json" -Body '{"project_name":"AI Infrastructure Geopolitical Risk","domain":"AI infrastructure and geopolitical risk","regions":["Latin America","Brazil","Chile","Mexico"],"languages":["English","Spanish","Portuguese"],"issue_categories":["energy demand","water and cooling","cloud dependency"],"desired_report_types":["weekly_intelligence_brief","alert_digest"],"source_boundaries":["G:/My Drive/CANON Corpus"]}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/sources/profile -ContentType "application/json" -Body '{"input_path":"data/my_docs","sample_size":25}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/frame-coverage -ContentType "application/json" -Body '{"question":"What does this corpus cover about grid risk?","mode":"my_topic_v1_corpus","research_frame":{"subdomains":["energy","water"],"regions":["Latin America"],"languages":["English","Spanish"]},"evidence_requirements":{"top_k":10,"minimum_source_types":["official","local_media"]}}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/report-quality -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","write_report":true}'

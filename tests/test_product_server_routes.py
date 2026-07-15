@@ -16,6 +16,7 @@ class ProductServerRouteTests(unittest.TestCase):
         self.assertEqual(payload["service"], "canon")
         self.assertIn("/v1/routes", payload["get"])
         self.assertGreater(payload["route_count"], 0)
+        self.assertIn("/v1/projects/start", payload["post"])
         self.assertIn("/v1/evidence-packets", payload["post"])
         self.assertIn("/v1/frame-coverage", payload["post"])
         self.assertIn("/v1/intelligence-brief", payload["post"])
@@ -48,6 +49,8 @@ class ProductServerRouteTests(unittest.TestCase):
         payload = handler.send_json.call_args.args[0]
         self.assertIn("human_review_boundary", payload)
         paths = {route["path"]: route for route in payload["routes"]}
+        self.assertEqual(paths["/v1/projects/start"]["method"], "POST")
+        self.assertIn("project_name", paths["/v1/projects/start"]["required"])
         self.assertEqual(paths["/v1/flagship-handoff"]["method"], "POST")
         self.assertEqual(paths["/v1/frame-coverage"]["method"], "POST")
         self.assertEqual(paths["/v1/report-quality"]["method"], "POST")
@@ -66,6 +69,7 @@ class ProductServerRouteTests(unittest.TestCase):
 
     def test_post_routes_include_integration_endpoints(self):
         routes = {
+            "/v1/projects/start": ("start_project", {"status": "ready"}),
             "/v1/sources/profile": ("source_profile", {"source_shape": "document_file"}),
             "/v1/sources/ingest": ("source_ingest", {"mode": "m"}),
             "/v1/corpora/build": ("corpus_build", {"corpus": {"corpus_id": "c"}}),

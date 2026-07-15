@@ -55,6 +55,37 @@ class ProductServiceTests(unittest.TestCase):
             report = service.query_diagnostics({"query": "q", "candidate_k": 5, "freedom_level": "strict"})
         self.assertEqual(report["original_query"], "q")
 
+    def test_start_project_builds_scoped_config(self):
+        report = service.start_project(
+            {
+                "project_name": "AI Infrastructure Geopolitical Risk",
+                "domain": "AI infrastructure and geopolitical risk",
+                "regions": ["Latin America"],
+                "languages": "English,Spanish",
+                "issue_categories": ["energy demand"],
+                "desired_report_types": ["weekly_intelligence_brief"],
+                "source_boundaries": ["G:/My Drive/CANON Corpus"],
+                "write_report": "false",
+            }
+        )
+
+        self.assertEqual(report["status"], "ready")
+        self.assertTrue(report["source_plan"]["monitor_ready"])
+        self.assertEqual(report["security_boundary"]["credentials_stored"], False)
+
+    def test_start_project_requires_scope_fields(self):
+        with self.assertRaises(service.ProductError):
+            service.start_project(
+                {
+                    "project_name": "Missing fields",
+                    "domain": "AI infrastructure",
+                    "regions": [],
+                    "languages": ["English"],
+                    "issue_categories": ["energy demand"],
+                    "desired_report_types": ["weekly_intelligence_brief"],
+                }
+            )
+
     def test_evidence_packets_wraps_synthesis_in_integration_contract(self):
         with patch("canon.product.service.build_query_diagnostics") as diagnostics:
             with patch("canon.product.service.synthesize") as synthesize:

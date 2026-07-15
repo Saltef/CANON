@@ -344,6 +344,24 @@ def report_quality_next_actions(
     return actions[:5] or ["Send the report to human review for usefulness, factual correctness, and missing perspectives."]
 
 
+def start_project(payload: dict[str, Any]) -> dict:
+    from canon.product.project import build_project_config
+
+    return build_project_config(
+        project_name=require_text(payload, "project_name"),
+        project_id=optional_text(payload, "project_id"),
+        domain=require_text(payload, "domain"),
+        regions=required_string_list(payload.get("regions"), "regions"),
+        languages=required_string_list(payload.get("languages"), "languages"),
+        issue_categories=required_string_list(payload.get("issue_categories"), "issue_categories"),
+        desired_report_types=required_string_list(payload.get("desired_report_types"), "desired_report_types"),
+        review_cadence=optional_text(payload, "review_cadence") or "weekly",
+        source_boundaries=optional_string_list(payload.get("source_boundaries"), "source_boundaries") or [],
+        corpus_id=optional_text(payload, "corpus_id"),
+        write_report=optional_bool(payload.get("write_report"), default=True),
+    )
+
+
 def alert_digest(payload: dict[str, Any]) -> dict:
     from canon.intelligence.alerts import run_alert_digest
 
@@ -1294,6 +1312,13 @@ def optional_string_list(value: Any, name: str) -> list[str] | None:
     else:
         raise ProductError(f"{name} must be a list or comma-separated string.")
     return values or None
+
+
+def required_string_list(value: Any, name: str) -> list[str]:
+    values = optional_string_list(value, name)
+    if not values:
+        raise ProductError(f"{name} must be a non-empty list or comma-separated string.")
+    return values
 
 
 def parse_providers_from_payload(value: Any) -> list[str] | None:

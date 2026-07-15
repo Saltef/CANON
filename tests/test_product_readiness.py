@@ -16,6 +16,7 @@ class ProductReadinessTests(unittest.TestCase):
                     report = build_readiness_report("social_science_ir_v1_harvest10")
         self.assertEqual(report["status"], "pass")
         self.assertIn("POST /v1/answer", report["endpoints"])
+        self.assertIn("POST /v1/projects/start", report["endpoints"])
         self.assertIn("POST /v1/evidence-packets", report["endpoints"])
         self.assertIn("POST /v1/frame-coverage", report["endpoints"])
         self.assertIn("POST /v1/query-diagnostics", report["endpoints"])
@@ -26,6 +27,7 @@ class ProductReadinessTests(unittest.TestCase):
         self.assertIn("POST /v1/intelligence-review/prepare", report["endpoints"])
         self.assertGreater(report["route_metadata"]["route_count"], 0)
         self.assertTrue(report["route_metadata"]["human_review_boundary"])
+        self.assertIn("project_start_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("evidence_packets_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("frame_coverage_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("report_quality_endpoint_documented", [check["id"] for check in report["checks"]])
@@ -52,6 +54,7 @@ class ProductReadinessTests(unittest.TestCase):
     def test_release_console_scripts_are_registered(self):
         pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
         scripts = pyproject["project"]["scripts"]
+        self.assertEqual(scripts["canon-project"], "canon.product.project:main")
         self.assertEqual(scripts["canon-frame-coverage"], "canon.product.frame_coverage:main")
         self.assertEqual(scripts["canon-report-quality"], "canon.product.report_quality:main")
         self.assertEqual(scripts["canon-readiness"], "canon.product.readiness:main")

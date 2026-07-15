@@ -51,6 +51,8 @@ class CanonHandler(BaseHTTPRequestHandler):
             payload = self.read_json()
             if parsed.path == "/v1/answer":
                 self.send_json(service.answer(payload))
+            elif parsed.path == "/v1/projects/start":
+                self.send_json(service.start_project(payload))
             elif parsed.path == "/v1/evidence-packets":
                 self.send_json(service.evidence_packets(payload))
             elif parsed.path == "/v1/frame-coverage":
@@ -154,6 +156,7 @@ def api_index() -> dict:
         ],
         "post": [
             "/v1/answer",
+            "/v1/projects/start",
             "/v1/evidence-packets",
             "/v1/frame-coverage",
             "/v1/intelligence-brief",
@@ -203,6 +206,22 @@ def api_routes() -> dict:
             route("GET", "/v1/diversity/queries", "List source-diversity query diagnostics.", [], ["mode", "verdict", "query_type", "limit"], None),
             route("GET", "/v1/diversity/queries/{query_id}", "Return one source-diversity query diagnostic.", ["query_id"], ["mode"], None),
             route("GET", "/v1/reports/regression-gate", "Return regression-gate report for a mode.", [], ["mode"], None),
+            route(
+                "POST",
+                "/v1/projects/start",
+                "Create a scoped intelligence project config with ontology, source plan, and monitor boundary.",
+                ["project_name", "domain", "regions", "languages", "issue_categories", "desired_report_types"],
+                ["project_id", "review_cadence", "source_boundaries", "corpus_id", "write_report"],
+                {
+                    "project_name": "AI Infrastructure Geopolitical Risk",
+                    "domain": "AI infrastructure and geopolitical risk",
+                    "regions": ["Latin America", "Brazil", "Chile", "Mexico"],
+                    "languages": ["English", "Spanish", "Portuguese"],
+                    "issue_categories": ["energy demand", "water and cooling", "cloud dependency"],
+                    "desired_report_types": ["weekly_intelligence_brief", "alert_digest"],
+                    "source_boundaries": ["G:/My Drive/CANON Corpus"],
+                },
+            ),
             route(
                 "POST",
                 "/v1/sources/profile",

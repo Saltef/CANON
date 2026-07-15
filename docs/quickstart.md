@@ -44,7 +44,18 @@ data/my_docs/
 Do not include secrets, private keys, `.env` files, credentials, or files you do
 not want indexed into local artifacts.
 
-## 4. Profile The Source
+## 4. Create A Project Boundary
+
+```powershell
+python -m canon.product.project --project-name "AI Infrastructure Geopolitical Risk" --domain "AI infrastructure and geopolitical risk" --regions "Latin America,Brazil,Chile,Mexico" --languages "English,Spanish,Portuguese" --issue-categories "energy demand,water and cooling,cloud dependency,sovereign AI" --report-types "weekly_intelligence_brief,regional_risk_report,alert_digest" --source-boundaries "G:\My Drive\CANON Corpus" --corpus-id ai_infra_geo_risk_corpus
+```
+
+This writes `reports/projects/<project_id>/project_config.json` and `.md`.
+The config records the domain ontology, monitored regions/languages, issue
+categories, desired reports, source/corpus boundary, and the rule that monitors
+must not run without an explicit source boundary.
+
+## 5. Profile The Source
 
 ```powershell
 python -m canon.ingest.flexible --input data/my_docs --mode my_topic_v1 --profile-only
@@ -62,7 +73,7 @@ For a local git checkout:
 python -m canon.product.mounted_corpus --input "C:\path\to\repo" --mode repo_review_v1 --profile-only
 ```
 
-## 5. Ingest And Build A Corpus
+## 6. Ingest And Build A Corpus
 
 ```powershell
 python -m canon.ingest.flexible --input data/my_docs --mode my_topic_v1
@@ -78,7 +89,7 @@ python -m canon.product.mounted_corpus --input "G:\My Drive\CANON Corpus" --mode
 Generated raw/processed artifacts are written under `data/`. Generated reports
 are written under `reports/`. Both locations are gitignored.
 
-## 6. Query Through The API
+## 7. Query Through The API
 
 Start the API:
 
@@ -96,6 +107,12 @@ See available routes and example request bodies:
 
 ```powershell
 Invoke-RestMethod http://localhost:8000/v1/routes
+```
+
+Create the same project boundary through the API:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/projects/start -ContentType "application/json" -Body '{"project_name":"AI Infrastructure Geopolitical Risk","domain":"AI infrastructure and geopolitical risk","regions":["Latin America","Brazil","Chile","Mexico"],"languages":["English","Spanish","Portuguese"],"issue_categories":["energy demand","water and cooling","cloud dependency"],"desired_report_types":["weekly_intelligence_brief","alert_digest"],"source_boundaries":["G:/My Drive/CANON Corpus"]}'
 ```
 
 Ask for evidence:
@@ -118,7 +135,7 @@ For the intended Drive-first workflow, use the private corpus as the first
 evidence source, then allow external expansion only when you want corroboration,
 freshness checks, or gap filling. See [drive_first_rag.md](drive_first_rag.md).
 
-## 7. Run The Pre-Human Gate
+## 8. Run The Pre-Human Gate
 
 ```powershell
 python -m canon.product.prehuman_check --mode my_topic_v1_corpus --benchmark-id llm_judged_my_topic_v1 --judge-provider heuristic --model-providers local --rerankers heuristic --top-k 10 --candidate-k 25
@@ -127,7 +144,7 @@ python -m canon.product.prehuman_check --mode my_topic_v1_corpus --benchmark-id 
 This is an automated triage gate. It does not replace human qrels or final
 answer review.
 
-## 8. Check Product Readiness
+## 9. Check Product Readiness
 
 ```powershell
 python -m canon.product.readiness --mode social_science_ir_v1_harvest10
