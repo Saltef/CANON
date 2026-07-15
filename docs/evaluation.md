@@ -20,6 +20,10 @@ This prepares qrels review candidates, fills provisional relevance labels, runs
 semantic-model evaluation, rerank evaluation, source diversity, smoke checks,
 and readiness checks.
 
+If provisional qrels cannot be written, the gate returns `qrels_review_required`
+with the review CSV path and exact `import-csv` command to run after relevance
+labels are completed. That status is a review handoff, not a Python failure.
+
 The strongest acceptable status from this path is:
 
 ```text

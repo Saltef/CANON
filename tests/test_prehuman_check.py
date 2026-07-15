@@ -35,12 +35,32 @@ class PrehumanCheckTests(unittest.TestCase):
                                                     "judged_count": 10,
                                                     "fill_relevance": True,
                                                 }
-                                                qrels.return_value = {
-                                                    "status": "qrels_written",
-                                                    "query_count": 2,
-                                                    "judgment_count": 6,
-                                                    "qrels": {"benchmark_kind": "llm_judged_qrels"},
-                                                }
+                                                def write_qrels(*args, **kwargs):
+                                                    kwargs["output_path"].parent.mkdir(parents=True, exist_ok=True)
+                                                    kwargs["output_path"].write_text(
+                                                        json.dumps(
+                                                            {
+                                                                "benchmark_id": "llm_judged_unit",
+                                                                "benchmark_kind": "llm_judged_qrels",
+                                                                "queries": [
+                                                                    {
+                                                                        "id": "q1",
+                                                                        "query": "grid risk",
+                                                                        "relevant": {"chunk:a": 3},
+                                                                    }
+                                                                ],
+                                                            }
+                                                        ),
+                                                        encoding="utf-8",
+                                                    )
+                                                    return {
+                                                        "status": "qrels_written",
+                                                        "query_count": 2,
+                                                        "judgment_count": 6,
+                                                        "qrels": {"benchmark_kind": "llm_judged_qrels"},
+                                                    }
+
+                                                qrels.side_effect = write_qrels
                                                 semantic.return_value = {
                                                     "providers": [{"provider": "local", "status": "ok"}],
                                                     "leaderboard": [{"provider": "local", "primary_score": 0.5}],
@@ -123,6 +143,48 @@ class PrehumanCheckTests(unittest.TestCase):
         qrels_source = next(item for item in report["components"] if item["id"] == "qrels_source")
         self.assertTrue(qrels_source["passed"])
         self.assertIn("industry-pilot", report["human_review_boundary"]["next_test"])
+
+    def test_prehuman_check_returns_review_needed_when_generated_qrels_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports_dir = root / "reports"
+            reports_dir.mkdir()
+            settings = SimpleNamespace(root=root, reports_dir=reports_dir)
+            with patch("canon.product.prehuman_check.load_settings", return_value=settings):
+                with patch("canon.product.prehuman_check.build_qrels_review_packet") as packet:
+                    with patch("canon.product.prehuman_check.judge_qrels_csv") as judge:
+                        with patch("canon.product.prehuman_check.qrels_from_review_csv") as qrels:
+                            packet.return_value = {
+                                "status": "ready_for_human_relevance_review",
+                                "query_count": 2,
+                                "candidate_count": 10,
+                            }
+                            judge.return_value = {
+                                "status": "judged",
+                                "row_count": 10,
+                                "judged_count": 0,
+                                "fill_relevance": True,
+                            }
+                            qrels.return_value = {
+                                "status": "needs_review",
+                                "query_count": 2,
+                                "judgment_count": 0,
+                            }
+
+                            report = run_prehuman_check(
+                                mode="unit",
+                                benchmark_id="missing_qrels",
+                                model_providers=["local"],
+                                rerankers=["heuristic"],
+                                write_report=False,
+                            )
+
+        self.assertEqual(report["status"], "qrels_review_required")
+        self.assertEqual(report["qrels_path"], "gold/missing_qrels.json")
+        self.assertEqual(report["model_leaderboard"], [])
+        qrels_file = next(item for item in report["components"] if item["id"] == "qrels_file_available")
+        self.assertFalse(qrels_file["passed"])
+        self.assertIn("import-csv", report["human_review_boundary"]["next_test"])
 
 
 if __name__ == "__main__":

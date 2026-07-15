@@ -44,6 +44,18 @@ def run_prehuman_check(
     )
     qrels_path = Path(qrels_report["qrels_path"])
     benchmark_id = qrels_report["benchmark_id"]
+    if not qrels_path.exists():
+        return qrels_review_required_report(
+            mode=mode,
+            benchmark_id=benchmark_id,
+            qrels_path=qrels_path,
+            qrels_report=qrels_report,
+            settings=settings,
+            judge_provider=judge_provider,
+            judge_model=judge_model,
+            top_k=top_k,
+            write_report=write_report,
+        )
     semantic_report = evaluate_semantic_models(
         mode=mode,
         qrels_path=qrels_path,
@@ -99,6 +111,70 @@ def run_prehuman_check(
                 "shipping an industry-pilot release",
             ],
             "next_test": next_human_test(qrels_report.get("benchmark_kind")),
+        },
+        "artifacts": artifacts(settings.root, settings.reports_dir, mode, benchmark_id, top_k),
+    }
+    if write_report:
+        output = settings.reports_dir / f"prehuman_product_check_{mode}.json"
+        report_io.write_json(output, report)
+        report_io.write_markdown(
+            settings.reports_dir / f"prehuman_product_check_{mode}.md",
+            render_markdown(report),
+        )
+    return report
+
+
+def qrels_review_required_report(
+    mode: str,
+    benchmark_id: str,
+    qrels_path: Path,
+    qrels_report: dict[str, Any],
+    settings: Any,
+    judge_provider: str,
+    judge_model: str | None,
+    top_k: int,
+    write_report: bool,
+) -> dict[str, Any]:
+    components = [
+        *qrels_components(qrels_report),
+        component(
+            "qrels_file_available",
+            False,
+            {
+                "status": "missing",
+                "qrels_path": relative(settings.root, qrels_path),
+                "reason": "Qrels file was not written; review/import qrels before model and rerank evaluation.",
+            },
+        ),
+        component(
+            "human_review_limit",
+            False,
+            {
+                "status": "required_for_release_claims",
+                "reason": human_review_limit_reason(qrels_report.get("benchmark_kind")),
+            },
+        ),
+    ]
+    report = {
+        "report_id": "prehuman_product_check_v1",
+        "mode": mode,
+        "status": "qrels_review_required",
+        "benchmark_id": benchmark_id,
+        "qrels_path": relative(settings.root, qrels_path),
+        "qrels_kind": qrels_report.get("benchmark_kind"),
+        "judge": {"provider": judge_provider, "model": judge_model},
+        "claim": "Qrels review/import is required before automated model and rerank evaluation can run.",
+        "components": [compact_component(item) for item in components],
+        "model_leaderboard": [],
+        "rerank_leaderboard": [],
+        "human_review_boundary": {
+            "required_before": [
+                "declaring a production retrieval winner",
+                "publishing model superiority claims",
+                "claiming unsupported factual claim rates",
+                "shipping an industry-pilot release",
+            ],
+            "next_test": next_qrels_action(settings.root, settings.reports_dir, mode, benchmark_id),
         },
         "artifacts": artifacts(settings.root, settings.reports_dir, mode, benchmark_id, top_k),
     }
@@ -305,6 +381,19 @@ def next_human_test(benchmark_kind: str | None) -> str:
     if benchmark_kind == "human_reviewed_qrels":
         return "Run industry-pilot report review and final release audit against the reviewed acceptance packet."
     return "Re-run this command with --qrels gold/<human_reviewed_qrels>.json after human qrels review."
+
+
+def next_qrels_action(root: Path, reports_dir: Path, mode: str, benchmark_id: str) -> str:
+    _, review_csv, _ = artifact_paths(reports_dir, mode)
+    qrels_output = root / "gold" / f"{benchmark_id}.json"
+    return (
+        "Review or fill relevance labels in "
+        f"{relative(root, review_csv)}, then run "
+        "`python -m canon.eval.qrels_review import-csv "
+        f"--csv {relative(root, review_csv)} "
+        f"--benchmark-id {benchmark_id} "
+        f"--output {relative(root, qrels_output)}`."
+    )
 
 
 def artifacts(root: Path, reports_dir: Path, mode: str, benchmark_id: str, top_k: int) -> dict[str, str]:
