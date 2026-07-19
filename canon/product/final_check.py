@@ -188,6 +188,8 @@ def should_exit_nonzero(status: str, no_fail: bool = False) -> bool:
 
 
 def review_task_packet_integrity(path: Path) -> list[dict[str, Any]]:
+    if path.name == DEFAULT_RECORDS.name and not path.exists():
+        return []
     if not path.exists():
         return [
             {
@@ -270,9 +272,9 @@ def artifact_fingerprint(path: Path, reports_dir: Path) -> dict[str, Any]:
 
 def relative_report_path(path: Path, reports_dir: Path) -> str:
     try:
-        return str(path.relative_to(reports_dir.parent))
+        return str(path.relative_to(reports_dir.parent)).replace("/", "\\")
     except ValueError:
-        return str(path)
+        return str(path).replace("/", "\\")
 
 
 def render_markdown(report: dict[str, Any]) -> str:

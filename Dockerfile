@@ -11,7 +11,6 @@ COPY conf /app/conf
 COPY data /app/data
 COPY docs /app/docs
 COPY gold /app/gold
-COPY scripts /app/scripts
 COPY tests /app/tests
 
 CMD ["python", "-m", "canon.product.server", "--host", "0.0.0.0", "--port", "8000"]

@@ -70,8 +70,14 @@ canon-report-quality = "canon.product.report_quality:main"
 requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
 include = ["canon*"]
+
+[tool.setuptools.package-data]
+canon = ["db/*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

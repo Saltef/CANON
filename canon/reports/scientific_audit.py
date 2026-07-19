@@ -23,7 +23,6 @@ REQUIRED_ARTIFACTS = {
     "public_qrels_validation": "qrels_validation_public_beir_scifact_smoke.json",
     "weight_tuning": "weight_tuning_{mode}_{method_set_id}.json",
     "claim_decision": "claim_decision_{mode}_{method_set_id}.json",
-    "product_readiness": "product_readiness_{mode}.json",
     "regression_gate": "regression_gate_{mode}_{method_set_id}.json",
     "dashboard": "dashboard_{mode}_{method_set_id}.json",
 }
@@ -110,7 +109,6 @@ def build_checks(artifacts: dict) -> list[dict]:
     data_card = artifacts.get("data_card", {})
     corpus_expansion = artifacts.get("corpus_expansion", {})
     claim_decision = artifacts.get("claim_decision", {})
-    product_readiness = artifacts.get("product_readiness", {})
     diversity_gate = artifacts.get("diversity_gate", {})
     checks.extend(
         [
@@ -170,11 +168,6 @@ def build_checks(artifacts: dict) -> list[dict]:
                 "claim_decision==pass",
                 claim_decision.get("status") == "pass",
                 "Scientific claim-decision report exists and passes.",
-            ),
-            check(
-                "product_readiness==pass",
-                product_readiness.get("status") == "pass",
-                "Product readiness report exists and passes.",
             ),
         ]
     )

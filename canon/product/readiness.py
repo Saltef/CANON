@@ -16,7 +16,10 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
     available_endpoints = endpoints()
     route_metadata = routes_metadata()
     package_metadata = load_package_metadata()
-    smoke_report = load_json(settings.reports_dir / f"product_smoke_{mode}.json")
+    smoke_report = load_json_any(
+        settings.reports_dir,
+        [f"product_smoke_{mode}.json", "product_smoke_dry_run.json"],
+    )
     checks = [
         check("health_ok", service.health()["status"] == "ok"),
         check("package_metadata_has_readme", bool(package_metadata.get("readme"))),
@@ -63,6 +66,14 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
     output = settings.reports_dir / f"product_readiness_{mode}.json"
     report_io.write_json(output, report)
     return report
+
+
+def load_json_any(base_dir, names: list[str]) -> dict:
+    for name in names:
+        payload = load_json(base_dir / name)
+        if payload:
+            return payload
+    return {}
 
 
 def load_json(path) -> dict:

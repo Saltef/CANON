@@ -399,8 +399,12 @@ def write_markdown(path: Path, text: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build CANON product release audit.")
     parser.add_argument("--mode", default=service.DEFAULT_MODE)
+    parser.add_argument("--no-fail", action="store_true")
     args = parser.parse_args()
-    print(json.dumps(build_release_audit(args.mode), indent=2))
+    report = build_release_audit(args.mode)
+    print(json.dumps(report, indent=2))
+    if report["status"] != "pass" and not args.no_fail:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

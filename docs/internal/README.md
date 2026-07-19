@@ -10,6 +10,7 @@ install, and test.
 Start here:
 
 - [testing.md](testing.md) for the internal command cookbook.
+- [finish_evaluation_plan.md](finish_evaluation_plan.md) for the release finish line, evaluation ladder, and benchmark design.
 - [research_ai_multi_agent_finalization_plan.md](research_ai_multi_agent_finalization_plan.md) for the larger Research AI / Multi-Agent Researcher boundary.
 - [product_plan.md](product_plan.md) and [product_journey.md](product_journey.md) for product direction.
 - phase files for implementation history.

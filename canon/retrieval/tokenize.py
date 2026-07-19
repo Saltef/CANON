@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
-TOKEN_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9_'-]*")
+TOKEN_RE = re.compile(r"[^\W_]+(?:'[^\W_]+)*", re.UNICODE)
 
 STOPWORDS = {
     "a",
@@ -37,4 +38,9 @@ STOPWORDS = {
 
 
 def tokenize(text: str) -> list[str]:
-    return [token.lower() for token in TOKEN_RE.findall(text) if token.lower() not in STOPWORDS]
+    normalized = unicodedata.normalize("NFKC", text)
+    normalized = "".join(
+        " " if unicodedata.category(char).startswith("P") and char not in {"'"} else char
+        for char in normalized
+    )
+    return [token.casefold() for token in TOKEN_RE.findall(normalized) if token.casefold() not in STOPWORDS]
