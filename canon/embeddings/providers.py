@@ -51,6 +51,36 @@ class HashedEmbeddingProvider:
         return results
 
 
+class SentenceTransformersEmbeddingProvider:
+    provider = "sentence-transformers"
+
+    def __init__(self, model: str = "BAAI/bge-small-en-v1.5") -> None:
+        os.environ.setdefault("USE_TF", "0")
+        os.environ.setdefault("USE_FLAX", "0")
+        os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+            raise RuntimeError(
+                "sentence-transformers is required for local model embeddings. "
+                "Install the models extra or use provider=local for the hashed baseline."
+            ) from exc
+        self.model = model
+        self.encoder = SentenceTransformer(model)
+
+    def embed(self, texts: list[str]) -> list[EmbeddingResult]:
+        vectors = self.encoder.encode(texts, normalize_embeddings=True)
+        return [
+            EmbeddingResult(
+                provider=self.provider,
+                model=self.model,
+                dimensions=len(vector),
+                vector=[float(value) for value in vector],
+            )
+            for vector in vectors
+        ]
+
+
 class OpenAIEmbeddingProvider:
     provider = "openai"
 
@@ -174,6 +204,8 @@ def get_embedding_provider(name: str, model: str | None = None) -> EmbeddingProv
     normalized = name.lower()
     if normalized in {"local", "hashed"}:
         return HashedEmbeddingProvider()
+    if normalized in {"sentence-transformers", "sentence_transformers", "bge-small"}:
+        return SentenceTransformersEmbeddingProvider(model=model or "BAAI/bge-small-en-v1.5")
     if normalized == "openai":
         return OpenAIEmbeddingProvider(model=model or "text-embedding-3-small")
     if normalized == "openrouter":

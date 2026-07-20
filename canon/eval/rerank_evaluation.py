@@ -189,6 +189,7 @@ def evaluate_rerankers(
     document_format: str = "plain",
     max_chunks_per_parent: int = 0,
     auto_query_expansion: bool = False,
+    benchmark_oracle_expansion: bool = False,
     parent_qrels: bool = False,
     parent_expansion_limit: int = 0,
 ) -> dict:
@@ -213,6 +214,7 @@ def evaluate_rerankers(
             document_format=document_format,
             max_chunks_per_parent=max_chunks_per_parent,
             auto_query_expansion=auto_query_expansion,
+            benchmark_oracle_expansion=benchmark_oracle_expansion,
             parent_qrels=parent_qrels,
             parent_expansion_limit=parent_expansion_limit,
         )
@@ -235,6 +237,7 @@ def evaluate_rerankers(
             "document_format": document_format,
             "max_chunks_per_parent": max_chunks_per_parent,
             "auto_query_expansion": auto_query_expansion,
+            "benchmark_oracle_expansion": benchmark_oracle_expansion,
             "parent_qrels": parent_qrels,
             "parent_expansion_limit": parent_expansion_limit,
         },
@@ -269,6 +272,7 @@ def evaluate_reranker(
     document_format: str = "plain",
     max_chunks_per_parent: int = 0,
     auto_query_expansion: bool = False,
+    benchmark_oracle_expansion: bool = False,
     parent_qrels: bool = False,
     parent_expansion_limit: int = 0,
     pooled_context: PooledCandidateContext | None = None,
@@ -300,6 +304,7 @@ def evaluate_reranker(
                 document_format=document_format,
                 max_chunks_per_parent=max_chunks_per_parent,
                 auto_query_expansion=auto_query_expansion,
+                benchmark_oracle_expansion=benchmark_oracle_expansion,
                 parent_qrels=parent_qrels,
                 parent_expansion_limit=parent_expansion_limit,
                 pooled_context=pooled_context,
@@ -344,6 +349,7 @@ def evaluate_query(
     document_format: str = "plain",
     max_chunks_per_parent: int = 0,
     auto_query_expansion: bool = False,
+    benchmark_oracle_expansion: bool = False,
     parent_qrels: bool = False,
     parent_expansion_limit: int = 0,
     pooled_context: PooledCandidateContext | None = None,
@@ -361,6 +367,7 @@ def evaluate_query(
         vector_model=vector_model,
         fusion=fusion,
         auto_query_expansion=auto_query_expansion,
+        benchmark_oracle_expansion=benchmark_oracle_expansion,
         parent_expansion_limit=parent_expansion_limit,
         pooled_context=pooled_context,
     )
@@ -459,6 +466,7 @@ def candidate_report_for_query(
     fusion: str = "union",
     query_variants: list[str] | None = None,
     auto_query_expansion: bool = False,
+    benchmark_oracle_expansion: bool = False,
     parent_expansion_limit: int = 0,
     pooled_context: PooledCandidateContext | None = None,
 ) -> dict:
@@ -476,6 +484,7 @@ def candidate_report_for_query(
             vector_k=vector_k or candidate_k,
             query_variants=query_variants,
             auto_query_expansion=auto_query_expansion,
+            benchmark_oracle_expansion=benchmark_oracle_expansion,
             topic_profile=pooled_context.topic_profile if pooled_context else None,
             parent_expansion_limit=parent_expansion_limit,
             provider=vector_provider,
@@ -493,6 +502,7 @@ def candidate_report_for_query(
             vector_k=vector_k or candidate_k,
             query_variants=query_variants,
             auto_query_expansion=auto_query_expansion,
+            benchmark_oracle_expansion=benchmark_oracle_expansion,
             topic_profile=pooled_context.topic_profile,
             parent_expansion_limit=parent_expansion_limit,
             provider=vector_provider,
@@ -511,6 +521,7 @@ def candidate_report_for_query(
             "vector_model": vector_model,
             "query_variant_count": len(query_variants or []),
             "auto_query_expansion": auto_query_expansion,
+            "benchmark_oracle_expansion": benchmark_oracle_expansion,
             "parent_expansion_limit": parent_expansion_limit,
             "fusion": fusion,
         },
@@ -760,6 +771,7 @@ def main() -> None:
     parser.add_argument("--document-format", choices=["plain", "structured"], default="plain")
     parser.add_argument("--max-chunks-per-parent", type=int, default=0)
     parser.add_argument("--auto-query-expansion", action="store_true")
+    parser.add_argument("--benchmark-oracle-expansion", action="store_true")
     parser.add_argument("--parent-qrels", action="store_true")
     parser.add_argument("--parent-expansion-limit", type=int, default=0)
     parser.add_argument("--query-variants", default=None, help="Global variants separated with ||")
@@ -783,6 +795,7 @@ def main() -> None:
                 document_format=args.document_format,
                 max_chunks_per_parent=args.max_chunks_per_parent,
                 auto_query_expansion=args.auto_query_expansion,
+                benchmark_oracle_expansion=args.benchmark_oracle_expansion,
                 parent_qrels=args.parent_qrels,
                 parent_expansion_limit=args.parent_expansion_limit,
                 query_variants=parse_variants(args.query_variants),

@@ -50,6 +50,7 @@ def build_candidate_pool(
     vector_k: int = 50,
     query_variants: list[str] | None = None,
     auto_query_expansion: bool = False,
+    benchmark_oracle_expansion: bool = False,
     topic_profile: dict[str, Any] | None = None,
     parent_expansion_limit: int = 0,
     provider: str = "local",
@@ -74,6 +75,7 @@ def build_candidate_pool(
         vector_k=vector_k,
         query_variants=query_variants,
         auto_query_expansion=auto_query_expansion,
+        benchmark_oracle_expansion=benchmark_oracle_expansion,
         topic_profile=resolved_topic_profile,
         parent_expansion_limit=parent_expansion_limit,
         provider=provider,
@@ -88,6 +90,7 @@ def build_candidate_pool(
         vector_k=vector_k,
         query_variants=query_variants,
         auto_query_expansion=auto_query_expansion,
+        benchmark_oracle_expansion=benchmark_oracle_expansion,
         topic_profile=resolved_topic_profile,
         parent_expansion_limit=parent_expansion_limit,
         provider=provider,
@@ -106,6 +109,7 @@ def build_candidate_pool(
         "vector_k": vector_k,
         "query_variants": query_variants or [],
         "auto_query_expansion": auto_query_expansion,
+        "benchmark_oracle_expansion": benchmark_oracle_expansion,
         "parent_expansion_limit": parent_expansion_limit,
         "fusion": fusion,
         "source_counts": source_counts(hits),
@@ -126,6 +130,7 @@ def candidate_pool_from_documents(
     vector_k: int = 50,
     query_variants: list[str] | None = None,
     auto_query_expansion: bool = False,
+    benchmark_oracle_expansion: bool = False,
     topic_profile: dict[str, Any] | None = None,
     parent_expansion_limit: int = 0,
     provider: str = "local",
@@ -139,7 +144,8 @@ def candidate_pool_from_documents(
     doc_by_id = {document.chunk_id: document for document in documents}
     variants = list(query_variants or [])
     if auto_query_expansion:
-        variants.extend(expand_query_variants(query))
+        if benchmark_oracle_expansion:
+            variants.extend(expand_query_variants(query))
         variants.extend(topic_query_variants(query, topic_profile or {}))
     queries = dedupe_queries([query, *variants])
     for query_index, query_text in enumerate(queries):
@@ -247,7 +253,12 @@ def sort_hits(hits: list[CandidateHit], fusion: str) -> list[CandidateHit]:
     if normalized == "rrf":
         return sorted(hits, key=lambda hit: (rrf_score(hit), -hit.best_rank, hit.document.chunk_id), reverse=True)
     if normalized == "weighted_bm25_dense":
-        return sorted(hits, key=lambda hit: (weighted_score(hit), -hit.best_rank, hit.document.chunk_id), reverse=True)
+        scores = normalized_weighted_scores(hits)
+        return sorted(
+            hits,
+            key=lambda hit: (scores.get(hit.document.chunk_id, 0.0), -hit.best_rank, hit.document.chunk_id),
+            reverse=True,
+        )
     if normalized == "dense_only":
         return sorted(hits, key=lambda hit: (best_source_score(hit, "vector:"), -hit.best_rank, hit.document.chunk_id), reverse=True)
     if normalized == "bm25_only":
@@ -261,6 +272,39 @@ def rrf_score(hit: CandidateHit, k: int = 60) -> float:
 
 def weighted_score(hit: CandidateHit) -> float:
     return 0.45 * best_source_score(hit, "lexical") + 0.55 * best_source_score(hit, "vector:")
+
+
+def normalized_weighted_scores(hits: list[CandidateHit]) -> dict[str, float]:
+    lexical = best_source_scores(hits, "lexical")
+    dense = best_source_scores(hits, "vector:")
+    normalized_lexical = minmax_scores(lexical)
+    normalized_dense = minmax_scores(dense)
+    return {
+        hit.document.chunk_id: (
+            0.45 * normalized_lexical.get(hit.document.chunk_id, 0.0)
+            + 0.55 * normalized_dense.get(hit.document.chunk_id, 0.0)
+        )
+        for hit in hits
+    }
+
+
+def best_source_scores(hits: list[CandidateHit], prefix: str) -> dict[str, float]:
+    return {
+        hit.document.chunk_id: best_source_score(hit, prefix)
+        for hit in hits
+        if best_source_score(hit, prefix) > 0.0
+    }
+
+
+def minmax_scores(scores: dict[str, float]) -> dict[str, float]:
+    if not scores:
+        return {}
+    values = list(scores.values())
+    low = min(values)
+    high = max(values)
+    if high == low:
+        return {key: 1.0 for key in scores}
+    return {key: (value - low) / (high - low) for key, value in scores.items()}
 
 
 def best_source_score(hit: CandidateHit, prefix: str) -> float:
@@ -394,6 +438,7 @@ def main() -> None:
     parser.add_argument("--fusion", default="union")
     parser.add_argument("--query-variants", default=None, help="Separate variants with ||")
     parser.add_argument("--auto-query-expansion", action="store_true")
+    parser.add_argument("--benchmark-oracle-expansion", action="store_true")
     args = parser.parse_args()
     print(
         json.dumps(
@@ -404,6 +449,7 @@ def main() -> None:
                 vector_k=args.vector_k,
                 query_variants=parse_variants(args.query_variants),
                 auto_query_expansion=args.auto_query_expansion,
+                benchmark_oracle_expansion=args.benchmark_oracle_expansion,
                 provider=args.provider,
                 model=args.model,
                 fusion=args.fusion,

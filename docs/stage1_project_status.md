@@ -20,6 +20,11 @@ The strongest focused pilot so far uses:
 - Candidate document format: `structured`
 - Parent cap: `max_chunks_per_parent=0` for unconstrained candidate coverage
 
+This is a 30-query pilot slice, not the full 323-query NFCorpus BEIR test set.
+It is useful for product debugging and regression testing, but it should not be
+reported as a full public benchmark result or compared directly to published
+full-corpus BEIR leaderboards.
+
 The strongest raw retrieval/ranking score now uses the same Qwen+Cohere stack
 with `auto_query_expansion=true`, corpus topic-profile expansion, and
 `parent_qrels=true`. The strongest coverage run also uses
@@ -27,6 +32,12 @@ with `auto_query_expansion=true`, corpus topic-profile expansion, and
 retrieved parent work into the candidate pool. This is the right diagnostic
 setting for public document-level qrels and alternate chunking, because
 relevance can transfer across chunks that share the same parent work.
+
+Benchmark integrity note: hand-written biomedical alias expansion is now
+quarantined behind `--benchmark-oracle-expansion`. Normal runs with
+`--auto-query-expansion` use explicit query variants and corpus-derived topic
+profiles only. Any run using `--benchmark-oracle-expansion` is diagnostic and
+must be excluded from headline metrics.
 
 This run produces:
 
@@ -86,6 +97,15 @@ The retrieval layer now builds per-corpus topic profiles through
 top corpus terms, phrases, topic buckets, and related terms, then feed
 auto-query expansion in the candidate generator. This keeps expansion
 reproducible while letting each mounted corpus contribute its own vocabulary.
+
+The hand-authored biomedical alias table remains available only as a benchmark
+oracle diagnostic through `--benchmark-oracle-expansion`. It is intentionally
+off by default so that public-qrels labels do not leak into normal retrieval
+claims.
+
+Hybrid score fusion now normalizes BM25 and dense scores independently before
+combining them in `weighted_bm25_dense`. This prevents raw BM25 magnitudes from
+swamping dense cosine similarities and makes fusion sweeps more interpretable.
 
 The candidate generator now supports parent-neighborhood expansion. When a
 chunk from a parent work is retrieved, Stage 1 can add a bounded number of
@@ -155,10 +175,11 @@ semantics risk to inspect before forcing retrieval behavior around it.
 
 Recommended retrieval fixes:
 
-- Continue query expansion based on biomedical aliases, title terms, and
-  corpus-specific topic profiles. The deterministic expansion path reduced
-  zero-hit queries from `4/30` to `1/30` and improved mean candidate recall from
-  `0.406249` to `0.422138`.
+- Continue query expansion based on title terms and corpus-specific topic
+  profiles. Use biomedical aliases only in explicit oracle diagnostics. The
+  previous deterministic diagnostic expansion reduced zero-hit queries from
+  `4/30` to `1/30` and improved mean candidate recall from `0.406249` to
+  `0.422138`, but that gain should be remeasured under non-oracle expansion.
 - Keep parent-neighborhood expansion in the Stage 1 matrix for document-level
   qrels. It improved mean candidate recall to `0.469410`, but it did not improve
   top-10 ranking, so it should be paired with a later ordering/diversification
@@ -217,13 +238,41 @@ Stage 2 now has a deterministic evidence-synthesis product path through
 `POST /v1/stage2-synthesis`.
 
 It consumes the Stage 1 research workflow, carries forward compact supporting
-evidence, creates cited synthesis claims, and runs automated quality gates for:
+evidence, creates many-to-many cited synthesis claims, and runs automated
+quality gates for:
 
 - evidence presence
+- claim presence
 - independent source breadth
 - citation integrity
 - claim-to-evidence overlap
 - Stage 1 workflow status visibility
+
+The Stage 2 claim model now includes `EvidenceLink` and `SynthesizedClaim`
+structures. Each claim can carry multiple evidence links, and each link records
+stance (`supports`, `contradicts`, `qualifies`, `neutral`, or `undetermined`),
+an entailment-style score, a hedge score, and an excerpt span.
+
+Stage 2 now has two synthesis modes:
+
+- deterministic local mode, used for offline tests and fallback behavior;
+- model-backed mode through `stage2_model_provider` / `stage2_model`, currently
+  supporting OpenRouter and OpenAI JSON synthesis.
+
+Model-backed Stage 2 extracts atomic claims, clusters opposing evidence into
+shared claim structures, assigns stance and hedge scores, and emits the same
+many-to-many disagreement-map contract. External model calls are blocked unless
+`allow_external_stage2_data=true` is explicitly set, because evidence text may
+come from a private mounted corpus. A real OpenRouter smoke test using only
+synthetic evidence produced one contested claim with both supporting and
+contradicting evidence links.
+
+Stage 2 also emits a `disagreement_map` with claim clusters, stance groups,
+net support, contested-cluster counts, and disagreement axes such as
+measurement/operationalization, population/scope, mechanism/theory, and
+temporal scope. This turns the benchmark target from paragraph fluency into a
+testable structure: whether CANON preserves contested evidence instead of
+flattening it.
 
 The current status boundary is `ready_for_human_review` when automated checks
 pass, or `blocked_insufficient_evidence` / `blocked_quality_gate` when they do

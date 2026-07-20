@@ -1,4 +1,5 @@
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -39,6 +40,24 @@ class EmbeddingTests(unittest.TestCase):
                 provider = get_embedding_provider("openrouter")
         self.assertEqual(provider.provider, "openrouter")
         self.assertEqual(provider.model, "openai/text-embedding-3-small")
+
+    def test_sentence_transformers_provider_returns_local_model_vectors(self):
+        class FakeSentenceTransformer:
+            def __init__(self, model):
+                self.model = model
+
+            def encode(self, texts, normalize_embeddings=True):
+                return [[0.1, 0.2, 0.3] for _text in texts]
+
+        fake_module = types.SimpleNamespace(SentenceTransformer=FakeSentenceTransformer)
+        with patch.dict("sys.modules", {"sentence_transformers": fake_module}):
+            provider = get_embedding_provider("sentence-transformers")
+            result = provider.embed(["democratic peace"])[0]
+
+        self.assertEqual(result.provider, "sentence-transformers")
+        self.assertEqual(result.model, "BAAI/bge-small-en-v1.5")
+        self.assertEqual(result.dimensions, 3)
+        self.assertEqual(result.vector, [0.1, 0.2, 0.3])
 
     def test_cohere_query_embeddings_use_search_query_input_type(self):
         with patch.dict("os.environ", {"COHERE_API_KEY": "test-key"}, clear=True):

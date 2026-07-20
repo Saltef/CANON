@@ -4,7 +4,7 @@ import json
 import unittest
 
 from canon.embeddings.providers import HashedEmbeddingProvider
-from canon.retrieval.candidates import candidate_pool_from_documents, expand_query_variants
+from canon.retrieval.candidates import CandidateHit, candidate_pool_from_documents, expand_query_variants, sort_hits
 from canon.retrieval.corpus import RetrievalDocument
 
 
@@ -96,13 +96,52 @@ class CandidatePoolTests(unittest.TestCase):
             lexical_k=1,
             vector_k=0,
             auto_query_expansion=True,
+            benchmark_oracle_expansion=True,
         )
 
         self.assertEqual(hits[0].document.chunk_id, "c1")
         self.assertIn("lexical:variant:1", hits[0].retrieval_sources)
 
+    def test_auto_query_expansion_does_not_use_oracle_aliases_by_default(self):
+        documents = [
+            doc("c1", "vicia faba favism vicine convicine"),
+            doc("c2", "civil war mediation dataset"),
+        ]
+        hits = candidate_pool_from_documents(
+            query="fava beans",
+            documents=documents,
+            embeddings_path=missing_path(),
+            lexical_k=1,
+            vector_k=0,
+            auto_query_expansion=True,
+        )
+
+        self.assertEqual(hits, [])
+
     def test_expand_query_variants_knows_biomedical_aliases(self):
         self.assertIn("hearing loss auditory impairment", expand_query_variants("deafness"))
+
+    def test_weighted_fusion_normalizes_bm25_and_dense_scores(self):
+        lexical_hit = CandidateHit(
+            document=doc("c1", "alpha lexical"),
+            retrieval_sources=("lexical",),
+            best_rank=1,
+            best_score=100.0,
+            scores={"lexical": 100.0},
+            ranks={"lexical": 1},
+        )
+        dense_hit = CandidateHit(
+            document=doc("c2", "alpha dense"),
+            retrieval_sources=("vector:local",),
+            best_rank=2,
+            best_score=0.9,
+            scores={"vector:local": 0.9},
+            ranks={"vector:local": 2},
+        )
+
+        ranked = sort_hits([lexical_hit, dense_hit], fusion="weighted_bm25_dense")
+
+        self.assertEqual(ranked[0].document.chunk_id, "c2")
 
     def test_parent_expansion_adds_sibling_chunks(self):
         documents = [

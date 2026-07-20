@@ -31,6 +31,7 @@ def run_stage1_optimizer(
     top_k: int = 10,
     max_chunks_per_parent: int = 0,
     auto_query_expansion: bool = False,
+    benchmark_oracle_expansion: bool = False,
     parent_qrels: bool = False,
     parent_expansion_limit: int = 0,
     write_report: bool = True,
@@ -59,6 +60,7 @@ def run_stage1_optimizer(
             top_k=top_k,
             max_chunks_per_parent=max_chunks_per_parent,
             auto_query_expansion=auto_query_expansion,
+            benchmark_oracle_expansion=benchmark_oracle_expansion,
             parent_qrels=parent_qrels,
             parent_expansion_limit=parent_expansion_limit,
         )
@@ -72,6 +74,7 @@ def run_stage1_optimizer(
         "document_format": document_format,
         "max_chunks_per_parent": max_chunks_per_parent,
         "auto_query_expansion": auto_query_expansion,
+        "benchmark_oracle_expansion": benchmark_oracle_expansion,
         "parent_qrels": parent_qrels,
         "parent_expansion_limit": parent_expansion_limit,
         "status": optimizer_status(trials),
@@ -112,6 +115,7 @@ def run_benchmark_trials(
     top_k: int,
     max_chunks_per_parent: int,
     auto_query_expansion: bool,
+    benchmark_oracle_expansion: bool,
     parent_qrels: bool,
     parent_expansion_limit: int,
 ) -> list[dict[str, Any]]:
@@ -133,6 +137,7 @@ def run_benchmark_trials(
             top_k=top_k,
             max_chunks_per_parent=max_chunks_per_parent,
             auto_query_expansion=auto_query_expansion,
+            benchmark_oracle_expansion=benchmark_oracle_expansion,
             parent_qrels=parent_qrels,
             parent_expansion_limit=parent_expansion_limit,
         )
@@ -158,6 +163,7 @@ def run_trial(
     top_k: int,
     max_chunks_per_parent: int,
     auto_query_expansion: bool,
+    benchmark_oracle_expansion: bool,
     parent_qrels: bool,
     parent_expansion_limit: int,
 ) -> dict[str, Any]:
@@ -173,6 +179,7 @@ def run_trial(
         top_k=top_k,
         max_chunks_per_parent=max_chunks_per_parent,
         auto_query_expansion=auto_query_expansion,
+        benchmark_oracle_expansion=benchmark_oracle_expansion,
         parent_qrels=parent_qrels,
         parent_expansion_limit=parent_expansion_limit,
     )
@@ -197,6 +204,7 @@ def run_trial(
         query_variants=benchmark.get("query_variants") or [],
         max_chunks_per_parent=max_chunks_per_parent,
         auto_query_expansion=auto_query_expansion,
+        benchmark_oracle_expansion=benchmark_oracle_expansion,
         parent_qrels=parent_qrels,
         parent_expansion_limit=parent_expansion_limit,
     )
@@ -213,6 +221,7 @@ def run_trial(
         "document_format": document_format,
         "max_chunks_per_parent": max_chunks_per_parent,
         "auto_query_expansion": auto_query_expansion,
+        "benchmark_oracle_expansion": benchmark_oracle_expansion,
         "parent_qrels": parent_qrels,
         "parent_expansion_limit": parent_expansion_limit,
         "lexical_search": "bm25",
@@ -333,6 +342,7 @@ def trial_cache_path(
     top_k: int,
     max_chunks_per_parent: int,
     auto_query_expansion: bool,
+    benchmark_oracle_expansion: bool,
     parent_qrels: bool,
     parent_expansion_limit: int,
 ) -> Path:
@@ -350,6 +360,7 @@ def trial_cache_path(
         "top_k": top_k,
         "max_chunks_per_parent": max_chunks_per_parent,
         "auto_query_expansion": auto_query_expansion,
+        "benchmark_oracle_expansion": benchmark_oracle_expansion,
         "parent_qrels": parent_qrels,
         "parent_expansion_limit": parent_expansion_limit,
     }
@@ -469,6 +480,7 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--max-chunks-per-parent", type=int, default=0)
     parser.add_argument("--auto-query-expansion", action="store_true")
+    parser.add_argument("--benchmark-oracle-expansion", action="store_true")
     parser.add_argument("--parent-qrels", action="store_true")
     parser.add_argument("--parent-expansion-limit", type=int, default=0)
     args = parser.parse_args()
@@ -486,6 +498,7 @@ def main() -> None:
                 top_k=args.top_k,
                 max_chunks_per_parent=args.max_chunks_per_parent,
                 auto_query_expansion=args.auto_query_expansion,
+                benchmark_oracle_expansion=args.benchmark_oracle_expansion,
                 parent_qrels=args.parent_qrels,
                 parent_expansion_limit=args.parent_expansion_limit,
             ),
