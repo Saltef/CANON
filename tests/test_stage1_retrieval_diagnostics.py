@@ -18,10 +18,15 @@ class Stage1RetrievalDiagnosticsTests(unittest.TestCase):
             processed.mkdir(parents=True)
             gold.mkdir()
             chunks = [
-                {"id": "chunk:a", "work_id": "work:a"},
-                {"id": "chunk:b", "work_id": "work:b"},
+                {"id": "chunk:a", "work_id": "work:a", "section": "abstract", "text": "alpha relevant evidence"},
+                {"id": "chunk:b", "work_id": "work:b", "section": "abstract", "text": "gamma unrelated label text"},
+            ]
+            works = [
+                {"id": "work:a", "title": "Alpha Evidence", "source_name": "Fixture"},
+                {"id": "work:b", "title": "Unrelated", "source_name": "Fixture"},
             ]
             (processed / "chunks_unit.json").write_text(json.dumps(chunks), encoding="utf-8")
+            (processed / "works_unit.json").write_text(json.dumps(works), encoding="utf-8")
             qrels = {
                 "benchmark_id": "unit",
                 "queries": [
@@ -40,6 +45,11 @@ class Stage1RetrievalDiagnosticsTests(unittest.TestCase):
                             {
                                 "status": "ok",
                                 "provider_id": "heuristic",
+                                "queries": [],
+                            },
+                            {
+                                "status": "ok",
+                                "provider_id": "cohere:rerank-v4.0-fast",
                                 "queries": [
                                     {
                                         "id": "q1",
@@ -74,15 +84,19 @@ class Stage1RetrievalDiagnosticsTests(unittest.TestCase):
                     rerank_report=rerank_path,
                     qrels_path=qrels_path,
                     mode="unit",
+                    provider_id="cohere:rerank-v4.0-fast",
                     write_report=False,
                 )
 
         self.assertEqual(report["aggregate"]["query_count"], 2)
+        self.assertEqual(report["provider"], "cohere:rerank-v4.0-fast")
         self.assertEqual(report["failure_modes"]["candidate_pool_has_evidence_but_top10_misses"], 1)
         self.assertEqual(report["failure_modes"]["no_relevant_chunks_in_pool"], 1)
         self.assertEqual(report["oracle_reranking"]["status"], "ok")
         self.assertEqual(report["oracle_reranking"]["interpretation"], "strong_discrimination")
         self.assertIn("qrels_granularity", report["qrels_semantics"])
+        self.assertEqual(report["qrels_quality"]["suspicious_query_count"], 1)
+        self.assertEqual(report["qrels_quality"]["suspicious_queries"][0]["id"], "q2")
         self.assertEqual(report["parent_dominance"]["queries_with_parent_duplication_at_10"], 0)
 
 

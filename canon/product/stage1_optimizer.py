@@ -30,6 +30,9 @@ def run_stage1_optimizer(
     resume: bool = True,
     top_k: int = 10,
     max_chunks_per_parent: int = 0,
+    auto_query_expansion: bool = False,
+    parent_qrels: bool = False,
+    parent_expansion_limit: int = 0,
     write_report: bool = True,
 ) -> dict[str, Any]:
     settings = load_settings()
@@ -55,6 +58,9 @@ def run_stage1_optimizer(
             resume=resume,
             top_k=top_k,
             max_chunks_per_parent=max_chunks_per_parent,
+            auto_query_expansion=auto_query_expansion,
+            parent_qrels=parent_qrels,
+            parent_expansion_limit=parent_expansion_limit,
         )
     ]
     report = {
@@ -65,6 +71,9 @@ def run_stage1_optimizer(
         "fusion_methods": fusions,
         "document_format": document_format,
         "max_chunks_per_parent": max_chunks_per_parent,
+        "auto_query_expansion": auto_query_expansion,
+        "parent_qrels": parent_qrels,
+        "parent_expansion_limit": parent_expansion_limit,
         "status": optimizer_status(trials),
         "objective": objective_description(top_k, objective_mode),
         "cache": {
@@ -102,6 +111,9 @@ def run_benchmark_trials(
     resume: bool,
     top_k: int,
     max_chunks_per_parent: int,
+    auto_query_expansion: bool,
+    parent_qrels: bool,
+    parent_expansion_limit: int,
 ) -> list[dict[str, Any]]:
     qrels_path = resolve_path(root, Path(benchmark["qrels"]))
     qrels = load_qrels(qrels_path)
@@ -120,6 +132,9 @@ def run_benchmark_trials(
             resume=resume,
             top_k=top_k,
             max_chunks_per_parent=max_chunks_per_parent,
+            auto_query_expansion=auto_query_expansion,
+            parent_qrels=parent_qrels,
+            parent_expansion_limit=parent_expansion_limit,
         )
         for candidate_k in candidate_values
         for fusion in fusion_methods
@@ -142,6 +157,9 @@ def run_trial(
     resume: bool,
     top_k: int,
     max_chunks_per_parent: int,
+    auto_query_expansion: bool,
+    parent_qrels: bool,
+    parent_expansion_limit: int,
 ) -> dict[str, Any]:
     cache_path = trial_cache_path(
         cache_dir,
@@ -154,6 +172,9 @@ def run_trial(
         objective_mode=objective_mode,
         top_k=top_k,
         max_chunks_per_parent=max_chunks_per_parent,
+        auto_query_expansion=auto_query_expansion,
+        parent_qrels=parent_qrels,
+        parent_expansion_limit=parent_expansion_limit,
     )
     if resume and cache_path.exists():
         cached = json.loads(cache_path.read_text(encoding="utf-8"))
@@ -175,6 +196,9 @@ def run_trial(
         document_format=document_format,
         query_variants=benchmark.get("query_variants") or [],
         max_chunks_per_parent=max_chunks_per_parent,
+        auto_query_expansion=auto_query_expansion,
+        parent_qrels=parent_qrels,
+        parent_expansion_limit=parent_expansion_limit,
     )
     reranker = first_or_empty(report.get("rerankers", []))
     summary = reranker.get("summary", {}) if reranker.get("status") == "ok" else {}
@@ -188,6 +212,9 @@ def run_trial(
         "fusion": fusion,
         "document_format": document_format,
         "max_chunks_per_parent": max_chunks_per_parent,
+        "auto_query_expansion": auto_query_expansion,
+        "parent_qrels": parent_qrels,
+        "parent_expansion_limit": parent_expansion_limit,
         "lexical_search": "bm25",
         "dense_retriever": provider_identifier(dense_provider, dense_model),
         "reranker": reranker.get("provider_id") or reranker_spec,
@@ -305,6 +332,9 @@ def trial_cache_path(
     objective_mode: str,
     top_k: int,
     max_chunks_per_parent: int,
+    auto_query_expansion: bool,
+    parent_qrels: bool,
+    parent_expansion_limit: int,
 ) -> Path:
     payload = {
         "benchmark_id": benchmark["id"],
@@ -319,6 +349,9 @@ def trial_cache_path(
         "objective_mode": objective_mode,
         "top_k": top_k,
         "max_chunks_per_parent": max_chunks_per_parent,
+        "auto_query_expansion": auto_query_expansion,
+        "parent_qrels": parent_qrels,
+        "parent_expansion_limit": parent_expansion_limit,
     }
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
     return cache_dir / f"{safe_slug(str(benchmark['id']))}_{digest}.json"
@@ -435,6 +468,9 @@ def main() -> None:
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--max-chunks-per-parent", type=int, default=0)
+    parser.add_argument("--auto-query-expansion", action="store_true")
+    parser.add_argument("--parent-qrels", action="store_true")
+    parser.add_argument("--parent-expansion-limit", type=int, default=0)
     args = parser.parse_args()
     print(
         json.dumps(
@@ -449,6 +485,9 @@ def main() -> None:
                 resume=not args.no_resume,
                 top_k=args.top_k,
                 max_chunks_per_parent=args.max_chunks_per_parent,
+                auto_query_expansion=args.auto_query_expansion,
+                parent_qrels=args.parent_qrels,
+                parent_expansion_limit=args.parent_expansion_limit,
             ),
             indent=2,
             ensure_ascii=True,

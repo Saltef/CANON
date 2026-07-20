@@ -19,6 +19,7 @@ from canon.retrieval.candidates import build_candidate_pool, candidate_pool_from
 from canon.retrieval.clusters import load_cluster_assignments
 from canon.retrieval.corpus import RetrievalDocument, load_processed_corpus
 from canon.retrieval.experiment import run as run_retrieval
+from canon.retrieval.topic_profile import ensure_topic_profile
 from canon.retrieval.tokenize import tokenize
 
 
@@ -37,6 +38,8 @@ class PooledCandidateContext:
     lexical_index: BM25Index
     embeddings_path: Path
     embedding_records: list[dict]
+    chunk_to_work: dict[str, str]
+    topic_profile: dict
 
 
 class RerankProvider(Protocol):
@@ -163,6 +166,8 @@ def build_pooled_candidate_context(
         lexical_index=BM25Index([document.text for document in documents]),
         embeddings_path=embeddings_path,
         embedding_records=records,
+        chunk_to_work={document.chunk_id: document.work_id for document in documents},
+        topic_profile=ensure_topic_profile(settings.data_dir, mode, documents),
     )
 
 
@@ -183,6 +188,9 @@ def evaluate_rerankers(
     fusion: str = "union",
     document_format: str = "plain",
     max_chunks_per_parent: int = 0,
+    auto_query_expansion: bool = False,
+    parent_qrels: bool = False,
+    parent_expansion_limit: int = 0,
 ) -> dict:
     settings = load_settings()
     qrels = load_qrels(qrels_path)
@@ -204,6 +212,9 @@ def evaluate_rerankers(
             fusion=fusion,
             document_format=document_format,
             max_chunks_per_parent=max_chunks_per_parent,
+            auto_query_expansion=auto_query_expansion,
+            parent_qrels=parent_qrels,
+            parent_expansion_limit=parent_expansion_limit,
         )
         for provider_name in (rerankers or DEFAULT_RERANKERS)
     ]
@@ -223,6 +234,9 @@ def evaluate_rerankers(
             "fusion": fusion,
             "document_format": document_format,
             "max_chunks_per_parent": max_chunks_per_parent,
+            "auto_query_expansion": auto_query_expansion,
+            "parent_qrels": parent_qrels,
+            "parent_expansion_limit": parent_expansion_limit,
         },
         "metric_k": k,
         "rerankers": provider_reports,
@@ -254,6 +268,9 @@ def evaluate_reranker(
     fusion: str = "union",
     document_format: str = "plain",
     max_chunks_per_parent: int = 0,
+    auto_query_expansion: bool = False,
+    parent_qrels: bool = False,
+    parent_expansion_limit: int = 0,
     pooled_context: PooledCandidateContext | None = None,
 ) -> dict:
     started = time.perf_counter()
@@ -282,6 +299,9 @@ def evaluate_reranker(
                 fusion=fusion,
                 document_format=document_format,
                 max_chunks_per_parent=max_chunks_per_parent,
+                auto_query_expansion=auto_query_expansion,
+                parent_qrels=parent_qrels,
+                parent_expansion_limit=parent_expansion_limit,
                 pooled_context=pooled_context,
             )
             for query in queries
@@ -323,6 +343,9 @@ def evaluate_query(
     fusion: str = "union",
     document_format: str = "plain",
     max_chunks_per_parent: int = 0,
+    auto_query_expansion: bool = False,
+    parent_qrels: bool = False,
+    parent_expansion_limit: int = 0,
     pooled_context: PooledCandidateContext | None = None,
 ) -> dict:
     candidate_report = candidate_report_for_query(
@@ -337,6 +360,8 @@ def evaluate_query(
         vector_provider=vector_provider,
         vector_model=vector_model,
         fusion=fusion,
+        auto_query_expansion=auto_query_expansion,
+        parent_expansion_limit=parent_expansion_limit,
         pooled_context=pooled_context,
     )
     candidates = candidate_report.get("results") or []
@@ -350,14 +375,25 @@ def evaluate_query(
     ranked_pairs = diversify_by_parent(ranked_pairs, max_chunks_per_parent)
     ranked_results = [result for result, _score in ranked_pairs]
     ranked_ids = [result["chunk_id"] for result in ranked_results]
-    metrics = evaluate_ranking(ranked_ids, query["relevant"], k)
-    candidate_scores = scored_candidates(candidates, reranked, query["relevant"])
+    qrels = effective_qrels(
+        candidates=candidates,
+        qrels=query["relevant"],
+        chunk_to_work=pooled_context.chunk_to_work if pooled_context else {},
+        parent_qrels=parent_qrels,
+    )
+    metrics = evaluate_ranking(ranked_ids, qrels, k)
+    candidate_scores = scored_candidates(candidates, reranked, qrels)
     return {
         "id": query["id"],
         "query": query["query"],
         "candidate_count": len(candidates),
         "candidate_generation": candidate_report.get("candidate_generation", {}),
-        "candidate_recall": candidate_recall(candidates, query["relevant"]),
+        "candidate_recall": candidate_recall(candidates, qrels),
+        "qrels_semantics": {
+            "parent_qrels_enabled": parent_qrels,
+            "effective_relevant_count": len(qrels),
+            "original_relevant_count": len(query["relevant"]),
+        },
         "metrics": metrics,
         "score_observability": score_observability(candidate_scores, k),
         "diversification": diversification_summary(ranked_results[:k], max_chunks_per_parent),
@@ -422,6 +458,8 @@ def candidate_report_for_query(
     vector_model: str | None,
     fusion: str = "union",
     query_variants: list[str] | None = None,
+    auto_query_expansion: bool = False,
+    parent_expansion_limit: int = 0,
     pooled_context: PooledCandidateContext | None = None,
 ) -> dict:
     if not pooled_candidates:
@@ -437,6 +475,9 @@ def candidate_report_for_query(
             lexical_k=lexical_k or candidate_k,
             vector_k=vector_k or candidate_k,
             query_variants=query_variants,
+            auto_query_expansion=auto_query_expansion,
+            topic_profile=pooled_context.topic_profile if pooled_context else None,
+            parent_expansion_limit=parent_expansion_limit,
             provider=vector_provider,
             model=vector_model,
             fusion=fusion,
@@ -451,6 +492,9 @@ def candidate_report_for_query(
             lexical_k=lexical_k or candidate_k,
             vector_k=vector_k or candidate_k,
             query_variants=query_variants,
+            auto_query_expansion=auto_query_expansion,
+            topic_profile=pooled_context.topic_profile,
+            parent_expansion_limit=parent_expansion_limit,
             provider=vector_provider,
             model=vector_model,
             fusion=fusion,
@@ -466,6 +510,8 @@ def candidate_report_for_query(
             "vector_provider": vector_provider,
             "vector_model": vector_model,
             "query_variant_count": len(query_variants or []),
+            "auto_query_expansion": auto_query_expansion,
+            "parent_expansion_limit": parent_expansion_limit,
             "fusion": fusion,
         },
         "results": [
@@ -503,6 +549,28 @@ def scored_candidates(
         }
         for index, result in enumerate(candidates, start=1)
     ]
+
+
+def effective_qrels(
+    candidates: list[dict],
+    qrels: dict[str, float],
+    chunk_to_work: dict[str, str],
+    parent_qrels: bool,
+) -> dict[str, float]:
+    if not parent_qrels:
+        return qrels
+    relevant_works = {
+        chunk_to_work.get(str(chunk_id), str(chunk_id))
+        for chunk_id, relevance in qrels.items()
+        if float(relevance) > 0
+    }
+    effective = dict(qrels)
+    for candidate in candidates:
+        chunk_id = str(candidate.get("chunk_id"))
+        work_id = str(candidate.get("work_id") or chunk_to_work.get(chunk_id, chunk_id))
+        if work_id in relevant_works and chunk_id not in effective:
+            effective[chunk_id] = 1.0
+    return effective
 
 
 def candidate_recall(candidates: list[dict], qrels: dict[str, float]) -> dict:
@@ -691,6 +759,9 @@ def main() -> None:
     parser.add_argument("--fusion", default="union")
     parser.add_argument("--document-format", choices=["plain", "structured"], default="plain")
     parser.add_argument("--max-chunks-per-parent", type=int, default=0)
+    parser.add_argument("--auto-query-expansion", action="store_true")
+    parser.add_argument("--parent-qrels", action="store_true")
+    parser.add_argument("--parent-expansion-limit", type=int, default=0)
     parser.add_argument("--query-variants", default=None, help="Global variants separated with ||")
     args = parser.parse_args()
     print(
@@ -711,6 +782,9 @@ def main() -> None:
                 fusion=args.fusion,
                 document_format=args.document_format,
                 max_chunks_per_parent=args.max_chunks_per_parent,
+                auto_query_expansion=args.auto_query_expansion,
+                parent_qrels=args.parent_qrels,
+                parent_expansion_limit=args.parent_expansion_limit,
                 query_variants=parse_variants(args.query_variants),
             ),
             indent=2,

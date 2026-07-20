@@ -57,6 +57,8 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.evidence_packets(payload))
             elif parsed.path == "/v1/frame-coverage":
                 self.send_json(service.frame_coverage_report(payload))
+            elif parsed.path == "/v1/research-workflow":
+                self.send_json(service.research_workflow(payload))
             elif parsed.path == "/v1/intelligence-brief":
                 self.send_json(service.intelligence_brief(payload))
             elif parsed.path == "/v1/report-quality":
@@ -175,6 +177,7 @@ def api_index() -> dict:
             "/v1/projects/start",
             "/v1/evidence-packets",
             "/v1/frame-coverage",
+            "/v1/research-workflow",
             "/v1/intelligence-brief",
             "/v1/report-quality",
             "/v1/intelligence-brief/evaluate",
@@ -292,6 +295,19 @@ def api_routes() -> dict:
                         "languages": ["English", "Spanish"],
                     },
                     "evidence_requirements": {"top_k": 10, "minimum_source_types": ["official", "local_media"]},
+                },
+            ),
+            route(
+                "POST",
+                "/v1/research-workflow",
+                "Run research workflow layers 1-6: question framing, retrieval, evidence map, concept analysis, and guidance.",
+                ["query or question"],
+                ["mode", "policy", "project_id", "research_frame", "evidence_requirements", "write_report"],
+                {
+                    "question": "What are the emerging risks around AI data center expansion in Latin America?",
+                    "mode": "ai_infra_geo_risk_demo",
+                    "evidence_requirements": {"top_k": 10, "include_source_diversity": True},
+                    "write_report": True,
                 },
             ),
             route(

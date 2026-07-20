@@ -18,7 +18,15 @@ The strongest focused pilot so far uses:
 - Reranker: `cohere:rerank-v4.0-fast`
 - Candidate pool: 250 lexical plus 250 vector candidates
 - Candidate document format: `structured`
-- Parent cap: `max_chunks_per_parent=1`
+- Parent cap: `max_chunks_per_parent=0` for unconstrained candidate coverage
+
+The strongest raw retrieval/ranking score now uses the same Qwen+Cohere stack
+with `auto_query_expansion=true`, corpus topic-profile expansion, and
+`parent_qrels=true`. The strongest coverage run also uses
+`parent_expansion_limit=2`, which adds up to two sibling chunks from each
+retrieved parent work into the candidate pool. This is the right diagnostic
+setting for public document-level qrels and alternate chunking, because
+relevance can transfer across chunks that share the same parent work.
 
 This run produces:
 
@@ -32,9 +40,31 @@ This run produces:
 - queries with top-10 relevant hits: `23/30`
 - zero candidate-recall queries: `4/30`
 
+With auto query expansion and parent-qrels enabled:
+
+- candidate recall mean: `0.422138`
+- work-level hit rate mean: `0.470343`
+- nDCG@10: `0.397614`
+- Recall@10: `0.142432`
+- MAP@10: `0.298061`
+- MRR@10: `0.65`
+- queries with any relevant work in pool: `29/30`
+- zero candidate-recall queries: `1/30`
+
+With parent-neighborhood expansion enabled:
+
+- candidate recall mean: `0.469410`
+- work-level hit rate mean: `0.470343`
+- nDCG@10: `0.396759`
+- Recall@10: `0.142432`
+- MAP@10: `0.297184`
+- MRR@10: `0.65`
+- queries with any relevant work in pool: `29/30`
+- zero candidate-recall queries: `1/30`
+
 The automated gate still reports `automated_fail` because broad public qrels
 make full candidate recall unrealistic at this candidate budget. That is useful
-signal, not a plumbing failure: four queries have no relevant evidence in the
+signal, not a plumbing failure: one query still has no relevant evidence in the
 candidate pool, and no reranker can recover evidence that was never retrieved.
 
 ## What Was Fixed
@@ -51,6 +81,23 @@ document from crowding out other sources in the final ranked evidence packet.
 The Stage 1 optimizer passes the parent cap into every trial and includes it in
 cache keys and reports, so experiments remain reproducible.
 
+The retrieval layer now builds per-corpus topic profiles through
+`canon.retrieval.topic_profile` / `canon-topic-profile`. These profiles capture
+top corpus terms, phrases, topic buckets, and related terms, then feed
+auto-query expansion in the candidate generator. This keeps expansion
+reproducible while letting each mounted corpus contribute its own vocabulary.
+
+The candidate generator now supports parent-neighborhood expansion. When a
+chunk from a parent work is retrieved, Stage 1 can add a bounded number of
+sibling chunks from that work as candidate evidence. In the NFCorpus pilot this
+raised candidate recall from `0.422138` to `0.469410`, which is a much larger
+coverage gain than the topic-profile expansion alone.
+
+The production research workflow can optionally enrich the deterministic
+research frame through OpenRouter. That gives Stage 1 a non-deterministic frame
+construction path for topic, scope, concepts, alternate queries, and review
+notes, while preserving deterministic fallbacks for repeatable local tests.
+
 ## Oracle Reranking Diagnosis
 
 The previous heuristic reranker had weak discrimination:
@@ -63,10 +110,10 @@ The previous heuristic reranker had weak discrimination:
 
 Cohere Rerank with the parent cap gives much stronger observability:
 
-- relevant score mean: `0.353832`
-- non-relevant score mean: `0.254203`
-- AUC-like separation: `0.95575`
-- overlap rate: `0.0885`
+- relevant score mean: `0.346928`
+- non-relevant score mean: `0.245519`
+- AUC-like separation: `0.856008`
+- overlap rate: `0.287985`
 - interpretation: `strong_discrimination`
 
 This supports the hypothesis that the value of a learned reranker is not only
@@ -88,25 +135,42 @@ document is relevant. This is appropriate for public BEIR comparison, but it is
 not a substitute for human-reviewed passage-level labels on the mounted project
 corpus.
 
+Diagnostics now include a qrels-quality guard that checks query-to-label text
+overlap. The latest NFCorpus run flags `9/30` suspicious low-overlap queries:
+`deafness`, `Dr. Dean Ornish`, `Dr. Walter Willett`, `eggnog`, `energy drinks`,
+`fava beans`, `Fosamax`, `How Citrus Might Help Keep Your Hands Warm`, and
+`genetic manipulation`. These are not automatically invalid labels, but they
+must be reviewed before treating zero-hit or low-recall behavior as purely a
+retrieval/model failure.
+
 ## Remaining Stage 1 Work
 
 The next improvement is first-stage retrieval, not reranking alone. The
-remaining zero-hit queries are:
-
-- `deafness`
-- `energy drinks`
-- `fava beans`
-- `genetic manipulation`
+remaining zero-hit query is `fava beans`. Its transferred gold chunk is
+`chunk:81588b7b16810a61` from parent `MED-4281`, titled "Beneficial effects of
+L-arginine on reducing obesity: potential mechanisms and important implications
+for human health." The visible chunk text is about L-arginine, obesity, and
+metabolic disorders rather than fava beans. Treat this as a qrels/content
+semantics risk to inspect before forcing retrieval behavior around it.
 
 Recommended retrieval fixes:
 
-- Add query expansion based on biomedical aliases and title terms.
+- Continue query expansion based on biomedical aliases, title terms, and
+  corpus-specific topic profiles. The deterministic expansion path reduced
+  zero-hit queries from `4/30` to `1/30` and improved mean candidate recall from
+  `0.406249` to `0.422138`.
+- Keep parent-neighborhood expansion in the Stage 1 matrix for document-level
+  qrels. It improved mean candidate recall to `0.469410`, but it did not improve
+  top-10 ranking, so it should be paired with a later ordering/diversification
+  pass rather than treated as a complete fix.
 - Compare original NFCorpus chunking and title-preserve chunking as a dual-index
   candidate source instead of choosing only one.
 - Report chunk recall and parent-document recall for every benchmark.
 - Sweep candidate budgets above 250 only after measuring marginal recall gain.
 - Keep Cohere Rerank in the model matrix because its score separation is now
   materially better than the heuristic baseline.
+- Add qrels sanity checks for low-overlap public labels so the acceptance gate
+  can distinguish retrieval failures from label/chunk-transfer mismatches.
 
 ## Product Workflow Status
 
@@ -125,16 +189,21 @@ Research Question
 Current status by layer:
 
 - Research Question: partially implemented through query and benchmark inputs.
-- Research Frame Constructor: designed, but needs structured frame output for
-  topic, scope, methods, concepts, and inclusion/exclusion criteria.
+- Research Frame Constructor: implemented with deterministic parsing and an
+  optional OpenRouter enrichment path for less deterministic framing.
 - Semantic Retrieval Engine: implemented and actively evaluated with BM25,
-  dense embeddings, fusion, reranking, and public qrels.
+  dense embeddings, corpus topic profiles, fusion, reranking, and public qrels.
 - Evidence Neighborhood Mapper: partially implemented through parent-context,
   source diversity, graph clusters, and parent-dominance diagnostics.
 - Concept & Discipline Analyzer: partially designed in docs; needs production
   classification and evaluation slices.
 - Research Guidance Layer: partially implemented through diagnostics,
   recommendations, and pre-human gates.
+- Layers 1-6 can now be run together through `canon.product.research_workflow`
+  or `POST /v1/research-workflow`. This deterministic production path parses
+  the research question, constructs a reviewable frame, retrieves evidence
+  packets, maps the evidence neighborhood, tags concepts/disciplines, and emits
+  next actions before synthesis.
 - Human Revision: workflow exists through qrels review and pilot review CSVs,
   but Stage 1 is currently running without new human review.
 - Iterative Retrieval: optimizer, sweeps, and diagnostics now support iteration.

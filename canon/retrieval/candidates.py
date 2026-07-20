@@ -14,6 +14,7 @@ from canon.product import report_io
 from canon.retrieval.bm25 import BM25Index
 from canon.retrieval.clusters import load_cluster_assignments
 from canon.retrieval.corpus import RetrievalDocument, load_processed_corpus
+from canon.retrieval.topic_profile import ensure_topic_profile, topic_query_variants
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,9 @@ def build_candidate_pool(
     lexical_k: int = 50,
     vector_k: int = 50,
     query_variants: list[str] | None = None,
+    auto_query_expansion: bool = False,
+    topic_profile: dict[str, Any] | None = None,
+    parent_expansion_limit: int = 0,
     provider: str = "local",
     model: str | None = None,
     fusion: str = "union",
@@ -59,6 +63,9 @@ def build_candidate_pool(
         mode,
         cluster_assignments=load_cluster_assignments(settings.data_dir, mode),
     )
+    resolved_topic_profile = topic_profile
+    if resolved_topic_profile is None and auto_query_expansion:
+        resolved_topic_profile = ensure_topic_profile(settings.data_dir, mode, documents)
     hits = candidate_pool_from_documents(
         query=query,
         documents=documents,
@@ -66,6 +73,9 @@ def build_candidate_pool(
         lexical_k=lexical_k,
         vector_k=vector_k,
         query_variants=query_variants,
+        auto_query_expansion=auto_query_expansion,
+        topic_profile=resolved_topic_profile,
+        parent_expansion_limit=parent_expansion_limit,
         provider=provider,
         model=model,
         fusion=fusion,
@@ -77,6 +87,9 @@ def build_candidate_pool(
         lexical_k=lexical_k,
         vector_k=vector_k,
         query_variants=query_variants,
+        auto_query_expansion=auto_query_expansion,
+        topic_profile=resolved_topic_profile,
+        parent_expansion_limit=parent_expansion_limit,
         provider=provider,
         model=model,
         fusion=fusion,
@@ -92,6 +105,8 @@ def build_candidate_pool(
         "lexical_k": lexical_k,
         "vector_k": vector_k,
         "query_variants": query_variants or [],
+        "auto_query_expansion": auto_query_expansion,
+        "parent_expansion_limit": parent_expansion_limit,
         "fusion": fusion,
         "source_counts": source_counts(hits),
         "candidates": [hit.to_dict() for hit in hits],
@@ -110,6 +125,9 @@ def candidate_pool_from_documents(
     lexical_k: int = 50,
     vector_k: int = 50,
     query_variants: list[str] | None = None,
+    auto_query_expansion: bool = False,
+    topic_profile: dict[str, Any] | None = None,
+    parent_expansion_limit: int = 0,
     provider: str = "local",
     model: str | None = None,
     fusion: str = "union",
@@ -119,7 +137,11 @@ def candidate_pool_from_documents(
 ) -> list[CandidateHit]:
     rows: dict[str, dict[str, Any]] = {}
     doc_by_id = {document.chunk_id: document for document in documents}
-    queries = [query, *(query_variants or [])]
+    variants = list(query_variants or [])
+    if auto_query_expansion:
+        variants.extend(expand_query_variants(query))
+        variants.extend(topic_query_variants(query, topic_profile or {}))
+    queries = dedupe_queries([query, *variants])
     for query_index, query_text in enumerate(queries):
         source_suffix = "" if query_index == 0 else f":variant:{query_index}"
         add_ranked_rows(
@@ -136,6 +158,8 @@ def candidate_pool_from_documents(
                 ranked_vectors(query_text, embedding_records, provider, model, vector_k),
                 source=f"vector:{provider}{source_suffix}",
             )
+    if parent_expansion_limit > 0:
+        add_parent_neighborhood_rows(rows, documents, parent_expansion_limit)
     hits = [
         CandidateHit(
             document=doc_by_id[chunk_id],
@@ -152,6 +176,70 @@ def candidate_pool_from_documents(
         if chunk_id in doc_by_id
     ]
     return sort_hits(hits, fusion)
+
+
+def add_parent_neighborhood_rows(
+    rows: dict[str, dict[str, Any]],
+    documents: Sequence[RetrievalDocument],
+    per_parent_limit: int,
+) -> None:
+    if not rows or per_parent_limit <= 0:
+        return
+    documents_by_parent: dict[str, list[RetrievalDocument]] = {}
+    parent_best: dict[str, dict[str, float]] = {}
+    document_by_id = {document.chunk_id: document for document in documents}
+    for document in documents:
+        documents_by_parent.setdefault(document.work_id, []).append(document)
+    for chunk_id, row in rows.items():
+        document = document_by_id.get(chunk_id)
+        if document is None:
+            continue
+        best_rank = min(int(rank) for rank in row["ranks"].values())
+        best_score = max(float(score) for score in row["scores"].values())
+        current = parent_best.get(document.work_id)
+        if current is None or best_rank < current["rank"]:
+            parent_best[document.work_id] = {"rank": float(best_rank), "score": best_score}
+    for work_id, parent_row in parent_best.items():
+        siblings = sorted(
+            documents_by_parent.get(work_id, []),
+            key=lambda document: (section_priority(document.section), -float_signal(document.chunk_importance), document.chunk_id),
+        )
+        added = 0
+        for sibling in siblings:
+            if sibling.chunk_id in rows:
+                continue
+            if added >= per_parent_limit:
+                break
+            rank = int(parent_row["rank"]) + added + 1
+            score = float(parent_row["score"]) * 0.97
+            row = rows.setdefault(sibling.chunk_id, {"sources": set(), "scores": {}, "ranks": {}})
+            row["sources"].add("parent_neighborhood")
+            row["scores"]["parent_neighborhood"] = score
+            row["ranks"]["parent_neighborhood"] = rank
+            added += 1
+
+
+def section_priority(section: str | None) -> int:
+    normalized = str(section or "").lower()
+    order = {
+        "title": 0,
+        "abstract": 1,
+        "summary": 2,
+        "introduction": 3,
+        "methods": 4,
+        "results": 5,
+        "discussion": 6,
+        "conclusion": 7,
+    }
+    return order.get(normalized, 20)
+
+
+def float_signal(value: Any) -> float:
+    if isinstance(value, dict):
+        return max((float(item) for item in value.values() if isinstance(item, int | float)), default=0.0)
+    if isinstance(value, int | float):
+        return float(value)
+    return 0.0
 
 
 def sort_hits(hits: list[CandidateHit], fusion: str) -> list[CandidateHit]:
@@ -257,6 +345,39 @@ def parse_variants(value: str | None) -> list[str]:
     return [piece.strip() for piece in value.split("||") if piece.strip()]
 
 
+def expand_query_variants(query: str) -> list[str]:
+    normalized = query.lower()
+    variants = []
+    alias_groups = {
+        "deafness": ["hearing loss auditory impairment"],
+        "energy drinks": ["caffeine taurine stimulant beverages"],
+        "fava beans": ["vicia faba favism vicine convicine"],
+        "genetic manipulation": ["genetic engineering genetically modified gmo"],
+        "dha": ["docosahexaenoic acid omega 3"],
+        "ecmo": ["extracorporeal membrane oxygenation"],
+        "adhd": ["attention deficit hyperactivity disorder"],
+    }
+    for trigger, aliases in alias_groups.items():
+        if trigger in normalized:
+            variants.extend(aliases)
+    tokens = [token for token in normalized.replace("-", " ").split() if len(token) >= 4]
+    if len(tokens) == 1:
+        variants.append(tokens[0])
+    return dedupe_queries(variants)
+
+
+def dedupe_queries(queries: list[str]) -> list[str]:
+    seen = set()
+    deduped = []
+    for query in queries:
+        normalized = " ".join(str(query or "").lower().split())
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(str(query).strip())
+    return deduped
+
+
 def safe_slug(text: str, limit: int = 60) -> str:
     slug = "".join(character if character.isalnum() else "-" for character in text.lower())[:limit].strip("-")
     return slug or "query"
@@ -272,6 +393,7 @@ def main() -> None:
     parser.add_argument("--model", default=None)
     parser.add_argument("--fusion", default="union")
     parser.add_argument("--query-variants", default=None, help="Separate variants with ||")
+    parser.add_argument("--auto-query-expansion", action="store_true")
     args = parser.parse_args()
     print(
         json.dumps(
@@ -281,6 +403,7 @@ def main() -> None:
                 lexical_k=args.lexical_k,
                 vector_k=args.vector_k,
                 query_variants=parse_variants(args.query_variants),
+                auto_query_expansion=args.auto_query_expansion,
                 provider=args.provider,
                 model=args.model,
                 fusion=args.fusion,

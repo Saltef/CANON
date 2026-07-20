@@ -270,6 +270,12 @@ def frame_coverage_report(payload: dict[str, Any]) -> dict:
     return report
 
 
+def research_workflow(payload: dict[str, Any]) -> dict:
+    from canon.product.research_workflow import run_research_workflow
+
+    return run_research_workflow(payload)
+
+
 def frame_coverage_status(frame_coverage: dict[str, Any]) -> str:
     status = frame_coverage.get("status")
     if status == "pass":

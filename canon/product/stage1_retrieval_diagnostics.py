@@ -8,12 +8,14 @@ from typing import Any
 from canon.config import load_settings
 from canon.eval.external_ir import load_qrels
 from canon.product import report_io
+from canon.retrieval.tokenize import tokenize
 
 
 def run_stage1_retrieval_diagnostics(
     rerank_report: Path,
     qrels_path: Path,
     mode: str,
+    provider_id: str | None = None,
     output_stem: str | None = None,
     write_report: bool = True,
 ) -> dict[str, Any]:
@@ -23,8 +25,10 @@ def run_stage1_retrieval_diagnostics(
     rerank = json.loads(report_path.read_text(encoding="utf-8"))
     qrels = load_qrels(qrels_file)
     chunk_to_work = load_chunk_to_work(settings.data_dir / "processed" / f"chunks_{mode}.json")
-    provider = first_ok_provider(rerank.get("rerankers", []))
+    chunk_lookup = load_chunk_lookup(settings.data_dir / "processed" / f"chunks_{mode}.json")
+    provider = select_provider(rerank.get("rerankers", []), provider_id)
     query_rows = diagnose_queries(provider.get("queries", []), qrels.get("queries", []), chunk_to_work)
+    qrels_quality = qrels_quality_report(qrels.get("queries", []), chunk_lookup)
     report = {
         "report_id": "stage1_retrieval_diagnostics_v1",
         "mode": mode,
@@ -35,6 +39,7 @@ def run_stage1_retrieval_diagnostics(
         "candidate_generation": rerank.get("candidate_generation", {}),
         "provider": provider.get("provider_id") or provider.get("provider"),
         "aggregate": aggregate(query_rows),
+        "qrels_quality": qrels_quality,
         "oracle_reranking": oracle_reranking(provider.get("queries", [])),
         "parent_dominance": parent_dominance(provider.get("queries", []), chunk_to_work),
         "failure_modes": failure_modes(query_rows),
@@ -137,6 +142,49 @@ def qrels_semantics(qrels: dict[str, Any], rows: list[dict[str, Any]]) -> dict[s
         "work_level_recall_also_reported": True,
         "mean_relevant_chunks_per_query": average([row["relevant_chunk_count"] for row in rows]),
         "mean_relevant_parent_documents_per_query": average([row["relevant_work_count"] for row in rows]),
+    }
+
+
+def qrels_quality_report(
+    qrel_queries: list[dict[str, Any]],
+    chunk_lookup: dict[str, dict[str, Any]],
+    low_overlap_threshold: float = 0.15,
+) -> dict[str, Any]:
+    rows = []
+    for query in qrel_queries:
+        query_terms = content_terms(str(query.get("query") or ""))
+        relevant = query.get("relevant") or {}
+        chunk_rows = []
+        for chunk_id in relevant:
+            chunk = chunk_lookup.get(str(chunk_id), {})
+            overlap = overlap_ratio(query_terms, content_terms(chunk_text(chunk)))
+            chunk_rows.append(
+                {
+                    "chunk_id": str(chunk_id),
+                    "work_id": str(chunk.get("work_id") or ""),
+                    "title": str(chunk.get("title") or ""),
+                    "overlap_ratio": overlap,
+                    "preview": str(chunk.get("text") or "")[:220],
+                }
+            )
+        max_overlap = max((row["overlap_ratio"] for row in chunk_rows), default=0.0)
+        if chunk_rows and max_overlap < low_overlap_threshold:
+            rows.append(
+                {
+                    "id": str(query.get("id")),
+                    "query": str(query.get("query") or ""),
+                    "relevant_count": len(chunk_rows),
+                    "max_query_label_overlap": max_overlap,
+                    "sample_labels": chunk_rows[:3],
+                    "risk": "low_query_label_text_overlap",
+                }
+            )
+    return {
+        "status": "ok",
+        "low_overlap_threshold": low_overlap_threshold,
+        "checked_query_count": len(qrel_queries),
+        "suspicious_query_count": len(rows),
+        "suspicious_queries": rows[:20],
     }
 
 
@@ -250,6 +298,28 @@ def recommendations(rows: list[dict[str, Any]]) -> list[str]:
     return recs
 
 
+def select_provider(rows: list[dict[str, Any]], provider_id: str | None = None) -> dict[str, Any]:
+    if provider_id:
+        for row in rows:
+            if provider_matches(row, provider_id):
+                return row
+        return {
+            "status": "unavailable",
+            "provider_id": provider_id,
+            "queries": [],
+            "reason": f"Provider not found in rerank report: {provider_id}",
+        }
+    return first_ok_provider(rows)
+
+
+def provider_matches(row: dict[str, Any], provider_id: str) -> bool:
+    return provider_id in {
+        str(row.get("provider") or ""),
+        str(row.get("provider_id") or ""),
+        f"{row.get('provider')}:{row.get('model')}",
+    }
+
+
 def first_ok_provider(rows: list[dict[str, Any]]) -> dict[str, Any]:
     for row in rows:
         if row.get("status") == "ok":
@@ -262,6 +332,54 @@ def load_chunk_to_work(path: Path) -> dict[str, str]:
     return {str(row["id"]): str(row["work_id"]) for row in rows}
 
 
+def load_chunk_lookup(path: Path) -> dict[str, dict[str, Any]]:
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    lookup = {str(row["id"]): dict(row) for row in rows}
+    works_path = path.with_name(path.name.replace("chunks_", "works_", 1))
+    if not works_path.exists():
+        return lookup
+    works = {str(row["id"]): row for row in json.loads(works_path.read_text(encoding="utf-8"))}
+    for row in lookup.values():
+        work = works.get(str(row.get("work_id")), {})
+        row["title"] = work.get("title") or row.get("title") or ""
+        row["source_name"] = work.get("source_name") or row.get("source_name") or ""
+    return lookup
+
+
+def chunk_text(chunk: dict[str, Any]) -> str:
+    return " ".join(
+        str(value or "")
+        for value in [chunk.get("title"), chunk.get("section"), chunk.get("text")]
+        if value
+    )
+
+
+def content_terms(text: str) -> set[str]:
+    stop = {
+        "about",
+        "after",
+        "also",
+        "and",
+        "are",
+        "for",
+        "from",
+        "how",
+        "into",
+        "the",
+        "this",
+        "what",
+        "which",
+        "with",
+    }
+    return {token for token in tokenize(text) if len(token) >= 3 and token not in stop}
+
+
+def overlap_ratio(left: set[str], right: set[str]) -> float:
+    if not left or not right:
+        return 0.0
+    return round(len(left & right) / len(left), 6)
+
+
 def render_markdown(report: dict[str, Any]) -> str:
     worst = "\n".join(
         f"- `{row['id']}` {row['query']!r}: candidate_recall={row['candidate_recall']} "
@@ -269,6 +387,11 @@ def render_markdown(report: dict[str, Any]) -> str:
         for row in report["worst_queries"]
     )
     recs = "\n".join(f"- {item}" for item in report["recommendations"])
+    qrels_quality = report.get("qrels_quality", {})
+    suspicious = "\n".join(
+        f"- `{row['id']}` {row['query']!r}: max_overlap={row['max_query_label_overlap']}"
+        for row in qrels_quality.get("suspicious_queries", [])[:10]
+    ) or "- None"
     return f"""# Stage 1 Retrieval Diagnostics
 
 Mode: `{report['mode']}`
@@ -284,6 +407,7 @@ Provider: `{report['provider']}`
 - queries_with_top10_relevant_hits: `{report['aggregate']['queries_with_top10_relevant_hits']}`
 - zero_candidate_recall_queries: `{report['aggregate']['zero_candidate_recall_queries']}`
 - qrels_granularity: `{report['qrels_semantics']['qrels_granularity']}`
+- qrels_suspicious_low_overlap_queries: `{qrels_quality.get('suspicious_query_count', 0)}`
 - oracle_reranking_status: `{report['oracle_reranking']['status']}`
 - parent_duplicate_chunks_at_10_mean: `{report['parent_dominance']['mean_duplicate_chunk_count_at_10']}`
 
@@ -298,6 +422,10 @@ Provider: `{report['provider']}`
 ## Recommendations
 
 {recs}
+
+## Qrels Quality Flags
+
+{suspicious}
 """
 
 
@@ -361,6 +489,7 @@ def main() -> None:
     parser.add_argument("--rerank-report", required=True)
     parser.add_argument("--qrels", required=True)
     parser.add_argument("--mode", required=True)
+    parser.add_argument("--provider-id", default=None)
     parser.add_argument("--output-stem", default=None)
     args = parser.parse_args()
     print(
@@ -369,6 +498,7 @@ def main() -> None:
                 rerank_report=Path(args.rerank_report),
                 qrels_path=Path(args.qrels),
                 mode=args.mode,
+                provider_id=args.provider_id,
                 output_stem=args.output_stem,
             ),
             indent=2,

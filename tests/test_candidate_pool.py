@@ -4,7 +4,7 @@ import json
 import unittest
 
 from canon.embeddings.providers import HashedEmbeddingProvider
-from canon.retrieval.candidates import candidate_pool_from_documents
+from canon.retrieval.candidates import candidate_pool_from_documents, expand_query_variants
 from canon.retrieval.corpus import RetrievalDocument
 
 
@@ -84,6 +84,45 @@ class CandidatePoolTests(unittest.TestCase):
 
         self.assertEqual({hit.document.chunk_id for hit in hits}, {"c1", "c2"})
 
+    def test_auto_query_expansion_adds_alias_hits(self):
+        documents = [
+            doc("c1", "vicia faba favism vicine convicine"),
+            doc("c2", "civil war mediation dataset"),
+        ]
+        hits = candidate_pool_from_documents(
+            query="fava beans",
+            documents=documents,
+            embeddings_path=missing_path(),
+            lexical_k=1,
+            vector_k=0,
+            auto_query_expansion=True,
+        )
+
+        self.assertEqual(hits[0].document.chunk_id, "c1")
+        self.assertIn("lexical:variant:1", hits[0].retrieval_sources)
+
+    def test_expand_query_variants_knows_biomedical_aliases(self):
+        self.assertIn("hearing loss auditory impairment", expand_query_variants("deafness"))
+
+    def test_parent_expansion_adds_sibling_chunks(self):
+        documents = [
+            doc("c1", "alpha query evidence", work_id="work:a"),
+            doc("c2", "sibling paragraph with different wording", work_id="work:a"),
+            doc("c3", "unrelated beta", work_id="work:b"),
+        ]
+        hits = candidate_pool_from_documents(
+            query="alpha query",
+            documents=documents,
+            embeddings_path=missing_path(),
+            lexical_k=1,
+            vector_k=0,
+            parent_expansion_limit=1,
+        )
+
+        by_id = {hit.document.chunk_id: hit for hit in hits}
+        self.assertIn("c2", by_id)
+        self.assertIn("parent_neighborhood", by_id["c2"].retrieval_sources)
+
 
 def embedding(chunk_id: str, vector: list[float]) -> dict:
     return {
@@ -106,10 +145,10 @@ def missing_path():
     return Path("__missing_embeddings__.jsonl")
 
 
-def doc(chunk_id: str, text: str) -> RetrievalDocument:
+def doc(chunk_id: str, text: str, work_id: str | None = None) -> RetrievalDocument:
     return RetrievalDocument(
         chunk_id=chunk_id,
-        work_id=f"work:{chunk_id}",
+        work_id=work_id or f"work:{chunk_id}",
         title=f"Title {chunk_id}",
         year=2024,
         source_name="Fixture",

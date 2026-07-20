@@ -8,6 +8,7 @@ from canon.eval.rerank_evaluation import (
     RerankResult,
     diversify_by_parent,
     document_text,
+    effective_qrels,
     evaluate_rerankers,
     get_rerank_provider,
 )
@@ -184,6 +185,18 @@ class RerankEvaluationTests(unittest.TestCase):
         diversified = diversify_by_parent(ranked, max_chunks_per_parent=1)
 
         self.assertEqual([row[0]["chunk_id"] for row in diversified], ["chunk:a1", "chunk:b1", "chunk:a2"])
+
+    def test_effective_qrels_transfers_document_labels_to_candidate_chunks(self):
+        qrels = {"chunk:gold": 1.0}
+        candidates = [{"chunk_id": "chunk:candidate", "work_id": "work:a"}]
+        effective = effective_qrels(
+            candidates=candidates,
+            qrels=qrels,
+            chunk_to_work={"chunk:gold": "work:a"},
+            parent_qrels=True,
+        )
+
+        self.assertEqual(effective["chunk:candidate"], 1.0)
 
 
 def result(chunk_id, title, preview):
