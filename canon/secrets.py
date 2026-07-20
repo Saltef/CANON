@@ -5,7 +5,14 @@ from pathlib import Path
 
 
 LOADED = False
-ALLOWED_ENV_KEYS = {"OPENAI_API_KEY", "COHERE_API_KEY", "CANON_DATA_DIR", "CANON_REPORTS_DIR", "CANON_SETTINGS"}
+ALLOWED_ENV_KEYS = {
+    "OPENAI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "COHERE_API_KEY",
+    "CANON_DATA_DIR",
+    "CANON_REPORTS_DIR",
+    "CANON_SETTINGS",
+}
 
 
 def load_local_env(path: Path | None = None) -> None:

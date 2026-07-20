@@ -8,7 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from canon.config import load_settings
-from canon.embeddings.providers import EmbeddingResult, get_embedding_provider
+from canon.embeddings.providers import (
+    EmbeddingResult,
+    embedding_preparation,
+    embed_documents as provider_embed_documents,
+    embed_queries,
+    get_embedding_provider,
+)
 from canon.eval.external_ir import load_qrels
 from canon.eval.ir_metrics import evaluate_ranking, mean_metric
 from canon.retrieval.clusters import load_cluster_assignments
@@ -94,8 +100,9 @@ def evaluate_provider(
     batch_size: int,
 ) -> dict[str, Any]:
     started = time.perf_counter()
+    provider_key, model = parse_provider_spec(provider_name)
     try:
-        provider = get_embedding_provider(provider_name)
+        provider = get_embedding_provider(provider_key, model)
         document_vectors = embed_documents(provider, documents, batch_size=batch_size)
         query_reports = [
             evaluate_query(provider, document_vectors, query, k=k)
@@ -103,7 +110,9 @@ def evaluate_provider(
         ]
     except Exception as exc:  # noqa: BLE001 - provider availability belongs in the report.
         return {
-            "provider": provider_name,
+            "provider": provider_key,
+            "model": model,
+            "provider_id": provider_identifier(provider_key, model),
             "status": "unavailable",
             "reason": str(exc),
             "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
@@ -113,6 +122,8 @@ def evaluate_provider(
     return {
         "provider": provider.provider,
         "model": provider.model,
+        "provider_id": provider_identifier(provider.provider, provider.model),
+        "preparation": embedding_preparation(provider),
         "status": "ok",
         "dimensions": document_vectors[0]["dimensions"] if document_vectors else 0,
         "elapsed_ms": elapsed_ms,
@@ -127,7 +138,7 @@ def embed_documents(provider: Any, documents: list[RetrievalDocument], batch_siz
     rows = []
     for start in range(0, len(documents), batch_size):
         batch = documents[start : start + batch_size]
-        embeddings = provider.embed([document.text for document in batch])
+        embeddings = provider_embed_documents(provider, [document.text for document in batch])
         rows.extend(
             {
                 "chunk_id": document.chunk_id,
@@ -146,7 +157,7 @@ def embed_documents(provider: Any, documents: list[RetrievalDocument], batch_siz
 
 
 def evaluate_query(provider: Any, document_vectors: list[dict[str, Any]], query: dict[str, Any], k: int) -> dict[str, Any]:
-    query_embedding = provider.embed([query["query"]])[0]
+    query_embedding = embed_queries(provider, [query["query"]])[0]
     ranked = rank_vectors(query_embedding, document_vectors)
     ranked_ids = [row["chunk_id"] for row in ranked]
     qrels = query.get("relevant") or {}
@@ -244,6 +255,7 @@ def model_leaderboard(provider_reports: list[dict[str, Any]], k: int) -> list[di
             "rank": index,
             "provider": report["provider"],
             "model": report["model"],
+            "provider_id": report.get("provider_id") or provider_identifier(report["provider"], report["model"]),
             "primary_metric": primary,
             "primary_score": report["summary"].get(primary, 0.0),
             "Recall@k": report["summary"].get(f"Recall@{k}", 0.0),
@@ -280,6 +292,7 @@ def model_recommendation(provider_reports: list[dict[str, Any]], k: int) -> dict
         "status": "recommendation_available",
         "provider": best["provider"],
         "model": best["model"],
+        "provider_id": best.get("provider_id") or provider_identifier(best["provider"], best["model"]),
         "confidence": confidence,
         "reason": reason,
         "human_review_required": True,
@@ -351,6 +364,15 @@ def parse_providers(value: str | None) -> list[str] | None:
         return None
     providers = [piece.strip() for piece in value.split(",") if piece.strip()]
     return providers or None
+
+
+def parse_provider_spec(value: str) -> tuple[str, str | None]:
+    provider, separator, model = value.partition(":")
+    return provider.strip(), model.strip() if separator and model.strip() else None
+
+
+def provider_identifier(provider: str, model: str | None) -> str:
+    return f"{provider}:{model}" if model else provider
 
 
 def write_json(path: Path, payload: object) -> None:

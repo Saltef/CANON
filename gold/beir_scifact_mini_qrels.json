@@ -1,0 +1,64 @@
+{
+  "benchmark_id": "beir_scifact_mini_qrels",
+  "benchmark_kind": "public_beir_qrels_expanded_to_chunks",
+  "description": "BEIR SciFact scientific claim verification benchmark.",
+  "queries": [
+    {
+      "id": "1",
+      "query": "0-dimensional biomaterials show inductive properties.",
+      "relevant": {
+        "chunk:956be0062fe9e44c": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1137",
+      "query": "TNFAIP3 is a tumor suppressor in glioblastoma.",
+      "relevant": {
+        "chunk:656dce55f36c3a54": 1.0,
+        "chunk:aa755caaafad3919": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "13",
+      "query": "5% of perinatal mortality is due to low birth weight.",
+      "relevant": {
+        "chunk:f9ee6a762237d2d3": 1.0,
+        "chunk:c4a94e175d8ac152": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1385",
+      "query": "cSMAC formation enhances weak ligand signalling.",
+      "relevant": {
+        "chunk:d3546c0d337da8f7": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "148",
+      "query": "Autophagy declines in aged organisms.",
+      "relevant": {
+        "chunk:8ab33b4357f591ec": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    }
+  ]
+}

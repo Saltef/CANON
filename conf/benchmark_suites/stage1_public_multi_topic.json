@@ -1,0 +1,48 @@
+{
+  "suite_id": "stage1_public_multi_topic_v1",
+  "description": "Automated Stage 1 retrieval suite over public SciFact claim topics with local controls and hosted model candidates.",
+  "model_providers": [
+    "local",
+    "openrouter:openai/text-embedding-3-small",
+    "openrouter:qwen/qwen3-embedding-8b",
+    "openrouter:baai/bge-m3",
+    "cohere"
+  ],
+  "rerankers": [
+    "heuristic",
+    "openrouter:cohere/rerank-v3.5",
+    "cohere",
+    "cohere:rerank-v4.0-fast"
+  ],
+  "top_k": 10,
+  "candidate_k": 25,
+  "pooled_candidates": true,
+  "fusion_methods": ["union", "rrf", "weighted_bm25_dense"],
+  "document_format": "structured",
+  "thresholds": {
+    "min_candidate_recall": 0.8,
+    "min_rerank_recall_at_k": 0.6
+  },
+  "benchmarks": [
+    {
+      "id": "scifact_claims_mini",
+      "topic": "biomedical_claim_verification",
+      "mode": "beir_scifact_mini",
+      "qrels": "gold/beir_scifact_mini_qrels.json",
+      "lexical_k": 25,
+      "vector_k": 25,
+      "query_variants": [
+        "nanotechnologies stem cell differentiation transplantation",
+        "nanoparticles nanotubes scaffolds stem cells",
+        "engineered nanometer-scale scaffolds stem cell differentiation"
+      ],
+      "query_topics": {
+        "1": "biomaterials",
+        "1137": "oncology",
+        "13": "epidemiology",
+        "1385": "immunology",
+        "148": "aging"
+      }
+    }
+  ]
+}

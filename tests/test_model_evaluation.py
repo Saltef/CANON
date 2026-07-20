@@ -7,6 +7,8 @@ from canon.config import load_settings
 from canon.eval.model_evaluation import (
     dense_cosine,
     evaluate_semantic_models,
+    parse_provider_spec,
+    provider_identifier,
     query_slices,
 )
 from canon.ingest.unstructured import ingest_unstructured_jsonl
@@ -22,6 +24,10 @@ class SemanticModelEvaluationTests(unittest.TestCase):
         slices = query_slices("How does interconnection backlog affect project delivery risk?")
         self.assertIn("relational_semantics", slices)
         self.assertIn("domain_terminology", slices)
+
+    def test_provider_specs_can_identify_model_variants(self):
+        self.assertEqual(parse_provider_spec("openrouter:qwen/qwen3-embedding-8b"), ("openrouter", "qwen/qwen3-embedding-8b"))
+        self.assertEqual(provider_identifier("openrouter", "baai/bge-m3"), "openrouter:baai/bge-m3")
 
     def test_evaluate_semantic_models_reports_metrics_and_unavailable_provider(self):
         settings = load_settings()

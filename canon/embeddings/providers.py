@@ -84,6 +84,42 @@ class OpenAIEmbeddingProvider:
         ]
 
 
+class OpenRouterEmbeddingProvider:
+    provider = "openrouter"
+
+    def __init__(self, model: str = "openai/text-embedding-3-small", api_key: str | None = None) -> None:
+        load_local_env()
+        self.model = model
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        if not self.api_key:
+            raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter embeddings.")
+
+    def embed(self, texts: list[str]) -> list[EmbeddingResult]:
+        request = urllib.request.Request(
+            "https://openrouter.ai/api/v1/embeddings",
+            data=json.dumps({"model": self.model, "input": texts, "encoding_format": "float"}).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=60) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return [
+            EmbeddingResult(
+                provider=self.provider,
+                model=payload.get("model") or self.model,
+                dimensions=len(row["embedding"]),
+                vector=[float(value) for value in row["embedding"]],
+            )
+            for row in sorted(payload["data"], key=lambda item: item["index"])
+        ]
+
+    def embed_queries(self, texts: list[str]) -> list[EmbeddingResult]:
+        return self.embed([prepare_openrouter_query(self.model, text) for text in texts])
+
+
 class CohereEmbeddingProvider:
     provider = "cohere"
 
@@ -101,13 +137,16 @@ class CohereEmbeddingProvider:
             raise RuntimeError("COHERE_API_KEY is required for Cohere embeddings.")
 
     def embed(self, texts: list[str]) -> list[EmbeddingResult]:
+        return self.embed_with_input_type(texts, self.input_type)
+
+    def embed_with_input_type(self, texts: list[str], input_type: str) -> list[EmbeddingResult]:
         request = urllib.request.Request(
             "https://api.cohere.com/v2/embed",
             data=json.dumps(
                 {
                     "model": self.model,
                     "texts": texts,
-                    "input_type": self.input_type,
+                    "input_type": input_type,
                     "embedding_types": ["float"],
                 }
             ).encode("utf-8"),
@@ -137,6 +176,46 @@ def get_embedding_provider(name: str, model: str | None = None) -> EmbeddingProv
         return HashedEmbeddingProvider()
     if normalized == "openai":
         return OpenAIEmbeddingProvider(model=model or "text-embedding-3-small")
+    if normalized == "openrouter":
+        return OpenRouterEmbeddingProvider(model=model or "openai/text-embedding-3-small")
     if normalized == "cohere":
         return CohereEmbeddingProvider(model=model or "embed-v4.0")
     raise ValueError(f"Unknown embedding provider: {name}")
+
+
+def embed_documents(provider: EmbeddingProvider, texts: list[str]) -> list[EmbeddingResult]:
+    return provider.embed(texts)
+
+
+def embed_queries(provider: EmbeddingProvider, texts: list[str]) -> list[EmbeddingResult]:
+    if isinstance(provider, CohereEmbeddingProvider):
+        return provider.embed_with_input_type(texts, "search_query")
+    if isinstance(provider, OpenRouterEmbeddingProvider):
+        return provider.embed_queries(texts)
+    return provider.embed(texts)
+
+
+def prepare_openrouter_query(model: str, query: str) -> str:
+    if model.startswith("qwen/qwen3-embedding"):
+        task = "Given a scientific claim or research question, retrieve relevant passages that support, refute, or answer it"
+        return f"Instruct: {task}\nQuery: {query}"
+    return query
+
+
+def embedding_preparation(provider: EmbeddingProvider) -> dict[str, str]:
+    if isinstance(provider, CohereEmbeddingProvider):
+        return {
+            "document_input": "Cohere input_type=search_document",
+            "query_input": "Cohere input_type=search_query",
+        }
+    if isinstance(provider, OpenRouterEmbeddingProvider) and provider.model.startswith("qwen/qwen3-embedding"):
+        return {
+            "document_input": "raw document text",
+            "query_input": "Qwen3 retrieval instruction prefix plus raw query",
+        }
+    if isinstance(provider, OpenRouterEmbeddingProvider) and provider.model == "baai/bge-m3":
+        return {
+            "document_input": "raw document text",
+            "query_input": "raw query text; hybrid BM25+dense retrieval remains in the first-stage pool",
+        }
+    return {"document_input": "raw document text", "query_input": "raw query text"}

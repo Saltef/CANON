@@ -31,7 +31,7 @@ def build_embedding_store(
             record_for_embedding(document, embedding)
             for document, embedding in zip(batch, embeddings, strict=True)
         )
-    output_path = settings.data_dir / "processed" / f"embeddings_{mode}_{provider.provider}.jsonl"
+    output_path = embedding_store_path(settings.data_dir, mode, provider.provider, provider.model)
     write_jsonl(output_path, records)
     report = {
         "mode": mode,
@@ -42,8 +42,22 @@ def build_embedding_store(
         "dimensions": records[0]["dimensions"] if records else 0,
         "output_path": str(output_path),
     }
-    write_json(settings.reports_dir / f"embeddings_{mode}_{provider.provider}.json", report)
+    write_json(settings.reports_dir / f"embeddings_{mode}_{artifact_key(provider.provider, provider.model)}.json", report)
     return report
+
+
+def embedding_store_path(data_dir: Path, mode: str, provider: str, model: str | None = None) -> Path:
+    return data_dir / "processed" / f"embeddings_{mode}_{artifact_key(provider, model)}.jsonl"
+
+
+def artifact_key(provider: str, model: str | None = None) -> str:
+    if not model:
+        return safe_slug(provider)
+    return f"{safe_slug(provider)}_{safe_slug(model)}"
+
+
+def safe_slug(value: str) -> str:
+    return "".join(character if character.isalnum() else "-" for character in value.lower()).strip("-") or "model"
 
 
 def record_for_embedding(document: RetrievalDocument, embedding: EmbeddingResult) -> dict:

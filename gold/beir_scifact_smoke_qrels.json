@@ -1,0 +1,65 @@
+{
+  "benchmark_id": "beir_scifact_smoke_qrels",
+  "benchmark_kind": "public_beir_qrels_expanded_to_chunks",
+  "description": "BEIR SciFact scientific claim verification benchmark.",
+  "queries": [
+    {
+      "id": "1",
+      "query": "0-dimensional biomaterials show inductive properties.",
+      "relevant": {
+        "chunk:956be0062fe9e44c": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "100",
+      "query": "All hematopoietic stem cells segregate their chromosomes randomly.",
+      "relevant": {
+        "chunk:ed30027c7695dab8": 1.0,
+        "chunk:b2ffc809202349d1": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1012",
+      "query": "Radioiodine treatment of non-toxic multinodular goitre reduces thyroid volume.",
+      "relevant": {
+        "chunk:883804bd23f2bdbb": 1.0,
+        "chunk:36302ff5f9cc8876": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1014",
+      "query": "Rapamycin decreases the concentration of triacylglycerols in fruit flies.",
+      "relevant": {
+        "chunk:14485d6f599d68d6": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1019",
+      "query": "Rapid phosphotransfer rates govern fidelity in two component systems",
+      "relevant": {
+        "chunk:2859734e7a41a2c4": 1.0,
+        "chunk:5f276d34cc2d6fc2": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    }
+  ]
+}

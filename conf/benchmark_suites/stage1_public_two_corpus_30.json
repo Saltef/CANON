@@ -1,0 +1,56 @@
+{
+  "suite_id": "stage1_public_two_corpus_30_v1",
+  "description": "Stage 1 public acceptance suite across SciFact and NFCorpus using structured rerank documents, BM25+dense fusion, and hosted model candidates.",
+  "model_providers": [
+    "local",
+    "openrouter:qwen/qwen3-embedding-8b",
+    "openrouter:baai/bge-m3",
+    "openrouter:openai/text-embedding-3-small",
+    "cohere"
+  ],
+  "rerankers": [
+    "heuristic",
+    "cohere:rerank-v4.0-fast",
+    "cohere:rerank-v4.0-pro",
+    "openrouter:cohere/rerank-v3.5"
+  ],
+  "top_k": 10,
+  "candidate_k": 50,
+  "pooled_candidates": true,
+  "fusion_methods": ["union", "rrf", "weighted_bm25_dense"],
+  "document_format": "structured",
+  "thresholds": {
+    "min_candidate_recall": 0.95,
+    "min_rerank_recall_at_k": 0.8
+  },
+  "benchmarks": [
+    {
+      "id": "scifact_claims_30",
+      "topic": "biomedical_claim_verification",
+      "mode": "beir_scifact_stage1",
+      "qrels": "gold/beir_scifact_stage1_qrels.json",
+      "lexical_k": 50,
+      "vector_k": 50,
+      "candidate_vector_provider": "openrouter:baai/bge-m3",
+      "query_variants": [
+        "scientific claim evidence support refute biomedical paper abstract",
+        "biomedical literature evidence claim verification",
+        "relevant research abstract supporting or contradicting claim"
+      ]
+    },
+    {
+      "id": "nfcorpus_30",
+      "topic": "biomedical_nutrition_retrieval",
+      "mode": "beir_nfcorpus_stage1",
+      "qrels": "gold/beir_nfcorpus_stage1_qrels.json",
+      "lexical_k": 50,
+      "vector_k": 50,
+      "candidate_vector_provider": "openrouter:baai/bge-m3",
+      "query_variants": [
+        "nutrition biomedical evidence clinical document",
+        "health science evidence relevant passage",
+        "medical nutrition corpus retrieval query"
+      ]
+    }
+  ]
+}

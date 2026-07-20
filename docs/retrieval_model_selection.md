@@ -9,6 +9,17 @@ The current implementation can compare providers with:
 python -m canon.eval.model_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --providers local,openai,cohere --k 10
 ```
 
+The Stage 1 automated suite also treats hosted models as core benchmark
+candidates:
+
+```powershell
+python -m canon.product.automated_benchmark_suite --suite conf/benchmark_suites/stage1_public_multi_topic.json
+```
+
+In that suite, `local` is the reproducible control, while OpenAI/Cohere are
+candidate production models. Missing API keys are reported as unavailable rows,
+not as model failures.
+
 That proves the evaluation path works, but it does not prove a global winner.
 Model choice must be made on the target corpus, source shapes, languages, query
 styles, latency budget, privacy requirements, and human relevance labels.

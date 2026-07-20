@@ -13,8 +13,9 @@ class GenerationTests(unittest.TestCase):
 
     def test_openai_generation_requires_key(self):
         with patch.dict("os.environ", {}, clear=True):
-            with self.assertRaises(RuntimeError):
-                get_generation_provider("openai")
+            with patch("canon.generation.providers.load_local_env"):
+                with self.assertRaises(RuntimeError):
+                    get_generation_provider("openai")
 
     def test_unknown_generation_provider_fails(self):
         with self.assertRaises(ValueError):

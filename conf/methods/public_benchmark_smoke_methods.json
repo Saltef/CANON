@@ -1,0 +1,22 @@
+{
+  "method_set_id": "public_benchmark_smoke_methods_v1",
+  "description": "Small method set for public benchmark smoke tests.",
+  "methods": [
+    {
+      "id": "lexical_k5_template",
+      "label": "Lexical BM25, k=5",
+      "policy": "lexical",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    },
+    {
+      "id": "rag_k5_template",
+      "label": "Hybrid RAG, k=5",
+      "policy": "rag",
+      "top_k": 5,
+      "generator": "template",
+      "generator_model": null
+    }
+  ]
+}

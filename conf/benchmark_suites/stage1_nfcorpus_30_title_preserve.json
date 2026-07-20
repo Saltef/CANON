@@ -1,0 +1,34 @@
+{
+  "suite_id": "stage1_nfcorpus_30_title_preserve_v1",
+  "description": "NFCorpus title-prefixed retrieval text with original-style document-preserving chunks.",
+  "model_providers": [
+    "local:hashed-semantic-v1",
+    "openrouter:qwen/qwen3-embedding-8b",
+    "openrouter:baai/bge-m3"
+  ],
+  "rerankers": [
+    "heuristic",
+    "cohere:rerank-v4.0-pro"
+  ],
+  "top_k": 10,
+  "candidate_k": 250,
+  "pooled_candidates": true,
+  "fusion_methods": ["rrf", "weighted_bm25_dense"],
+  "document_format": "structured",
+  "thresholds": {
+    "min_candidate_recall": 0.5,
+    "min_rerank_recall_at_k": 0.12
+  },
+  "benchmarks": [
+    {
+      "id": "nfcorpus_30_title_preserve",
+      "topic": "biomedical_nutrition_retrieval",
+      "mode": "beir_nfcorpus_stage1_title_preserve",
+      "qrels": "gold/beir_nfcorpus_stage1_title_preserve_qrels.json",
+      "lexical_k": 250,
+      "vector_k": 250,
+      "candidate_vector_provider": "local:hashed-semantic-v1",
+      "query_variants": []
+    }
+  ]
+}

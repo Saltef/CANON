@@ -1,0 +1,42 @@
+{
+  "suite_id": "stage1_scifact_30_v1",
+  "description": "Stage 1 public SciFact 30-query acceptance suite for claim verification retrieval.",
+  "model_providers": [
+    "local",
+    "openrouter:qwen/qwen3-embedding-8b",
+    "openrouter:baai/bge-m3",
+    "openrouter:openai/text-embedding-3-small",
+    "cohere"
+  ],
+  "rerankers": [
+    "heuristic",
+    "cohere:rerank-v4.0-fast",
+    "cohere:rerank-v4.0-pro",
+    "openrouter:cohere/rerank-v3.5"
+  ],
+  "top_k": 10,
+  "candidate_k": 50,
+  "pooled_candidates": true,
+  "fusion_methods": ["union", "rrf", "weighted_bm25_dense"],
+  "document_format": "structured",
+  "thresholds": {
+    "min_candidate_recall": 0.95,
+    "min_rerank_recall_at_k": 0.8
+  },
+  "benchmarks": [
+    {
+      "id": "scifact_claims_30",
+      "topic": "biomedical_claim_verification",
+      "mode": "beir_scifact_stage1",
+      "qrels": "gold/beir_scifact_stage1_qrels.json",
+      "lexical_k": 50,
+      "vector_k": 50,
+      "candidate_vector_provider": "openrouter:baai/bge-m3",
+      "query_variants": [
+        "scientific claim evidence support refute biomedical paper abstract",
+        "biomedical literature evidence claim verification",
+        "relevant research abstract supporting or contradicting claim"
+      ]
+    }
+  ]
+}

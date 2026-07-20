@@ -32,6 +32,101 @@ automated_pass_human_review_required
 
 Use this for packaging confidence and triage, not final model claims.
 
+## Automated Multi-Topic Benchmark Suite
+
+Run the Stage 1 suite across configured public/topic benchmarks:
+
+```powershell
+python -m canon.product.automated_benchmark_suite --suite conf/benchmark_suites/stage1_public_multi_topic.json
+```
+
+This produces aggregate topic summaries, semantic retrieval metrics, pooled
+lexical/vector candidate-recall diagnostics, rerank metrics, and score
+observability. The default suite includes `local` as the reproducible control
+and OpenAI/Cohere as hosted model candidates. If API keys are missing, hosted
+models are reported as unavailable so the model matrix is visibly incomplete
+rather than silently treated as a loss.
+
+It is meant for automated regression testing before human review; it does not
+replace human qrels or brief-level acceptance labels.
+
+Run the Stage 1 candidate-pool sweep after the model matrix is configured:
+
+```powershell
+python -m canon.product.stage1_sweep --suite conf/benchmark_suites/stage1_public_multi_topic.json --candidate-values 25,50,100
+```
+
+The default Stage 1 suite includes local control embeddings, Cohere Embed v4,
+OpenRouter OpenAI text embeddings, OpenRouter Qwen3 Embedding 8B, and
+OpenRouter BGE-M3. Qwen queries are instruction-prefixed according to its model
+guidance; BGE-M3 and OpenAI-style embeddings use raw query/document text; Cohere
+uses separate `search_query` and `search_document` input modes.
+
+Run the AutoML-style Stage 1 optimizer when comparing full retrieval stacks:
+
+```powershell
+python -m canon.product.stage1_optimizer --suite conf/benchmark_suites/stage1_public_multi_topic.json --candidate-values 25,50,100
+```
+
+Every optimizer trial includes BM25 traditional text search as the sparse
+candidate source, then varies the dense retriever, candidate pool size, fusion
+method, reranker, and reranker document format. The optimizer caches completed
+trials under `reports/stage1_optimizer_cache/`, so interrupted hosted-model
+runs can resume without paying for completed trials again.
+
+Useful focused run:
+
+```powershell
+python -m canon.product.stage1_optimizer --suite conf/benchmark_suites/stage1_public_multi_topic.json --dense-retrievers openrouter:baai/bge-m3,openrouter:qwen/qwen3-embedding-8b --rerankers cohere:rerank-v4.0-fast --candidate-values 25,50 --fusion-methods union,rrf,weighted_bm25_dense --document-format structured --objective-mode balanced --max-chunks-per-parent 1
+```
+
+The Stage 1 objective uses retrieval metrics (`candidate_recall`, `nDCG@k`,
+`Recall@k`, `MRR@k`, `MAP@k`), score-gap observability, latency, and a relative
+cost hint. Objective modes are `quality`, `balanced`, `low_latency`, and
+`low_cost`. Text generation metrics such as BLEU, METEOR, ROUGE, and BERTScore
+are reserved for answer/brief evaluation, where generated text can be compared
+against reference answers.
+
+Use `--max-chunks-per-parent` when qrels are document-level or when multiple
+chunks from one parent source crowd out source breadth. A value of `1` enforces
+one top-ranked chunk per parent before lower-ranked duplicate chunks are
+appended, making top-k reports easier to review without changing first-stage
+candidate recall.
+
+Check whether automated Stage 1 completion criteria pass:
+
+```powershell
+python -m canon.product.stage1_gate --optimizer-report reports/stage1_optimizer_v1.json
+```
+
+During development, use `--no-fail` to write the report even when the gate is
+blocked:
+
+```powershell
+python -m canon.product.stage1_gate --no-fail
+```
+
+## Public Corpus Acceptance Sets
+
+SciFact 30-query import:
+
+```powershell
+python -m canon.ingest.beir --dataset-dir data/raw/external/scifact --mode beir_scifact_stage1 --benchmark-id beir_scifact_stage1_qrels --split test --max-queries 30 --include-qrels-documents --chunk-tokens 220 --overlap-tokens 0
+```
+
+NFCorpus 30-query import:
+
+```powershell
+python -m canon.ingest.beir --dataset-dir data/raw/external/nfcorpus --mode beir_nfcorpus_stage1 --benchmark-id beir_nfcorpus_stage1_qrels --split test --max-queries 30 --include-qrels-documents --chunk-tokens 220 --overlap-tokens 0
+```
+
+Then run the two-corpus Stage 1 acceptance suite:
+
+```powershell
+python -m canon.product.stage1_optimizer --suite conf/benchmark_suites/stage1_public_two_corpus_30.json --candidate-values 25,50 --fusion-methods union,rrf,weighted_bm25_dense --document-format structured --objective-mode balanced
+python -m canon.product.stage1_gate --optimizer-report reports/stage1_optimizer_v1.json
+```
+
 ## Human-Reviewed Qrels
 
 Prepare review candidates:

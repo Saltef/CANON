@@ -223,6 +223,18 @@ class ChunkerTests(unittest.TestCase):
         self.assertEqual(chunks[0].importance["parent_context_token_start"], 0.0)
         self.assertEqual(chunks[0].importance["parent_context_token_end"], 15.0)
 
+    def test_biomedical_web_article_uses_title_aware_paragraph_policy(self):
+        policy = chunking_policy(
+            demo_work(raw={"document_type": "biomedical_web_article", "domain": "biomedical_nutrition_retrieval"}),
+            "body",
+            chunk_tokens=420,
+            overlap_tokens=0,
+        )
+
+        self.assertEqual(policy["strategy"], "paragraph_sentence_boundary")
+        self.assertEqual(policy["chunk_tokens"], 260)
+        self.assertEqual(policy["overlap_tokens"], 0)
+
     def test_web_chunks_isolate_instruction_like_sentences(self):
         chunks = chunk_text(
             demo_work(raw={"document_type": "web_page", "domain": "web_grey_literature"}),

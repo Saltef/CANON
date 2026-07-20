@@ -5,27 +5,29 @@ import json
 from pathlib import Path
 
 from canon.config import load_settings
-from canon.embeddings.store import load_embedding_records
+from canon.embeddings.store import artifact_key, embedding_store_path, load_embedding_records
 
 
-def build_pgvector_plan(mode: str, provider: str = "local") -> dict:
+def build_pgvector_plan(mode: str, provider: str = "local", model: str | None = None) -> dict:
     settings = load_settings()
-    embeddings_path = settings.data_dir / "processed" / f"embeddings_{mode}_{provider}.jsonl"
+    embeddings_path = embedding_store_path(settings.data_dir, mode, provider, model)
     records = load_embedding_records(embeddings_path)
     dimensions = records[0]["dimensions"] if records else 0
-    sql_path = settings.data_dir / "processed" / f"pgvector_{mode}_{provider}.sql"
+    key = artifact_key(provider, model)
+    sql_path = settings.data_dir / "processed" / f"pgvector_{mode}_{key}.sql"
     sql = render_pgvector_sql(records, dimensions)
     sql_path.write_text(sql, encoding="utf-8")
     report = {
         "mode": mode,
         "provider": provider,
+        "model": model,
         "embedding_path": str(embeddings_path),
         "sql_path": str(sql_path),
         "record_count": len(records),
         "dimensions": dimensions,
         "ready": bool(records),
     }
-    write_json(settings.reports_dir / f"pgvector_{mode}_{provider}.json", report)
+    write_json(settings.reports_dir / f"pgvector_{mode}_{key}.json", report)
     return report
 
 
@@ -69,8 +71,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Create a pgvector load plan for CANON embeddings.")
     parser.add_argument("--mode", default="dry_run")
     parser.add_argument("--provider", default="local")
+    parser.add_argument("--model", default=None)
     args = parser.parse_args()
-    print(json.dumps(build_pgvector_plan(args.mode, args.provider), indent=2))
+    print(json.dumps(build_pgvector_plan(args.mode, args.provider, args.model), indent=2))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,356 @@
+{
+  "benchmark_id": "beir_scifact_test_qrels",
+  "benchmark_kind": "public_beir_qrels_expanded_to_chunks",
+  "description": "BEIR SciFact scientific claim verification benchmark.",
+  "queries": [
+    {
+      "id": "1",
+      "query": "0-dimensional biomaterials show inductive properties.",
+      "relevant": {
+        "chunk:956be0062fe9e44c": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "100",
+      "query": "All hematopoietic stem cells segregate their chromosomes randomly.",
+      "relevant": {
+        "chunk:ed30027c7695dab8": 1.0,
+        "chunk:b2ffc809202349d1": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1012",
+      "query": "Radioiodine treatment of non-toxic multinodular goitre reduces thyroid volume.",
+      "relevant": {
+        "chunk:883804bd23f2bdbb": 1.0,
+        "chunk:36302ff5f9cc8876": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1014",
+      "query": "Rapamycin decreases the concentration of triacylglycerols in fruit flies.",
+      "relevant": {
+        "chunk:14485d6f599d68d6": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1019",
+      "query": "Rapid phosphotransfer rates govern fidelity in two component systems",
+      "relevant": {
+        "chunk:2859734e7a41a2c4": 1.0,
+        "chunk:5f276d34cc2d6fc2": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1020",
+      "query": "Rapid up-regulation and higher basal expression of interferon-induced genes increase survival of granule cell neurons that are infected by West Nile virus.",
+      "relevant": {
+        "chunk:767bba78733f8802": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1021",
+      "query": "Rapid up-regulation and higher basal expression of interferon-induced genes reduce survival of granule cell neurons that are infected by West Nile virus.",
+      "relevant": {
+        "chunk:767bba78733f8802": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1024",
+      "query": "Recurrent mutations occur frequently within CTCF anchor sites adjacent to oncogenes.",
+      "relevant": {
+        "chunk:87a2bcf91733f456": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1029",
+      "query": "Reduced responsiveness to interleukin-2 in regulatory T cells is associated with greater resistance to autoimmune diseases such as Type 1 Diabetes.",
+      "relevant": {
+        "chunk:f7082adf13a4b2fd": 1.0,
+        "chunk:8d2ee08f9980d8db": 1.0,
+        "chunk:e74702aa4ed3d4aa": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 3
+      }
+    },
+    {
+      "id": "1041",
+      "query": "Replacement of histone H2A with H2A.Z slows gene activation in yeasts by stabilizing +1 nucleosomes.",
+      "relevant": {
+        "chunk:fa42d22a5ea1f8e9": 1.0,
+        "chunk:f49f93422ffecb1c": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 2
+      }
+    },
+    {
+      "id": "1049",
+      "query": "Ribosomopathies have a low degree of cell and tissue specific pathology.",
+      "relevant": {
+        "chunk:24e4f213759a8e4e": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1062",
+      "query": "S-nitrosylated GAPDH physiologically transnitrosylates histone deacetylases.",
+      "relevant": {
+        "chunk:6530befe3d315179": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1086",
+      "query": "Sildenafil improves erectile function in men who experience sexual dysfunction as a result of the use of SSRI antidepressants.",
+      "relevant": {
+        "chunk:5618cf682a6db6df": 1.0,
+        "chunk:1a2ad2aa8eb6c78b": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1088",
+      "query": "Silencing of Bcl2 is important for the maintenance and progression of tumors.",
+      "relevant": {
+        "chunk:c473d3d44849631e": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1089",
+      "query": "Smc5/6 engagment drives the activation of SUMO E3 ligase Mms21 by ATP-dependent remolding.",
+      "relevant": {
+        "chunk:4b745e972705e97d": 1.0,
+        "chunk:dd0f292286f73b6e": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1099",
+      "query": "Statins decrease blood cholesterol.",
+      "relevant": {
+        "chunk:115d38541cac7db6": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1100",
+      "query": "Statins increase blood cholesterol.",
+      "relevant": {
+        "chunk:115d38541cac7db6": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1104",
+      "query": "Stroke patients with prior use of direct oral anticoagulants have a lower risk of in-hospital mortality than stroke patients with prior use of warfarin.",
+      "relevant": {
+        "chunk:ec83ed1a4d472afb": 1.0,
+        "chunk:2f028d355a973869": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1107",
+      "query": "Subcutaneous fat depots undergo extensive browning processes after cold exposure.",
+      "relevant": {
+        "chunk:5ba2186af3f820af": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1110",
+      "query": "Suboptimal nutrition is not predictive of chronic disease",
+      "relevant": {
+        "chunk:0a978a11bcd61e1f": 1.0,
+        "chunk:6eba948fa9b36f41": 1.0,
+        "chunk:177d3b99eda18ed7": 1.0,
+        "chunk:d8da04f38597c218": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1121",
+      "query": "Synaptic activity enhances local release of brain derived neurotrophic factor from postsynaptic dendrites.",
+      "relevant": {
+        "chunk:9a58c13df33e3a6c": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "113",
+      "query": "Angiotensin converting enzyme inhibitors are associated with increased risk for functional renal insufficiency.",
+      "relevant": {
+        "chunk:e09c6c9995ad79bf": 1.0,
+        "chunk:6961e52ea79281ff": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1130",
+      "query": "T regulatory cells (tTregs) lacking αvβ8 are more adept at suppressing pathogenic T-cell responses during active inflammation.",
+      "relevant": {
+        "chunk:9559977e6cfd6a4a": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1132",
+      "query": "TCR/CD3 microdomains are a required to induce the immunologic synapse to activate T cells.",
+      "relevant": {
+        "chunk:3b82a3844d06fbba": 1.0,
+        "chunk:a0b437cd636c1496": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 2
+      }
+    },
+    {
+      "id": "1137",
+      "query": "TNFAIP3 is a tumor suppressor in glioblastoma.",
+      "relevant": {
+        "chunk:656dce55f36c3a54": 1.0,
+        "chunk:aa755caaafad3919": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1140",
+      "query": "Taking 400mg of α-tocopheryl acetate helps to prevent prostate cancer.",
+      "relevant": {
+        "chunk:d464f0f25dde60d8": 1.0,
+        "chunk:2762aea1c8e5b6e4": 1.0,
+        "chunk:174a623e79b3a274": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1144",
+      "query": "Taxation of sugar-sweetened beverages had no effect on the incidence rate of type II diabetes in India.",
+      "relevant": {
+        "chunk:f8af9de14ff77507": 1.0,
+        "chunk:9b22a60d04e31f13": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1146",
+      "query": "Teaching hospitals do not provide better care than non-teaching hospitals.",
+      "relevant": {
+        "chunk:edc1809326369189": 1.0,
+        "chunk:100af040df7d06e0": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "115",
+      "query": "Anthrax spores can be disposed of easily after they are dispersed.",
+      "relevant": {
+        "chunk:570fc01b13a015a7": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    },
+    {
+      "id": "1150",
+      "query": "Tetraspanin-3 is a causative factor in the development of acute myelogenous leukemia",
+      "relevant": {
+        "chunk:4e0a1acce72296e1": 1.0
+      },
+      "metadata": {
+        "source_qrels": "beir_document_level",
+        "source_relevant_doc_count": 1
+      }
+    }
+  ]
+}

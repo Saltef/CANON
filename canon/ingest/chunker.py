@@ -17,6 +17,11 @@ DOCUMENT_TYPE_CHUNK_POLICIES = {
         "strategy": "section_sentence_boundary",
         "rationale": "Academic evidence often needs claim, method, result, and limitation spans preserved together.",
     },
+    "biomedical_web_article": {
+        "strategy": "paragraph_sentence_boundary",
+        "max_tokens": 260,
+        "rationale": "Biomedical web evidence benefits from title-aware chunks while avoiding excessive qrels expansion for broad health topics.",
+    },
     "preprint": {
         "strategy": "section_sentence_boundary",
         "rationale": "Preprint chunks use the academic policy while review status remains a source-trust signal.",
@@ -113,6 +118,7 @@ INSTRUCTION_LIKE_RE = re.compile(
 
 DOCUMENT_TYPE_GENERATION_ROLES = {
     "academic_article": "evidence_context",
+    "biomedical_web_article": "biomedical_context_with_title_grounding",
     "preprint": "evidence_context_with_review_status",
     "policy_report": "institutional_context_with_method_review",
     "market_report": "market_context_with_incentive_annotation",
