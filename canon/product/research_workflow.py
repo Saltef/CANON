@@ -287,6 +287,16 @@ def compact_packet_response(packet_response: dict[str, Any]) -> dict[str, Any]:
         "frame_coverage": packet_response.get("frame_coverage"),
         "coverage_gaps": packet_response.get("coverage_gaps"),
         "retrieval_metrics": packet_response.get("retrieval_metrics"),
+        "evidence_packets": [
+            {
+                "packet_id": packet.get("packet_id"),
+                "supporting_evidence": packet.get("supporting_evidence") or [],
+                "conflicting_evidence": packet.get("conflicting_evidence") or [],
+                "limitations": packet.get("limitations") or [],
+                "source_diversity": packet.get("source_diversity") or {},
+            }
+            for packet in packet_response.get("evidence_packets") or []
+        ],
     }
 
 

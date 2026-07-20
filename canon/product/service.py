@@ -276,6 +276,12 @@ def research_workflow(payload: dict[str, Any]) -> dict:
     return run_research_workflow(payload)
 
 
+def stage2_synthesis(payload: dict[str, Any]) -> dict:
+    from canon.product.stage2_synthesis import run_stage2_synthesis
+
+    return run_stage2_synthesis(payload)
+
+
 def frame_coverage_status(frame_coverage: dict[str, Any]) -> str:
     status = frame_coverage.get("status")
     if status == "pass":

@@ -210,6 +210,31 @@ Current status by layer:
 - Evidence Synthesis: implemented elsewhere in CANON, but should remain blocked
   from final claims until retrieval and human-reviewed labels pass.
 
+## Stage 2 Build Status
+
+Stage 2 now has a deterministic evidence-synthesis product path through
+`canon.product.stage2_synthesis`, `canon-stage2-synthesis`, and
+`POST /v1/stage2-synthesis`.
+
+It consumes the Stage 1 research workflow, carries forward compact supporting
+evidence, creates cited synthesis claims, and runs automated quality gates for:
+
+- evidence presence
+- independent source breadth
+- citation integrity
+- claim-to-evidence overlap
+- Stage 1 workflow status visibility
+
+The current status boundary is `ready_for_human_review` when automated checks
+pass, or `blocked_insufficient_evidence` / `blocked_quality_gate` when they do
+not. This lets Stage 2 move forward before human review while still preventing
+unsupported final claims.
+
+The positive demo run for `ai_infra_geo_risk_demo` on grid-risk synthesis
+produced four cited claims across three sources and passed the automated gate as
+`pass_pending_human_review`. A broader Latin America risk query correctly
+blocked because the evidence packet was empty.
+
 ## Completion Definition
 
 Stage 1 should be considered complete when:

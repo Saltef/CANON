@@ -59,6 +59,8 @@ class CanonHandler(BaseHTTPRequestHandler):
                 self.send_json(service.frame_coverage_report(payload))
             elif parsed.path == "/v1/research-workflow":
                 self.send_json(service.research_workflow(payload))
+            elif parsed.path == "/v1/stage2-synthesis":
+                self.send_json(service.stage2_synthesis(payload))
             elif parsed.path == "/v1/intelligence-brief":
                 self.send_json(service.intelligence_brief(payload))
             elif parsed.path == "/v1/report-quality":
@@ -178,6 +180,7 @@ def api_index() -> dict:
             "/v1/evidence-packets",
             "/v1/frame-coverage",
             "/v1/research-workflow",
+            "/v1/stage2-synthesis",
             "/v1/intelligence-brief",
             "/v1/report-quality",
             "/v1/intelligence-brief/evaluate",
@@ -307,6 +310,19 @@ def api_routes() -> dict:
                     "question": "What are the emerging risks around AI data center expansion in Latin America?",
                     "mode": "ai_infra_geo_risk_demo",
                     "evidence_requirements": {"top_k": 10, "include_source_diversity": True},
+                    "write_report": True,
+                },
+            ),
+            route(
+                "POST",
+                "/v1/stage2-synthesis",
+                "Run Stage 2: synthesize cited claims from a Stage 1 evidence packet and run automated quality gates.",
+                ["query or question"],
+                ["mode", "policy", "project_id", "research_frame", "evidence_requirements", "max_claims", "write_report"],
+                {
+                    "question": "What are the emerging risks around AI data center expansion in Latin America?",
+                    "mode": "ai_infra_geo_risk_demo",
+                    "evidence_requirements": {"top_k": 8, "include_source_diversity": True},
                     "write_report": True,
                 },
             ),
