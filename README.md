@@ -236,7 +236,7 @@ protocol. It is not leaderboard-comparable to published BEIR results.
 - [Use Case and Product Boundary](docs/use_case.md)
 - [Scientific Defensibility](docs/scientific_defensibility.md)
 
-Internal planning, phase notes, and development checklists live in
+Internal planning, roadmaps, and development checklists live in
 [docs/internal](docs/internal/README.md). They are kept separate from the public
 presentation so the repo stays readable while still preserving the working
 roadmap.

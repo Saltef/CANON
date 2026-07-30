@@ -1,6 +1,6 @@
 # Internal CANON Notes
 
-This folder keeps development planning, phase notes, research roadmaps, and
+This folder keeps development planning, research roadmaps, and
 integration plans separate from the public repo presentation.
 
 Use these files for active development and private testing context. Keep the
@@ -13,7 +13,10 @@ Start here:
 - [finish_evaluation_plan.md](finish_evaluation_plan.md) for the release finish line, evaluation ladder, and benchmark design.
 - [research_ai_multi_agent_finalization_plan.md](research_ai_multi_agent_finalization_plan.md) for the larger Research AI / Multi-Agent Researcher boundary.
 - [product_plan.md](product_plan.md) and [product_journey.md](product_journey.md) for product direction.
-- phase files for implementation history.
+
+Historical phase logs are intentionally not tracked as public documentation.
+Use git history for implementation archaeology, and promote only cleaned,
+current material into this folder.
 
 When a note becomes useful for external users, promote a cleaned version into
 the public `docs/` folder rather than linking directly to raw internal planning.

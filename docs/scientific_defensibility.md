@@ -47,7 +47,8 @@ The project should be compared against established evaluation practice:
 
 ## Current Evidence Bundle
 
-The committed evidence bundle is intentionally compact. It includes:
+The committed evidence bundle is intentionally compact. Every path in this
+list exists in the repository:
 
 - Public qrels fixtures: `gold/beir_scifact_full_qrels.json`,
   `gold/beir_nfcorpus_full_qrels.json`, and
@@ -63,55 +64,10 @@ The committed evidence bundle is intentionally compact. It includes:
 - Publishable evaluation package guide:
   `docs/publishable_evaluation_package.md`
 
-The broader generated portfolio bundle is local by default because many reports
-are large, cache-like, or project-specific. Before citing a report publicly,
-regenerate it from the committed commands, check its claim boundary, and commit
-a compact summary artifact rather than raw caches.
-
-Generated local artifacts may include:
-
-- Method definitions: `conf/methods/baseline_methods.json`
-- Retrieval policy weights: `conf/settings.toml`
-- Seed queries: `gold/seed_queries.json`
-- Probe queries: `gold/probe_queries.json`
-- Main evaluation: `reports/evaluation_suite_social_science_ir_v1_harvest10_baseline_methods_v1.json`
-- Probe evaluation: `reports/probe_eval_social_science_ir_v1_harvest10_baseline_methods_v1.json`
-- Batch stability: `reports/batch_eval_social_science_ir_v1_harvest10_baseline_methods_v1.json`
-- Qrels validation: `reports/qrels_validation_internal_social_science_ir_qrels_v1.json`
-- Public-qrels smoke validation: `reports/qrels_validation_public_beir_scifact_smoke.json`
-- BEIR/TREC-style IR metrics: `reports/external_ir_internal_social_science_ir_qrels_v1_social_science_ir_v1_harvest10_baseline_methods_v1.json`
-- Bootstrap uncertainty: `reports/bootstrap_ir_internal_social_science_ir_qrels_v1_social_science_ir_v1_harvest10_baseline_methods_v1.json`
-- Paired significance: `reports/paired_significance_internal_social_science_ir_qrels_v1_social_science_ir_v1_harvest10_baseline_methods_v1.json`
-- Citation faithfulness: `reports/faithfulness_social_science_ir_v1_harvest10_baseline_methods_v1.json`
-- Query perturbation robustness: `reports/perturbation_eval_social_science_ir_v1_harvest10_baseline_methods_v1.json`
-- Corpus data card: `reports/data_card_social_science_ir_v1_harvest10.md`
-- Weight sensitivity: `reports/weight_tuning_social_science_ir_v1_harvest10_baseline_methods_v1.json`
-- Claim decision: `reports/claim_decision_social_science_ir_v1_harvest10_baseline_methods_v1.md`
-- Regression gates: `reports/regression_gate_social_science_ir_v1_harvest10_baseline_methods_v1.json`
-- Dashboard: `reports/dashboard_social_science_ir_v1_harvest10_baseline_methods_v1.html`
-- Reproducibility manifest: `reports/experiment_manifest_social_science_ir_v1_harvest10_full.json`
-- Scientific audit: `reports/scientific_audit_social_science_ir_v1_harvest10_baseline_methods_v1.md`
-
-The heterogeneous unstructured portfolio should include:
-
-- Mixed unstructured routing benchmark: `reports/mixed_unstructured_document_routing_v1.json`
-- Document-type slices: `reports/document_type_slices_unstructured_demo_corpus.json`
-- Domain slices: `reports/domain_slices_mixed_domain_demo_corpus.json`
-- Heterogeneous readiness gate:
-  `reports/heterogeneous_unstructured_readiness_unstructured_demo_corpus_mixed_domain_demo_corpus.json`
-- Unstructured coverage matrix:
-  `reports/unstructured_experiment_coverage_matrix_v1.json`
-- Public-opinion analysis:
-  `reports/public_opinion_analysis_social_public_opinion_demo_corpus.json`
-- Evidence committee:
-  `reports/evidence_committee_social_public_opinion_demo_corpus.json`
-- Public-opinion synthesis smoke test:
-  `reports/synthesis_social_public_opinion_demo_corpus_rag_public-opinion-battery-storage-safety-concerns.json`
-- Chunking strategy benchmark: `reports/chunking_strategy_eval_ct14_ov0.json`
-- Adversarial RAG security benchmark: `reports/adversarial_rag_security_v1.json`
-- Importance phase gate: `reports/importance_phase_gate_v1.json`
-- Unstructured experiment portfolio:
-  `reports/unstructured_experiment_portfolio_v1.md`
+Broader generated portfolio reports are local by default because they are large,
+cache-like, or project-specific. They are not named here as evidence. Before
+citing any generated report publicly, regenerate it from committed commands,
+check its claim boundary, and commit a compact summary artifact.
 
 ## Scientific Controls Already Present
 
