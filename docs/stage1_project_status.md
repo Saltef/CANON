@@ -67,6 +67,36 @@ therefore: do not claim an auto-expansion top-10 ranking gain from this pilot.
 Parent-neighborhood expansion still improves candidate coverage, but it should
 not be presented as a top-k ranking improvement.
 
+### Historical Base-Shift Audit
+
+The July 30 base row should not be described as a documented improvement over
+the earlier July 19 base row. The earlier status note reported base nDCG@10
+`0.343299`, while the fixed-qrels summary reports `0.393658` with the same
+candidate-recall mean of `0.365927`. The repeat-spread check makes clear that
+this is too large to explain as ordinary current-run variance.
+
+A follow-up payload-path probe checked the likely explanation that
+`document_format="structured"` only began reaching the Cohere reranker in the
+newer run. That hypothesis is not supported. `document_text()` is identical
+between `569cd7b` and `402e1ae`, and both commits build reranker payloads with
+`documents = [document_text(result, document_format) for result in candidates]`
+before calling `provider.rerank(...)`. Replayed payload captures also showed
+that when candidate order was identical across the two commits, the literal
+document strings sent to the reranker were identical.
+
+What remains is a historical comparability gap, not a proven ranking-system
+gain. The old July 19 request payloads and Cohere score cache were not committed,
+so the exact old hosted reranker inputs cannot be audited byte-for-byte from the
+repository. Treat the July 30 row as the current fresh cached base result under
+the documented protocol, and treat the July 19 row as retired until an archived
+payload/score artifact is found.
+
+The compact machine-readable probe is
+`reports/stage1_payload_shift_probe.json`. Future rerank summaries should commit
+candidate-ID hashes, payload-text hashes, qrels hashes, provider/model IDs, and
+cache roots with every headline table so this class of shift can be explained
+without reconstructing historical runs.
+
 Benchmark integrity note: hand-written biomedical alias expansion is
 quarantined behind `--benchmark-oracle-expansion`. Normal runs with
 `--auto-query-expansion` use explicit query variants and corpus-derived topic

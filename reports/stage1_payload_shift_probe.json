@@ -1,0 +1,92 @@
+{
+  "report_id": "stage1_payload_shift_probe",
+  "created_at": "2026-07-30",
+  "question": "Why did the base Qwen+Cohere Stage 1 nDCG@10 move from 0.343299 in the earlier status note to 0.393658 in the July 30 fixed-qrels summary while candidate recall stayed near 0.365927?",
+  "conclusion": "The structured-document-format propagation hypothesis is not supported by the committed code or by replayed payload captures. The July 30 row is the current documented cached run, but it should not be described as a documented improvement over the earlier July 19 row because the older Cohere request payloads and score cache were not committed.",
+  "historical_rows": {
+    "earlier_status_note": {
+      "commit_family": "569cd7b_to_efb5887",
+      "base_candidate_recall_mean": 0.365927,
+      "base_ndcg_at_10": 0.343299,
+      "base_recall_at_10": 0.112004,
+      "base_map_at_10": 0.23596,
+      "base_mrr_at_10": 0.651111,
+      "candidate_document_format": "structured"
+    },
+    "july_30_fixed_qrels_summary": {
+      "first_committed_in": "402e1ae",
+      "base_candidate_recall_mean": 0.365927,
+      "base_ndcg_at_10": 0.393658,
+      "base_recall_at_10": 0.142102,
+      "base_map_at_10": 0.294536,
+      "base_mrr_at_10": 0.647222,
+      "candidate_document_format": "structured"
+    }
+  },
+  "static_code_audit": {
+    "document_text_identical_between_569cd7b_and_402e1ae": true,
+    "document_format_used_before_provider_rerank_in_569cd7b": true,
+    "document_format_used_before_provider_rerank_in_402e1ae": true,
+    "reranker_payload_lines": [
+      "documents = [document_text(result, document_format) for result in candidates]",
+      "reranked = provider.rerank(query[\"query\"], documents, top_n=len(documents))"
+    ],
+    "base_parent_qrels_enabled": false,
+    "parent_qrels_protocol_change_explains_base_row": false
+  },
+  "payload_replay": {
+    "method": "Instrumented replay with a fake reranker provider that captures the documents list passed to provider.rerank. Query embeddings were regenerated through OpenRouter, so this is a code-path/payload-shape probe, not a byte-identical replay of the uncommitted July 19 hosted run.",
+    "captures": {
+      "569cd7b": {
+        "query_count": 30,
+        "document_count": 9766,
+        "candidate_recall_mean": 0.366139,
+        "candidate_ids_hash": "eda9f014939088a594a723fcdaafec9b34ad970cbb493d16b3ec3b3a76309095",
+        "request_hash": "10cbad11e84c85f42c2d03b25cdfe03c43b1e38cd87ba7d16c773a48be8b44a3",
+        "local_capture_path": ".tmp/payload-dumps/569cd7b.json"
+      },
+      "402e1ae": {
+        "query_count": 30,
+        "failure_count": 0,
+        "document_count": 9764,
+        "candidate_recall_mean": 0.365927,
+        "candidate_ids_hash": "39d09d1fac8ae09f4b54fa88ea7fb9292f21146c63009a8616a9e3d1eafb6909",
+        "request_hash": "29868162eb57de9657c66a971aa45fca91baf35acdf9af065845583462a6fe69",
+        "local_capture_path": ".tmp/payload-dumps/402e1ae_by_query.json"
+      }
+    },
+    "direct_content_comparison": {
+      "common_queries": 30,
+      "same_candidate_order_queries": 6,
+      "same_candidate_order_and_same_document_list_queries": 6,
+      "same_candidate_set_queries": 11,
+      "same_candidate_set_and_same_per_chunk_text_queries": 6,
+      "changed_set_queries": 19,
+      "mean_jaccard_for_changed_candidate_sets": 0.987862,
+      "min_jaccard_for_changed_candidate_sets": 0.968504
+    }
+  },
+  "repeat_cache_audit": {
+    "source": "reports/stage1_fixed_qrels_v2_repeat_spread.json plus per-query repeat caches",
+    "base_runs": 3,
+    "base_ndcg_spread_percentage_points": 0.141,
+    "base_candidate_recall_mean_each_run": [
+      0.365927,
+      0.365927,
+      0.365927
+    ],
+    "identical_candidate_order_queries_across_repeats": 1,
+    "identical_candidate_set_queries_across_repeats": 3,
+    "changed_candidate_set_queries_across_repeats": 27,
+    "mean_three_way_jaccard_for_changed_candidate_sets": 0.987522,
+    "min_three_way_jaccard_for_changed_candidate_sets": 0.968379,
+    "interpretation": "The current stack is stable at the metric level, but identical candidate recall does not imply byte-identical candidate payloads. Future reports should preserve candidate and payload hashes, not only aggregate recall."
+  },
+  "claim_boundary": [
+    "Do not claim that the July 30 base row proves a reranker or retrieval improvement over the July 19 row.",
+    "Do not attribute the historical shift to structured document-format propagation.",
+    "Use the July 30 fixed-qrels row as the current baseline under the documented protocol.",
+    "Retire the earlier July 19 base row unless an archived request payload and reranker score cache can be found."
+  ],
+  "recommended_next_control": "For every hosted rerank evaluation, store per-query candidate ID hashes, document payload hashes, qrels hashes, provider/model IDs, cache roots, and score-cache hashes next to the headline summary."
+}
