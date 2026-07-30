@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+import time
+import urllib.parse
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -17,20 +21,56 @@ from canon.eval.source_diversity import (
     DEFAULT_MIN_DISTINCT_SOURCES,
     source_diversity_row,
 )
+from canon.generation.providers import get_generation_provider
+from canon.ingest.openalex import abstract_from_inverted_index, fetch_json
 from canon.ingest.flexible import ingest_flexible_source, profile_source
 from canon.reports.claim_decision import build_claim_decision
 from canon.retrieval.compare import compare
+from canon.retrieval.candidates import build_candidate_pool, build_windowed_candidate_pool
 from canon.retrieval.experiment import cached_documents
-from canon.retrieval.query_diagnostics import FREEDOM_THRESHOLDS, diagnose_query
+from canon.retrieval.query_diagnostics import FREEDOM_THRESHOLDS, content_terms, diagnose_query, term_matches_tokens
+from canon.rerank.providers import get_rerank_provider
 from canon.synthesis.answer import synthesize
 
 
 DEFAULT_MODE = "social_science_ir_v1_harvest10"
 DEFAULT_DIVERSITY_MODE = "social_science_ir_10k"
 DEFAULT_POLICY = "rag"
+DEFAULT_PRODUCTION_MODE = "beir_scifact_full"
+DEFAULT_PRODUCTION_TOP_K = 12
+DEFAULT_PRODUCTION_CANDIDATE_K = 12
+DEFAULT_PRODUCTION_CANDIDATE_SCOPE = "lexical_window"
+DEFAULT_PRODUCTION_LEXICAL_WINDOW_K = 96
+DEFAULT_EXTERNAL_SEARCH_PROVIDER = "openalex"
+DEFAULT_EXTERNAL_RESULT_COUNT = 5
 DEFAULT_POLICIES = ["lexical", "balanced", "semantic", "rag", "diverse", "conflict_aware"]
 DEFAULT_DIVERSE_METHOD_ID = "diverse_k5_template"
 DEFAULT_DIVERSITY_BASELINE_METHOD_ID = "lexical_k5_template"
+DEFAULT_PUBLISHABLE_PACKAGE = "publishable_package_canon_publishable_evidence_workflow_v1.json"
+PRODUCTION_GENERIC_QUERY_TERMS = {
+    "approach",
+    "around",
+    "benefit",
+    "benefits",
+    "case",
+    "cases",
+    "center",
+    "data",
+    "effect",
+    "effects",
+    "evidence",
+    "expansion",
+    "impact",
+    "impacts",
+    "issue",
+    "issues",
+    "risk",
+    "risks",
+    "role",
+    "roles",
+    "trend",
+    "trends",
+}
 
 
 class ProductError(ValueError):
@@ -126,7 +166,16 @@ def answer(payload: dict[str, Any]) -> dict:
     policy = str(payload.get("policy") or DEFAULT_POLICY)
     top_k = optional_int(payload.get("top_k"))
     freedom_level = optional_freedom_level(payload.get("freedom_level"))
-    report = synthesize(query=query, policy=policy, mode=mode, top_k=top_k)
+    report = synthesize(
+        query=query,
+        policy=policy,
+        mode=mode,
+        top_k=top_k,
+        generator_name=optional_text(payload, "generator_provider")
+        or optional_text(payload, "generator")
+        or "template",
+        generator_model=optional_text(payload, "generator_model"),
+    )
     decision = safe_claim_decision(mode)
     return {
         "query": report["query"],
@@ -158,7 +207,16 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
     top_k = optional_positive_int(requirements.get("top_k"), "top_k") if requirements else None
     top_k = top_k or optional_int(payload.get("top_k"))
     freedom_level = optional_freedom_level(payload.get("freedom_level"))
-    report = synthesize(query=query, policy=policy, mode=mode, top_k=top_k)
+    report = synthesize(
+        query=query,
+        policy=policy,
+        mode=mode,
+        top_k=top_k,
+        generator_name=optional_text(payload, "generator_provider")
+        or optional_text(payload, "generator")
+        or "template",
+        generator_model=optional_text(payload, "generator_model"),
+    )
     evidence = enrich_evidence_metadata(report.get("evidence") or [], mode)
     diagnostics = build_query_diagnostics(
         query=query,
@@ -235,6 +293,1545 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
     }
     response["contract_validation"] = validate_report(response, "evidence_packet_response")
     return response
+
+
+def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
+    params = params or {}
+    settings = load_settings()
+    mode = optional_text(params, "mode") or DEFAULT_PRODUCTION_MODE
+    package = load_report(settings.reports_dir / DEFAULT_PUBLISHABLE_PACKAGE)
+    benchmark_card = load_report(settings.reports_dir / "publishable_benchmark_card_v1.json")
+    stage1_gate = load_report(settings.reports_dir / "stage1_gate_v1.json")
+    checks = package.get("checks") or []
+    blocked_checks = [check_row["id"] for check_row in checks if not check_row.get("passed")]
+    return {
+        "report_id": "production_workbench_status_v1",
+        "status": production_status_value(settings, mode),
+        "product": "CANON Evidence Discovery Workbench",
+        "mode": mode,
+        "available_modes": available_corpus_modes(settings.data_dir),
+        "recommended_defaults": {
+            "mode": mode,
+            "policy": DEFAULT_POLICY,
+            "top_k": DEFAULT_PRODUCTION_TOP_K,
+            "candidate_k": DEFAULT_PRODUCTION_CANDIDATE_K,
+            "freedom_level": "balanced",
+            "external_expansion": "off_by_default_opt_in_openalex",
+            "retrieval_engine": "model_candidate_pool",
+            "candidate_scope": DEFAULT_PRODUCTION_CANDIDATE_SCOPE,
+            "lexical_window_k": DEFAULT_PRODUCTION_LEXICAL_WINDOW_K,
+            "retrieval_provider": "openrouter",
+            "retrieval_model": "qwen/qwen3-embedding-8b",
+            "reranker_provider": "cohere",
+            "reranker_model": "rerank-v4.0-pro",
+            "generator_provider": "openrouter",
+            "generator_model": "openai/gpt-4.1-mini",
+        },
+        "retrieval_engines": [
+            {
+                "engine": "model_candidate_pool",
+                "label": "Hosted embedding candidate pool",
+                "status": "available_if_openrouter_key_configured",
+                "boundary": (
+                    "Uses full-corpus BM25 to form a bounded candidate window, hosted embeddings for that window, "
+                    "then optional hosted reranking."
+                ),
+            },
+            {
+                "engine": "canon_synthesis",
+                "label": "CANON synthesis retriever",
+                "status": "available",
+                "boundary": "Uses the existing deterministic CANON retrieval policy stack.",
+            },
+        ],
+        "candidate_scopes": [
+            {
+                "scope": "lexical_window",
+                "label": "Full-corpus lexical scan plus bounded dense window",
+                "status": "default_interactive",
+                "boundary": "BM25 scans the full corpus; hosted embeddings are computed only for the lexical window.",
+            },
+            {
+                "scope": "full_embedding_store",
+                "label": "Full-corpus semantic index",
+                "status": "available_when_embedding_store_exists_or_can_be_built",
+                "boundary": "Dense retrieval covers the full corpus, but first use may build or require a full embedding store.",
+            },
+        ],
+        "retrieval_models": [
+            {
+                "provider": "openrouter",
+                "model": "qwen/qwen3-embedding-8b",
+                "hosted": True,
+                "status": "best_on_current_scifact_mini_slice",
+            },
+            {
+                "provider": "openrouter",
+                "model": "baai/bge-m3",
+                "hosted": True,
+                "status": "available_if_openrouter_key_configured",
+            },
+            {
+                "provider": "openrouter",
+                "model": "openai/text-embedding-3-small",
+                "hosted": True,
+                "status": "available_if_openrouter_key_configured",
+            },
+            {
+                "provider": "sentence-transformers",
+                "model": "BAAI/bge-small-en-v1.5",
+                "hosted": False,
+                "status": "available_if_local_model_cache_or_hf_access_exists",
+            },
+            {
+                "provider": "local",
+                "model": "hashed-semantic-v1",
+                "hosted": False,
+                "status": "available",
+            },
+        ],
+        "rerank_models": [
+            {
+                "provider": "cohere",
+                "model": "rerank-v4.0-pro",
+                "hosted": True,
+                "status": "best_on_current_scifact_mini_slice_tied",
+            },
+            {
+                "provider": "openrouter",
+                "model": "cohere/rerank-v3.5",
+                "hosted": True,
+                "status": "available_if_openrouter_key_configured",
+            },
+            {
+                "provider": "heuristic",
+                "model": "lexical-overlap-rerank-v1",
+                "hosted": False,
+                "status": "available",
+            },
+        ],
+        "generation_models": [
+            {
+                "provider": "deterministic",
+                "model": "evidence-note-v1",
+                "hosted": False,
+                "status": "available",
+            },
+            {
+                "provider": "openrouter",
+                "model": "openai/gpt-4.1-mini",
+                "hosted": True,
+                "status": "available_if_openrouter_key_configured",
+            },
+            {
+                "provider": "openrouter",
+                "model": "openai/gpt-4o-mini",
+                "hosted": True,
+                "status": "available_if_openrouter_key_configured",
+            },
+            {
+                "provider": "openrouter",
+                "model": "google/gemini-2.5-flash",
+                "hosted": True,
+                "status": "available_if_openrouter_key_configured",
+            },
+            {
+                "provider": "openrouter",
+                "model": "moonshotai/kimi-k3",
+                "hosted": True,
+                "status": "available_if_openrouter_key_configured",
+            },
+            {
+                "provider": "openrouter",
+                "model": "moonshotai/kimi-k2.7-code",
+                "hosted": True,
+                "status": "available_if_openrouter_key_configured",
+            },
+            {
+                "provider": "openrouter",
+                "model": "moonshotai/kimi-k2.6",
+                "hosted": True,
+                "status": "available_if_openrouter_key_configured",
+            },
+            {
+                "provider": "openrouter",
+                "model": "moonshotai/kimi-k2-thinking",
+                "hosted": True,
+                "status": "available_if_openrouter_key_configured",
+            },
+        ],
+        "try_queries": production_try_queries(mode),
+        "shippable_without_human_review": [
+            "corpus-backed evidence packets",
+            "query diagnostics and query refinement",
+            "citation-bearing draft brief for user inspection",
+            "coverage and source-diversity warnings",
+            "local telemetry and explicit user feedback capture",
+        ],
+        "blocked_without_human_review": [
+            "autonomous factual conclusions",
+            "clinical, legal, policy, or publication-ready correctness claims",
+            "claims that CANON outperforms existing RAG systems",
+            "production unsupported-claim-rate claims",
+            "durable model-winner conclusions",
+        ],
+        "quality_state": {
+            "package_status": package.get("status") or "not_available",
+            "package_checks_passed": sum(1 for check_row in checks if check_row.get("passed")),
+            "package_checks_total": len(checks),
+            "blocked_checks": blocked_checks,
+            "benchmark_card_status": benchmark_card.get("status") or "not_available",
+            "aggregate_diagnostics": benchmark_card.get("aggregate_diagnostics") or {},
+            "stage1_gate_status": stage1_gate.get("status") or "not_available",
+            "stage1_gate_failures": stage1_gate.get("failures") or [],
+        },
+        "operational_boundary": {
+            "default_data_flow": "local corpus retrieval and local report generation",
+            "hosted_models": "called only when generator_provider selects a hosted model; query and relevance-gated snippets are sent",
+            "hosted_retrieval": "called only when retrieval_engine selects model_candidate_pool; query and corpus chunks are sent for embedding/reranking",
+            "external_web": (
+                "off by default; when execute_external_search is true, the workbench sends only the query string "
+                "to OpenAlex and marks returned evidence as external_source/ONLINE"
+            ),
+            "feedback": "stored as local product feedback, not as authoritative human-review labels",
+            "corpus_setup": "users can profile, ingest, and build local corpora from paths the local API process can read",
+        },
+        "endpoints": {
+            "app": "GET /app",
+            "run": "POST /v1/production/evidence-workbench",
+            "feedback": "POST /v1/production/feedback",
+            "corpus_setup": "POST /v1/production/corpus-setup",
+            "raw_packet": "POST /v1/evidence-packets",
+        },
+    }
+
+
+def production_status_value(settings, mode: str) -> str:
+    if not (settings.data_dir / "processed" / f"works_{mode}.json").exists():
+        return "setup_required_corpus_missing"
+    return "ship_user_experience_ready"
+
+
+def available_corpus_modes(data_dir: Path, limit: int = 80) -> list[str]:
+    processed = data_dir / "processed"
+    if not processed.exists():
+        return []
+    modes = []
+    for path in sorted(processed.glob("works_*.json")):
+        mode = path.stem.removeprefix("works_")
+        if mode.startswith("unit_") or mode.endswith("_dockercheck"):
+            continue
+        modes.append(mode)
+    preferred = [
+        DEFAULT_PRODUCTION_MODE,
+        "beir_scifact_mini",
+        "ai_infra_geo_risk_demo",
+        DEFAULT_MODE,
+        "social_science_ir_10k",
+        "beir_nfcorpus_full",
+    ]
+    ordered = [mode for mode in preferred if mode in modes]
+    ordered.extend(mode for mode in modes if mode not in set(ordered))
+    return ordered[:limit]
+
+
+def production_try_queries(mode: str) -> list[str]:
+    if mode == "ai_infra_geo_risk_demo":
+        return [
+            "What are the grid risks around AI data center expansion?",
+            "How could data center water and cooling needs affect local opposition?",
+            "What evidence links sovereign AI policy to cloud dependency?",
+        ]
+    if "nfcorpus" in mode:
+        return ["dietary fiber and cardiovascular risk", "vitamin D supplementation", "alternative medicine"]
+    if "scifact" in mode:
+        return [
+            "Radioiodine treatment of non-toxic multinodular goitre reduces thyroid volume.",
+            "All hematopoietic stem cells segregate their chromosomes randomly.",
+            "Rapid phosphotransfer rates govern fidelity in two component systems",
+            "Albendazole is used to treat lymphatic filariasis.",
+        ]
+    return [
+        "Do sanctions work?",
+        "What does the literature say about whether democracies are less likely to fight each other?",
+        "Where do civil war studies disagree about grievances and resources?",
+    ]
+
+
+def production_corpus_setup(payload: dict[str, Any]) -> dict[str, Any]:
+    input_path = require_path(payload, "input_path")
+    mode = require_text(payload, "mode")
+    profile = source_profile(
+        {
+            "input_path": str(input_path),
+            "format": optional_text(payload, "format"),
+            "sample_size": optional_positive_int(payload.get("sample_size"), "sample_size") or 25,
+        }
+    )
+    if optional_bool(payload.get("profile_only"), default=False):
+        return {
+            "report_id": "production_corpus_setup_v1",
+            "status": "profile_ready",
+            "input_path": str(input_path),
+            "mode": mode,
+            "profile": profile,
+            "next_action": "Run setup without profile_only to ingest and build this corpus.",
+            "boundary": "Profile results are local source-shape diagnostics, not evidence quality review.",
+        }
+
+    ingest = source_ingest(
+        {
+            "input_path": str(input_path),
+            "mode": mode,
+            "format": optional_text(payload, "format"),
+            "domain": optional_text(payload, "domain"),
+            "provenance": optional_text(payload, "provenance"),
+            "source_name": optional_text(payload, "source_name"),
+            "chunk_tokens": optional_positive_int(payload.get("chunk_tokens"), "chunk_tokens"),
+            "overlap_tokens": optional_nonnegative_int(payload.get("overlap_tokens"), "overlap_tokens"),
+        }
+    )
+    corpus_id = optional_text(payload, "corpus_id") or mode
+    build_corpus = optional_bool(payload.get("build_corpus"), default=True)
+    corpus = (
+        corpus_build(
+            {
+                "corpus_id": corpus_id,
+                "from_modes": [mode],
+                "corpus_only": True,
+                "top_k": optional_positive_int(payload.get("top_k"), "top_k") or 5,
+                "policies": optional_string_list(payload.get("policies"), "policies")
+                or ["lexical", "balanced", "semantic", "rag"],
+            }
+        )
+        if build_corpus
+        else {}
+    )
+    recommended_mode = corpus_id if build_corpus else mode
+    return {
+        "report_id": "production_corpus_setup_v1",
+        "status": "corpus_ready" if build_corpus else "source_ingested",
+        "input_path": str(input_path),
+        "mode": mode,
+        "corpus_id": corpus_id if build_corpus else None,
+        "recommended_mode": recommended_mode,
+        "profile": profile,
+        "ingest": ingest,
+        "corpus": corpus.get("corpus", {}),
+        "validation": corpus.get("validation", {}),
+        "next_action": f"Select mode '{recommended_mode}' in the workbench and run a question.",
+        "boundary": "The corpus is locally indexed. Evidence quality still depends on source fit and human inspection.",
+    }
+
+
+def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
+    started = time.perf_counter()
+    query = optional_text(payload, "question") or require_text(payload, "query")
+    mode = str(payload.get("mode") or DEFAULT_PRODUCTION_MODE)
+    policy = str(payload.get("policy") or DEFAULT_POLICY)
+    top_k = optional_positive_int(payload.get("top_k"), "top_k") or DEFAULT_PRODUCTION_TOP_K
+    freedom_level = optional_freedom_level(payload.get("freedom_level"))
+    retrieval_engine = optional_text(payload, "retrieval_engine") or "canon_synthesis"
+    generator_provider = optional_text(payload, "generator_provider") or optional_text(payload, "generator") or "deterministic"
+    generator_model = optional_text(payload, "generator_model") or (
+        "openai/gpt-4.1-mini" if generator_provider == "openrouter" else None
+    )
+    session_id = optional_text(payload, "session_id") or f"prod_{uuid.uuid4().hex[:12]}"
+    requirements = production_evidence_requirements(payload, top_k)
+    if retrieval_engine == "model_candidate_pool":
+        packet_response = production_model_candidate_packet(
+            payload=payload,
+            request_id=session_id,
+            query=query,
+            mode=mode,
+            policy=policy,
+            top_k=top_k,
+            freedom_level=freedom_level,
+            requirements=requirements,
+        )
+    elif retrieval_engine in {"canon_synthesis", "synthesis", "evidence_packets"}:
+        packet_response = evidence_packets(
+            {
+                "request_id": session_id,
+                "project_id": str(payload.get("project_id") or "production_workbench"),
+                "question": query,
+                "mode": mode,
+                "policy": policy,
+                "freedom_level": freedom_level,
+                "research_frame": optional_dict(payload.get("research_frame"), "research_frame"),
+                "evidence_requirements": requirements,
+            }
+        )
+    else:
+        raise ProductError("retrieval_engine must be model_candidate_pool or canon_synthesis.")
+    packet = first_packet(packet_response)
+    evidence = packet.get("supporting_evidence") or []
+    gaps = packet_response.get("coverage_gaps") or []
+    relevance_gate = production_relevance_gate(query, packet_response, evidence)
+    external_search = production_external_search(query, payload)
+    external_cards = external_search.get("evidence_cards") or []
+    external_expansion = merge_external_expansion(packet_response.get("external_expansion") or {}, external_search)
+    elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
+    report = {
+        "report_id": "production_evidence_workbench_session_v1",
+        "status": production_session_status(packet_response, evidence, gaps, relevance_gate),
+        "session_id": session_id,
+        "created_at": utc_now(),
+        "query": query,
+        "mode": mode,
+        "policy": policy,
+        "top_k": top_k,
+        "elapsed_ms": elapsed_ms,
+        "retrieval": {
+            "engine": retrieval_engine,
+            "provider": packet_response.get("retrieval_provider"),
+            "model": packet_response.get("retrieval_model"),
+            "candidate_scope": packet_response.get("candidate_scope"),
+            "lexical_window_k": packet_response.get("lexical_window_k"),
+            "reranker_provider": packet_response.get("reranker_provider"),
+            "reranker_model": packet_response.get("reranker_model"),
+            "candidate_count": packet_response.get("candidate_count"),
+            "boundary": packet_response.get("retrieval_boundary")
+            or "Uses the selected CANON retrieval engine to produce inspection candidates.",
+        },
+        "claim_boundary": production_claim_boundary(),
+        "generation": {
+            "requested_provider": generator_provider,
+            "requested_model": generator_model,
+            "hosted_model_boundary": (
+                "Hosted generation sends the selected query and gated evidence snippets to the provider."
+                if generator_provider not in {"deterministic", "template", "local"}
+                else "No hosted generation requested."
+            ),
+        },
+        "relevance_gate": relevance_gate,
+        "draft_brief": production_draft_brief(
+            packet_response,
+            relevance_gate,
+            evidence,
+            generator_provider=generator_provider,
+            generator_model=generator_model,
+        ),
+        "evidence_packet": {
+            "packet_id": packet.get("packet_id"),
+            "support_level": packet.get("support_level"),
+            "confidence": packet.get("confidence"),
+            "evidence_count": len(evidence),
+            "usable_evidence_count": relevance_gate.get("usable_evidence_count", len(evidence)),
+            "external_evidence_count": len(external_cards),
+            "source_diversity": packet.get("source_diversity") or {},
+            "frame_coverage": packet.get("frame_coverage") or {},
+            "evidence_scope_summary": production_scope_summary(evidence, external_cards),
+        },
+        "evidence_cards": production_evidence_cards(evidence, relevance_gate) + external_cards,
+        "query_lingo": packet_response.get("query_diagnostics") or {},
+        "coverage_gaps": gaps,
+        "external_expansion": external_expansion,
+        "recommended_actions": production_recommended_actions(packet_response, evidence, gaps),
+        "feedback": {
+            "endpoint": "POST /v1/production/feedback",
+            "session_id": session_id,
+            "dimensions": [
+                "useful",
+                "irrelevant",
+                "missing_source",
+                "citation_issue",
+                "query_needs_refinement",
+            ],
+        },
+        "raw_contract_validation": packet_response.get("contract_validation") or {},
+    }
+    if optional_bool(payload.get("write_telemetry"), default=True):
+        write_production_telemetry(report)
+    return report
+
+
+def production_evidence_requirements(payload: dict[str, Any], top_k: int) -> dict[str, Any]:
+    raw = optional_dict(payload.get("evidence_requirements"), "evidence_requirements")
+    requirements = {
+        "top_k": top_k,
+        "include_conflicts": True,
+        "include_source_diversity": True,
+        "include_query_diagnostics": True,
+    }
+    requirements.update(raw)
+    requirements["top_k"] = top_k
+    if optional_bool(payload.get("suggest_external_expansion"), default=False):
+        requirements["external_expansion"] = {
+            "enabled": True,
+            "allowed_source_types": optional_string_list(
+                payload.get("allowed_source_types"),
+                "allowed_source_types",
+            )
+            or ["official", "academic", "news"],
+            "max_external_queries": optional_positive_int(
+                payload.get("max_external_queries"),
+                "max_external_queries",
+            )
+            or 5,
+        }
+    return requirements
+
+
+def production_model_candidate_packet(
+    payload: dict[str, Any],
+    request_id: str,
+    query: str,
+    mode: str,
+    policy: str,
+    top_k: int,
+    freedom_level: str | None,
+    requirements: dict[str, Any],
+) -> dict[str, Any]:
+    retrieval_provider = optional_text(payload, "retrieval_provider") or optional_text(payload, "vector_provider") or "openrouter"
+    retrieval_model = optional_text(payload, "retrieval_model") or optional_text(payload, "vector_model")
+    retrieval_model = retrieval_model or default_retrieval_model(retrieval_provider)
+    reranker_provider = optional_text(payload, "reranker_provider") or optional_text(payload, "reranker") or "cohere"
+    reranker_model = optional_text(payload, "reranker_model") or default_reranker_model(reranker_provider)
+    candidate_k = optional_positive_int(payload.get("candidate_k"), "candidate_k") or max(
+        top_k,
+        DEFAULT_PRODUCTION_CANDIDATE_K,
+    )
+    lexical_k = optional_positive_int(payload.get("lexical_k"), "lexical_k") or candidate_k
+    vector_k = optional_positive_int(payload.get("vector_k"), "vector_k") or candidate_k
+    candidate_scope = optional_text(payload, "candidate_scope") or DEFAULT_PRODUCTION_CANDIDATE_SCOPE
+    lexical_window_k = optional_positive_int(payload.get("lexical_window_k"), "lexical_window_k") or max(
+        DEFAULT_PRODUCTION_LEXICAL_WINDOW_K,
+        candidate_k * 6,
+    )
+    fusion = optional_text(payload, "fusion") or "weighted_bm25_dense"
+    try:
+        if candidate_scope in {"lexical_window", "windowed", "bounded_lexical_window"}:
+            candidate_report = build_windowed_candidate_pool(
+                query=query,
+                mode=mode,
+                lexical_window_k=lexical_window_k,
+                lexical_k=lexical_k,
+                vector_k=vector_k,
+                provider=retrieval_provider,
+                model=retrieval_model,
+                fusion=fusion,
+            )
+        elif candidate_scope in {"full_embedding_store", "full_dense"}:
+            candidate_report = build_candidate_pool(
+                query=query,
+                mode=mode,
+                lexical_k=lexical_k,
+                vector_k=vector_k,
+                provider=retrieval_provider,
+                model=retrieval_model,
+                fusion=fusion,
+            )
+        else:
+            raise ProductError("candidate_scope must be lexical_window or full_embedding_store.")
+        candidates = candidate_report.get("candidates") or []
+        ranked_candidates, rerank_summary = production_rerank_candidates(
+            query=query,
+            candidates=candidates,
+            provider_name=reranker_provider,
+            model=reranker_model,
+        )
+    except Exception as exc:  # noqa: BLE001 - model availability belongs in the product response.
+        return {
+            "status": "model_retrieval_failed",
+            "request_id": request_id,
+            "project_id": str(payload.get("project_id") or "production_workbench"),
+            "query": query,
+            "mode": mode,
+            "policy": policy,
+            "retrieval_provider": retrieval_provider,
+            "retrieval_model": retrieval_model,
+            "candidate_scope": candidate_scope,
+            "lexical_window_k": lexical_window_k if candidate_scope in {"lexical_window", "windowed", "bounded_lexical_window"} else None,
+            "reranker_provider": reranker_provider,
+            "reranker_model": reranker_model,
+            "candidate_count": 0,
+            "retrieval_error": str(exc),
+            "retrieval_boundary": "Model-backed retrieval failed; no fallback candidates were substituted.",
+            "evidence_packets": [],
+            "query_diagnostics": {
+                "matched_terms": [],
+                "weak_terms": content_terms(query),
+                "query_variants": [],
+                "semantic_similarity_summary": {},
+            },
+            "coverage_gaps": [{"gap": "Model-backed retrieval failed.", "details": str(exc)}],
+            "external_expansion": production_external_expansion(requirements),
+            "answer_report": {
+                "answer": "",
+                "citations": [],
+                "support_assessment": {
+                    "support_level": "failed",
+                    "query_term_coverage": 0.0,
+                    "covered_focus_terms": [],
+                    "missing_focus_terms": content_terms(query),
+                },
+            },
+            "contract_validation": {"status": "failed", "error": str(exc)},
+        }
+    evidence = production_candidate_evidence(ranked_candidates[:top_k])
+    support = production_candidate_support(query, evidence)
+    return {
+        "status": "complete",
+        "request_id": request_id,
+        "project_id": str(payload.get("project_id") or "production_workbench"),
+        "query": query,
+        "mode": mode,
+        "policy": policy,
+        "freedom_level": freedom_level,
+        "retrieval_provider": retrieval_provider,
+        "retrieval_model": retrieval_model,
+        "candidate_scope": candidate_scope,
+        "lexical_window_k": lexical_window_k if candidate_scope in {"lexical_window", "windowed", "bounded_lexical_window"} else None,
+        "reranker_provider": rerank_summary.get("provider"),
+        "reranker_model": rerank_summary.get("model"),
+        "candidate_count": len(candidates),
+        "retrieval_boundary": (
+            "Evidence candidates were generated with BM25 plus the selected embedding provider, "
+            "then ordered with the selected reranker for user inspection."
+        ),
+        "candidate_generation": {
+            "engine": "model_candidate_pool",
+            "candidate_scope": candidate_scope,
+            "lexical_window_k": candidate_report.get("lexical_window_k"),
+            "window_document_count": candidate_report.get("window_document_count"),
+            "document_count": candidate_report.get("document_count"),
+            "lexical_k": lexical_k,
+            "vector_k": vector_k,
+            "fusion": fusion,
+            "retrieval_provider": retrieval_provider,
+            "retrieval_model": retrieval_model,
+            "source_counts": candidate_report.get("source_counts") or {},
+        },
+        "rerank_summary": rerank_summary,
+        "evidence_packets": [
+            {
+                "packet_id": f"packet_{request_id}",
+                "support_level": support["support_level"],
+                "confidence": support["support_confidence_label"],
+                "supporting_evidence": evidence,
+                "source_diversity": production_source_diversity(evidence),
+                "frame_coverage": {"status": "partial", "note": "Automated coverage over candidate evidence only."},
+                "evidence_scope_summary": {"private_corpus": len(evidence), "external_source": 0},
+            }
+        ],
+        "query_diagnostics": {
+            "matched_terms": support["covered_focus_terms"],
+            "weak_terms": support["missing_focus_terms"],
+            "field_phrases": [],
+            "query_variants": [],
+            "semantic_similarity_summary": {
+                "top_max": max((candidate_score(row) for row in ranked_candidates[:top_k]), default=0.0),
+                "provider": retrieval_provider,
+                "model": retrieval_model,
+            },
+            "drift_risk": "sensitive",
+        },
+        "coverage_gaps": production_candidate_gaps(support["missing_focus_terms"]),
+        "external_expansion": production_external_expansion(requirements),
+        "answer_report": {
+            "answer": "",
+            "citations": [{"citation_id": item["evidence_id"]} for item in evidence],
+            "support_assessment": support,
+        },
+        "contract_validation": {"status": "pass", "note": "Model candidate packet adapter."},
+    }
+
+
+def default_retrieval_model(provider: str) -> str | None:
+    if provider == "openrouter":
+        return "qwen/qwen3-embedding-8b"
+    if provider == "sentence-transformers":
+        return "BAAI/bge-small-en-v1.5"
+    if provider == "local":
+        return "hashed-semantic-v1"
+    if provider == "cohere":
+        return "embed-v4.0"
+    return None
+
+
+def default_reranker_model(provider: str) -> str | None:
+    if provider == "cohere":
+        return "rerank-v4.0-pro"
+    if provider == "openrouter":
+        return "cohere/rerank-v3.5"
+    if provider in {"heuristic", "local"}:
+        return "lexical-overlap-rerank-v1"
+    return None
+
+
+def production_rerank_candidates(
+    query: str,
+    candidates: list[dict[str, Any]],
+    provider_name: str,
+    model: str | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if not candidates:
+        return [], {"provider": provider_name, "model": model, "status": "no_candidates"}
+    provider = get_rerank_provider(provider_name, model)
+    documents = [production_candidate_document_text(candidate) for candidate in candidates]
+    reranked = provider.rerank(query, documents, top_n=len(documents))
+    by_index = {row.index: row.score for row in reranked if 0 <= row.index < len(candidates)}
+    ranked = []
+    used_indexes = set()
+    for row in reranked:
+        if 0 <= row.index < len(candidates) and row.index not in used_indexes:
+            candidate = dict(candidates[row.index])
+            candidate["rerank_score"] = row.score
+            ranked.append(candidate)
+            used_indexes.add(row.index)
+    for index, candidate in enumerate(candidates):
+        if index not in used_indexes:
+            fallback = dict(candidate)
+            fallback["rerank_score"] = by_index.get(index, 0.0)
+            ranked.append(fallback)
+    return ranked, {
+        "provider": provider.provider,
+        "model": provider.model,
+        "status": "ok",
+        "scored_candidate_count": len(by_index),
+    }
+
+
+def production_candidate_document_text(candidate: dict[str, Any]) -> str:
+    return "\n".join(
+        str(value or "")
+        for value in [
+            candidate.get("title"),
+            candidate.get("source_name"),
+            candidate.get("section"),
+            candidate.get("text"),
+            candidate.get("preview"),
+        ]
+    ).strip()
+
+
+def production_candidate_evidence(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = []
+    for index, candidate in enumerate(candidates, start=1):
+        rows.append(
+            {
+                "evidence_id": f"C{index}",
+                "rank": index,
+                "title": candidate.get("title"),
+                "source_name": candidate.get("source_name"),
+                "published_at": str(candidate.get("year") or ""),
+                "source_type": "corpus_candidate",
+                "language": "unknown",
+                "evidence_scope": "private_corpus",
+                "document_id": candidate.get("work_id"),
+                "chunk_id": candidate.get("chunk_id"),
+                "text": candidate.get("preview") or "",
+                "citation": {"citation_id": f"C{index}"},
+                "retrieval_sources": candidate.get("retrieval_sources") or [],
+                "retrieval_scores": candidate.get("scores") or {},
+                "retrieval_ranks": candidate.get("ranks") or {},
+                "rerank_score": candidate.get("rerank_score"),
+            }
+        )
+    return rows
+
+
+def production_candidate_support(query: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
+    focus_terms = content_terms(query)
+    tokens = set()
+    for item in evidence:
+        tokens.update(tokenize_for_gate(production_candidate_document_text(item)))
+    covered = [term for term in focus_terms if term_matches_tokens(term, tokens)]
+    missing = [term for term in focus_terms if term not in covered]
+    coverage = round(len(covered) / len(focus_terms), 6) if focus_terms else 0.0
+    if coverage >= 0.65 and len(evidence) >= 2:
+        support_level = "strong"
+    elif coverage >= 0.35:
+        support_level = "moderate"
+    elif evidence:
+        support_level = "weak"
+    else:
+        support_level = "none"
+    return {
+        "support_level": support_level,
+        "support_confidence": coverage,
+        "support_confidence_label": "medium" if support_level in {"strong", "moderate"} else "low",
+        "query_term_coverage": coverage,
+        "covered_focus_terms": covered,
+        "missing_focus_terms": missing,
+        "focus_terms": focus_terms,
+        "context_relevance": coverage,
+        "semantic_alignment": max((max_vector_score(item.get("retrieval_scores", {})) for item in evidence), default=0.0),
+        "corroboration": {"overall_verdict": "candidate_only", "total_support_count": len(evidence)},
+    }
+
+
+def production_candidate_gaps(missing_terms: list[str]) -> list[dict[str, Any]]:
+    if not missing_terms:
+        return []
+    return [
+        {
+            "gap": "Missing visible query coverage for: " + ", ".join(missing_terms[:8]),
+            "suggested_next_query": " ".join(missing_terms[:8]),
+        }
+    ]
+
+
+def production_source_diversity(evidence: list[dict[str, Any]]) -> dict[str, Any]:
+    sources = {item.get("source_name") for item in evidence if item.get("source_name")}
+    warnings = []
+    if len(sources) < 2 and evidence:
+        warnings.append("Candidate evidence is concentrated in one source.")
+    return {
+        "distinct_source_count": len(sources),
+        "warnings": warnings,
+    }
+
+
+def production_external_expansion(requirements: dict[str, Any]) -> dict[str, Any]:
+    external = requirements.get("external_expansion") or {}
+    if not external:
+        return {"status": "disabled", "executed": False}
+    return {
+        "status": "planned",
+        "executed": False,
+        "allowed_source_types": external.get("allowed_source_types") or [],
+        "max_external_queries": external.get("max_external_queries"),
+    }
+
+
+def production_external_search(query: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if not optional_bool(payload.get("execute_external_search"), default=False):
+        return {
+            "status": "disabled",
+            "executed": False,
+            "provider": optional_text(payload, "external_search_provider") or DEFAULT_EXTERNAL_SEARCH_PROVIDER,
+            "evidence_cards": [],
+        }
+    provider = optional_text(payload, "external_search_provider") or DEFAULT_EXTERNAL_SEARCH_PROVIDER
+    max_results = optional_positive_int(payload.get("max_external_results"), "max_external_results") or DEFAULT_EXTERNAL_RESULT_COUNT
+    max_results = min(max_results, 10)
+    search_query = external_search_query(query)
+    if provider != "openalex":
+        return {
+            "status": "failed",
+            "executed": False,
+            "provider": provider,
+            "error": "external_search_provider must be openalex.",
+            "evidence_cards": [],
+        }
+    try:
+        cards = openalex_external_search(search_query, max_results)
+    except Exception as exc:  # noqa: BLE001 - external search availability belongs in the product response.
+        return {
+            "status": "failed",
+            "executed": False,
+            "provider": provider,
+            "search_query": search_query,
+            "error": str(exc),
+            "evidence_cards": [],
+            "boundary": "External search failed; no external evidence was mixed into corpus results.",
+        }
+    return {
+        "status": "executed",
+        "executed": True,
+        "provider": provider,
+        "search_query": search_query,
+        "result_count": len(cards),
+        "evidence_cards": cards,
+        "boundary": (
+            "External OpenAlex search used only the query string. Results are marked as external_source "
+            "and should be inspected separately from corpus evidence."
+        ),
+    }
+
+
+def external_search_query(query: str) -> str:
+    cleaned = re.sub(r"[^\w\s./-]+", " ", collapse_spaces(query))
+    return collapse_spaces(cleaned).strip(" .-/") or collapse_spaces(query)
+
+
+def openalex_external_search(query: str, max_results: int) -> list[dict[str, Any]]:
+    settings = load_settings()
+    openalex_settings = settings.raw.get("openalex") or {}
+    base_url = str(openalex_settings.get("base_url") or "https://api.openalex.org")
+    filters = [
+        f"language:{openalex_settings.get('language') or 'en'}",
+        "is_retracted:false",
+    ]
+    from_year = openalex_settings.get("from_publication_year")
+    to_year = openalex_settings.get("to_publication_year")
+    if from_year:
+        filters.append(f"from_publication_date:{from_year}-01-01")
+    if to_year:
+        filters.append(f"to_publication_date:{to_year}-12-31")
+    params = {
+        "search": query,
+        "per-page": str(max_results),
+        "filter": ",".join(filters),
+        "sort": "relevance_score:desc",
+        "mailto": settings.contact_email,
+        "select": ",".join(
+            [
+                "id",
+                "doi",
+                "title",
+                "publication_year",
+                "language",
+                "abstract_inverted_index",
+                "primary_location",
+                "best_oa_location",
+                "open_access",
+                "cited_by_count",
+            ]
+        ),
+    }
+    url = f"{base_url}/works?{urllib.parse.urlencode(params)}"
+    payload = fetch_json(url, timeout=30)
+    return [
+        external_openalex_card(row, index)
+        for index, row in enumerate(payload.get("results", [])[:max_results], start=1)
+    ]
+
+
+def external_openalex_card(row: dict[str, Any], rank: int) -> dict[str, Any]:
+    primary_location = row.get("primary_location") or {}
+    best_oa_location = row.get("best_oa_location") or {}
+    source = (
+        primary_location.get("source")
+        or best_oa_location.get("source")
+        or {}
+    )
+    open_access = row.get("open_access") or {}
+    landing_page = (
+        primary_location.get("landing_page_url")
+        or best_oa_location.get("landing_page_url")
+        or row.get("doi")
+        or row.get("id")
+    )
+    abstract = abstract_from_inverted_index(row.get("abstract_inverted_index")) or ""
+    text = collapse_spaces(abstract or row.get("title") or "")
+    if len(text) > 900:
+        text = text[:897].rstrip() + "..."
+    evidence_id = f"X{rank}"
+    return {
+        "evidence_id": evidence_id,
+        "rank": rank,
+        "title": row.get("title") or "Untitled OpenAlex result",
+        "source_name": source.get("display_name") or "OpenAlex",
+        "published_at": str(row.get("publication_year") or ""),
+        "source_type": "online_openalex",
+        "language": row.get("language") or "unknown",
+        "evidence_scope": "external_source",
+        "retrieval_stage": "external_openalex_search",
+        "document_id": row.get("id"),
+        "chunk_id": external_chunk_id(row.get("id"), rank),
+        "text": text,
+        "citation": {
+            "citation_id": evidence_id,
+            "url": landing_page,
+            "doi": row.get("doi"),
+            "openalex_id": row.get("id"),
+        },
+        "relevance": {
+            "relevance_label": "external_online_result",
+            "usage_status": "external_candidate_only",
+            "source_marker": "ONLINE",
+        },
+        "external_source": {
+            "provider": "openalex",
+            "is_open_access": bool(open_access.get("is_oa")),
+            "cited_by_count": int(row.get("cited_by_count") or 0),
+        },
+    }
+
+
+def external_chunk_id(openalex_id: Any, rank: int) -> str:
+    raw = str(openalex_id or f"rank:{rank}").rsplit("/", 1)[-1]
+    slug = re.sub(r"[^A-Za-z0-9_.:-]+", "-", raw).strip("-") or f"rank-{rank}"
+    return f"external:openalex:{slug}"
+
+
+def merge_external_expansion(existing: dict[str, Any], external_search: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(existing or {})
+    if not merged:
+        merged = {"status": "disabled", "executed": False}
+    merged["online_search"] = {
+        key: value
+        for key, value in external_search.items()
+        if key != "evidence_cards"
+    }
+    if external_search.get("executed"):
+        merged["status"] = "executed"
+        merged["enabled"] = True
+        merged["executed"] = True
+        merged["external_result_count"] = external_search.get("result_count", 0)
+        merged["boundary"] = external_search.get("boundary") or merged.get("boundary")
+    elif external_search.get("status") == "failed":
+        merged["status"] = "failed"
+        merged["enabled"] = True
+        merged["executed"] = False
+        merged["error"] = external_search.get("error")
+        merged["boundary"] = external_search.get("boundary") or merged.get("boundary")
+    return merged
+
+
+def production_scope_summary(evidence: list[dict[str, Any]], external_cards: list[dict[str, Any]]) -> dict[str, int]:
+    summary = {"private_corpus": 0, "external_source": 0}
+    for item in evidence:
+        scope = evidence_scope(item)
+        summary[scope] = summary.get(scope, 0) + 1
+    summary["external_source"] = summary.get("external_source", 0) + len(external_cards)
+    return summary
+
+
+def candidate_score(candidate: dict[str, Any]) -> float:
+    values = [float(value) for value in (candidate.get("scores") or {}).values() if isinstance(value, (int, float))]
+    if isinstance(candidate.get("rerank_score"), (int, float)):
+        values.append(float(candidate["rerank_score"]))
+    return max(values, default=0.0)
+
+
+def max_vector_score(scores: dict[str, Any]) -> float:
+    values = [
+        float(value)
+        for key, value in scores.items()
+        if str(key).startswith("vector:") and isinstance(value, (int, float))
+    ]
+    return max(values, default=0.0)
+
+
+def first_packet(packet_response: dict[str, Any]) -> dict[str, Any]:
+    packets = packet_response.get("evidence_packets") or []
+    return packets[0] if packets else {}
+
+
+def production_relevance_gate(
+    query: str,
+    packet_response: dict[str, Any],
+    evidence: list[dict[str, Any]],
+) -> dict[str, Any]:
+    answer_report = packet_response.get("answer_report") or {}
+    support = answer_report.get("support_assessment") or {}
+    diagnostics = packet_response.get("query_diagnostics") or {}
+    focus_terms = content_terms(query)
+    anchor_terms = production_anchor_terms(focus_terms)
+    query_phrases = production_query_phrases(query)
+    matched_terms = diagnostics.get("matched_terms") or support.get("covered_focus_terms") or []
+    weak_terms = diagnostics.get("weak_terms") or support.get("missing_focus_terms") or []
+    term_coverage = optional_float(support.get("query_term_coverage"))
+    if term_coverage is None:
+        term_coverage = round(len(matched_terms) / len(focus_terms), 6) if focus_terms else 0.0
+    card_gates = [production_evidence_card_gate(item, focus_terms, anchor_terms, query_phrases) for item in evidence]
+    usable_count = sum(1 for row in card_gates if row["usage_status"] == "usable_candidate_evidence")
+    required_usable_count = production_required_usable_count(evidence)
+    support_level = str(support.get("support_level") or "").lower()
+    if packet_response.get("status") != "complete":
+        status = "run_failed"
+        severity = "high"
+        message = "The retrieval run did not complete."
+        draft_allowed = False
+    elif evidence and usable_count == 0:
+        status = "corpus_mismatch"
+        severity = "high"
+        message = "The selected corpus does not visibly cover the query terms."
+        draft_allowed = False
+    elif focus_terms and not matched_terms and term_coverage == 0.0:
+        status = "corpus_mismatch"
+        severity = "high"
+        message = "The selected corpus does not visibly cover the query terms."
+        draft_allowed = False
+    elif support_level == "weak" or (focus_terms and term_coverage < 0.25) or usable_count < required_usable_count:
+        status = "weak_query_match"
+        severity = "medium"
+        message = "Retrieved rows are weakly aligned with the query and should be treated as candidates for debugging."
+        draft_allowed = False
+    else:
+        status = "pass"
+        severity = "info"
+        message = "Retrieved rows visibly overlap with the query; inspect citations before use."
+        draft_allowed = True
+    return {
+        "status": status,
+        "severity": severity,
+        "message": message,
+        "draft_allowed": draft_allowed,
+        "evidence_use": "supporting_evidence_candidates" if draft_allowed else "diagnostic_candidates_only",
+        "focus_terms": focus_terms,
+        "anchor_terms": anchor_terms,
+        "query_phrases": query_phrases,
+        "matched_terms": matched_terms,
+        "weak_terms": weak_terms,
+        "query_term_coverage": round(float(term_coverage), 6),
+        "support_level": support.get("support_level"),
+        "support_confidence": support.get("support_confidence"),
+        "usable_evidence_count": usable_count if draft_allowed else 0,
+        "diagnostic_candidate_count": len(evidence) - usable_count,
+        "required_usable_count": required_usable_count,
+        "candidate_count": len(evidence),
+        "card_gates": card_gates,
+    }
+
+
+def production_anchor_terms(focus_terms: list[str]) -> list[str]:
+    anchors = [term for term in focus_terms if term not in PRODUCTION_GENERIC_QUERY_TERMS]
+    if anchors:
+        return anchors
+    return [term for term in focus_terms if len(term) >= 4]
+
+
+def production_query_phrases(query: str) -> list[str]:
+    tokens = [
+        token
+        for token in tokenize_for_gate(query)
+        if token not in {"what", "where", "when", "which", "with", "about", "around", "does", "this"}
+    ]
+    phrases = []
+    for left, right in zip(tokens, tokens[1:], strict=False):
+        if left in PRODUCTION_GENERIC_QUERY_TERMS and right in PRODUCTION_GENERIC_QUERY_TERMS:
+            continue
+        phrase = f"{left} {right}"
+        if phrase not in phrases:
+            phrases.append(phrase)
+    if "data" in tokens and "center" in tokens and "data center" not in phrases:
+        phrases.append("data center")
+    return phrases
+
+
+def production_required_usable_count(evidence: list[dict[str, Any]]) -> int:
+    if not evidence:
+        return 0
+    if len(evidence) == 1:
+        return 1
+    return 2
+
+
+def production_evidence_card_gate(
+    item: dict[str, Any],
+    focus_terms: list[str],
+    anchor_terms: list[str],
+    query_phrases: list[str],
+) -> dict[str, Any]:
+    text = " ".join(
+        str(value or "")
+        for value in [
+            item.get("title"),
+            item.get("source_name"),
+            item.get("text"),
+            item.get("preview"),
+            item.get("source_type"),
+        ]
+    )
+    normalized_text = normalized_term(text)
+    tokens = set(tokenize_for_gate(text))
+    overlap = [term for term in focus_terms if term_matches_tokens(term, tokens)]
+    anchor_overlap = [term for term in anchor_terms if term_matches_tokens(term, tokens)]
+    phrase_overlap = [phrase for phrase in query_phrases if phrase in normalized_text]
+    if not focus_terms:
+        label = "review"
+        usage = "usable_candidate_evidence"
+    elif (
+        (phrase_overlap and anchor_overlap)
+        or len(anchor_overlap) >= 2
+        or (len(overlap) >= 3 and anchor_overlap)
+        or (len(focus_terms) <= 2 and anchor_overlap)
+    ):
+        label = "visible_query_overlap"
+        usage = "usable_candidate_evidence"
+    else:
+        label = "off_query"
+        usage = "diagnostic_candidate_only"
+    return {
+        "evidence_id": item.get("evidence_id"),
+        "relevance_label": label,
+        "usage_status": usage,
+        "query_overlap_terms": overlap,
+        "anchor_overlap_terms": anchor_overlap,
+        "query_phrase_overlap": phrase_overlap,
+    }
+
+
+def tokenize_for_gate(text: str) -> list[str]:
+    from canon.retrieval.tokenize import tokenize
+
+    return tokenize(text)
+
+
+def production_session_status(
+    packet_response: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    gaps: list[dict[str, Any]],
+    relevance_gate: dict[str, Any],
+) -> str:
+    if packet_response.get("status") != "complete":
+        return "run_failed"
+    if relevance_gate.get("status") == "corpus_mismatch":
+        return "corpus_mismatch_no_grounded_answer"
+    if relevance_gate.get("status") in {"weak_query_match", "weak_candidate_overlap"}:
+        return "needs_query_refinement"
+    if not evidence:
+        return "needs_query_refinement"
+    if gaps:
+        return "ready_with_gaps"
+    return "ready_for_user_inspection"
+
+
+def production_claim_boundary() -> dict[str, Any]:
+    return {
+        "safe_to_use_for": [
+            "finding and inspecting candidate evidence",
+            "query refinement",
+            "coverage-gap discovery",
+            "drafting notes that users verify against citations",
+        ],
+        "not_safe_to_claim": [
+            "the answer is complete or factually correct",
+            "the model found every relevant source",
+            "CANON is a benchmark winner",
+            "the result is publication or high-stakes decision ready",
+        ],
+        "human_review_required_for": [
+            "final conclusions",
+            "factual correctness claims",
+            "publication-quality benchmark claims",
+            "clinical, legal, policy, or operational decisions",
+        ],
+    }
+
+
+def production_draft_brief(
+    packet_response: dict[str, Any],
+    relevance_gate: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    generator_provider: str = "deterministic",
+    generator_model: str | None = None,
+) -> dict[str, Any]:
+    answer_report = packet_response.get("answer_report") or {}
+    citations = answer_report.get("citations") or []
+    support = answer_report.get("support_assessment") or {}
+    if not relevance_gate.get("draft_allowed"):
+        return {
+            "status": "blocked_by_relevance_gate",
+            "method": "abstention",
+            "text": "",
+            "abstention": relevance_gate.get("message") or "The retrieved evidence is not strong enough for a draft.",
+            "citation_count": 0,
+            "citations": [],
+            "support_assessment": support,
+            "boundary": "No draft was generated because the selected corpus/query match is weak.",
+        }
+    usable_evidence = usable_evidence_for_note(evidence, relevance_gate)
+    usable_citations = citations_for_usable_evidence(citations, usable_evidence)
+    if generator_provider not in {"deterministic", "template", "local"}:
+        return model_generated_draft_brief(
+            query=packet_response.get("query") or "",
+            evidence=usable_evidence,
+            diagnostic_count=len(evidence) - len(usable_evidence),
+            support=support,
+            citations=usable_citations,
+            generator_provider=generator_provider,
+            generator_model=generator_model,
+        )
+    answer = evidence_derived_note(packet_response.get("query") or "", usable_evidence, len(evidence) - len(usable_evidence))
+    return {
+        "status": "evidence_note_ready" if answer and usable_citations else "insufficient_cited_evidence",
+        "method": "deterministic_evidence_note",
+        "generator": {"provider": "deterministic", "model": "evidence-note-v1"},
+        "text": answer,
+        "citation_count": len(usable_citations),
+        "citations": usable_citations,
+        "support_assessment": support,
+        "boundary": "This is an evidence-derived note, not model-generated synthesis or final analysis.",
+    }
+
+
+def model_generated_draft_brief(
+    query: str,
+    evidence: list[dict[str, Any]],
+    diagnostic_count: int,
+    support: dict[str, Any],
+    citations: list[dict[str, Any]],
+    generator_provider: str,
+    generator_model: str | None,
+) -> dict[str, Any]:
+    if not evidence:
+        return {
+            "status": "insufficient_cited_evidence",
+            "method": "model_generation_skipped",
+            "generator": {"provider": generator_provider, "model": generator_model},
+            "text": "",
+            "abstention": "No usable evidence rows passed the relevance gate.",
+            "citation_count": 0,
+            "citations": [],
+            "support_assessment": support,
+            "boundary": "Model generation was skipped because no gated evidence was available.",
+        }
+    try:
+        provider = get_generation_provider(generator_provider, generator_model)
+        prompt = model_generation_prompt(query, evidence, diagnostic_count, support)
+        result = provider.generate(prompt)
+        if not str(result.text or "").strip():
+            result = provider.generate(prompt + "\nReturn a non-empty cited answer or an explicit evidence limitation.")
+    except Exception as exc:  # noqa: BLE001 - provider availability belongs in the product response.
+        return {
+            "status": "model_generation_failed",
+            "method": "hosted_model_generation",
+            "generator": {"provider": generator_provider, "model": generator_model},
+            "text": "",
+            "error": str(exc),
+            "citation_count": 0,
+            "citations": [],
+            "support_assessment": support,
+            "boundary": "Hosted model generation failed; no fallback answer was substituted.",
+        }
+    if not str(result.text or "").strip():
+        return {
+            "status": "model_generation_empty",
+            "method": "hosted_model_generation",
+            "generator": {"provider": result.provider, "model": result.model},
+            "text": "",
+            "error": "Hosted model returned an empty response after retry.",
+            "citation_count": 0,
+            "citations": [],
+            "support_assessment": support,
+            "diagnostic_candidate_count": diagnostic_count,
+            "boundary": "Hosted model generation returned no draft; no fallback answer was substituted.",
+        }
+    return {
+        "status": "model_draft_ready",
+        "method": "hosted_model_generation",
+        "generator": {"provider": result.provider, "model": result.model},
+        "text": result.text,
+        "citation_count": len(citations),
+        "citations": citations,
+        "support_assessment": support,
+        "diagnostic_candidate_count": diagnostic_count,
+        "boundary": "Model draft is based only on relevance-gated evidence snippets and still requires verification.",
+    }
+
+
+def model_generation_prompt(
+    query: str,
+    evidence: list[dict[str, Any]],
+    diagnostic_count: int,
+    support: dict[str, Any],
+) -> str:
+    return json.dumps(
+        {
+            "task": "write_a_concise_evidence_grounded_answer",
+            "query": query,
+            "rules": [
+                "Use only the evidence_items below.",
+                "Cite every factual sentence with citation ids like [C1].",
+                "Do not mention evidence not listed here.",
+                "If evidence is partial, say what is missing.",
+                "Do not claim final correctness or completeness.",
+            ],
+            "support_assessment": support,
+            "diagnostic_candidate_count_excluded": diagnostic_count,
+            "evidence_items": [
+                {
+                    "citation_id": item.get("evidence_id") or item.get("citation_id"),
+                    "title": item.get("title"),
+                    "source_name": item.get("source_name"),
+                    "published_at": item.get("published_at"),
+                    "text": collapse_spaces(item.get("text") or item.get("preview") or "")[:900],
+                }
+                for item in evidence[:8]
+            ],
+            "output_format": {
+                "answer": "2-4 concise paragraphs or bullets",
+                "must_include": ["direct answer", "key evidence", "important caveats"],
+            },
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+def usable_evidence_for_note(evidence: list[dict[str, Any]], relevance_gate: dict[str, Any]) -> list[dict[str, Any]]:
+    usable_ids = {
+        row.get("evidence_id")
+        for row in relevance_gate.get("card_gates", [])
+        if row.get("usage_status") == "usable_candidate_evidence"
+    }
+    if not usable_ids:
+        return []
+    return [item for item in evidence if item.get("evidence_id") in usable_ids]
+
+
+def citations_for_usable_evidence(
+    citations: list[dict[str, Any]],
+    evidence: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    usable_ids = {item.get("evidence_id") or item.get("citation_id") for item in evidence}
+    return [citation for citation in citations if citation.get("citation_id") in usable_ids]
+
+
+def evidence_derived_note(query: str, evidence: list[dict[str, Any]], diagnostic_count: int = 0) -> str:
+    if not evidence:
+        return ""
+    intro = f"CANON found {len(evidence)} usable candidate evidence item(s) for inspection."
+    if query:
+        intro += f" Query: {query}."
+    if diagnostic_count:
+        intro += f" {diagnostic_count} retrieved row(s) were kept as diagnostics only."
+    rows = []
+    for item in evidence[:4]:
+        citation_id = item.get("evidence_id") or item.get("citation_id") or "C?"
+        title = collapse_spaces(item.get("title") or "Untitled source")
+        text = collapse_spaces(item.get("text") or item.get("preview") or "")
+        if len(text) > 180:
+            text = text[:177].rstrip() + "..."
+        rows.append(f"{citation_id}: {title}. {text}")
+    return " ".join([intro, *rows])
+
+
+def production_evidence_cards(evidence: list[dict[str, Any]], relevance_gate: dict[str, Any]) -> list[dict[str, Any]]:
+    gates = {
+        row.get("evidence_id"): row
+        for row in relevance_gate.get("card_gates", [])
+    }
+    return [
+        {
+            "evidence_id": item.get("evidence_id"),
+            "rank": item.get("rank"),
+            "title": item.get("title"),
+            "source_name": item.get("source_name"),
+            "published_at": item.get("published_at"),
+            "source_type": item.get("source_type"),
+            "language": item.get("language"),
+            "evidence_scope": item.get("evidence_scope"),
+            "document_id": item.get("document_id"),
+            "chunk_id": item.get("chunk_id"),
+            "text": item.get("text"),
+            "citation": item.get("citation"),
+            "relevance": gates.get(item.get("evidence_id"), {}),
+        }
+        for item in evidence
+    ]
+
+
+def production_recommended_actions(
+    packet_response: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    gaps: list[dict[str, Any]],
+) -> list[str]:
+    actions = []
+    for gap in gaps[:4]:
+        suggested = str(gap.get("suggested_next_query") or "").strip()
+        if suggested:
+            actions.append(f"Try a follow-up query: {suggested}")
+        else:
+            actions.append(str(gap.get("gap") or "Inspect the evidence gap."))
+    diagnostics = packet_response.get("query_diagnostics") or {}
+    weak_terms = diagnostics.get("weak_terms") or []
+    if weak_terms:
+        actions.append("Replace weak terms: " + ", ".join(weak_terms[:5]))
+    if len(evidence) < 5:
+        actions.append("Increase top_k or broaden the query before trusting the draft.")
+    if not actions:
+        actions.append("Inspect the top cited evidence before using the draft.")
+    return dedupe_strings(actions)[:6]
+
+
+def write_production_telemetry(report: dict[str, Any]) -> None:
+    settings = load_settings()
+    packet = report.get("evidence_packet") or {}
+    relevance = report.get("relevance_gate") or {}
+    record = {
+        "report_id": "production_workbench_telemetry_event_v1",
+        "created_at": report.get("created_at"),
+        "session_id": report.get("session_id"),
+        "status": report.get("status"),
+        "mode": report.get("mode"),
+        "policy": report.get("policy"),
+        "top_k": report.get("top_k"),
+        "query": report.get("query"),
+        "elapsed_ms": report.get("elapsed_ms"),
+        "evidence_count": packet.get("evidence_count"),
+        "usable_evidence_count": packet.get("usable_evidence_count"),
+        "support_level": packet.get("support_level"),
+        "confidence": packet.get("confidence"),
+        "relevance_gate_status": relevance.get("status"),
+        "query_term_coverage": relevance.get("query_term_coverage"),
+        "coverage_gap_count": len(report.get("coverage_gaps") or []),
+        "boundary": "Local product telemetry only; this is not a human-review label.",
+    }
+    append_jsonl(settings.reports_dir / "production_workbench_telemetry_v1.jsonl", record)
+
+
+def production_feedback(payload: dict[str, Any]) -> dict[str, Any]:
+    settings = load_settings()
+    session_id = require_text(payload, "session_id")
+    feedback_type = optional_text(payload, "feedback_type") or "general"
+    rating = optional_rating(payload.get("rating"))
+    comment = optional_text(payload, "comment")
+    evidence_id = optional_text(payload, "evidence_id")
+    if rating is None and not comment and not evidence_id:
+        raise ProductError("Provide rating, comment, or evidence_id for feedback.")
+    record = {
+        "report_id": "production_feedback_event_v1",
+        "feedback_id": f"feedback_{uuid.uuid4().hex[:12]}",
+        "created_at": utc_now(),
+        "session_id": session_id,
+        "feedback_type": feedback_type,
+        "rating": rating,
+        "evidence_id": evidence_id,
+        "query": optional_text(payload, "query"),
+        "comment": comment,
+        "not_human_review_label": True,
+        "boundary": "This captures user experience feedback. It is not an authoritative qrels or factual-correctness label.",
+    }
+    append_jsonl(settings.reports_dir / "production_feedback_v1.jsonl", record)
+    return {
+        "report_id": "production_feedback_response_v1",
+        "status": "feedback_recorded",
+        "feedback_id": record["feedback_id"],
+        "session_id": session_id,
+        "stored_at": "reports/production_feedback_v1.jsonl",
+        "boundary": record["boundary"],
+    }
+
+
+def optional_rating(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        rating = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ProductError("rating must be an integer from 1 to 5.") from exc
+    if rating < 1 or rating > 5:
+        raise ProductError("rating must be between 1 and 5.")
+    return rating
+
+
+def optional_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def dedupe_strings(values: list[str]) -> list[str]:
+    seen = set()
+    rows = []
+    for value in values:
+        text = collapse_spaces(value)
+        key = normalized_term(text)
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        rows.append(text)
+    return rows
 
 
 def frame_coverage_report(payload: dict[str, Any]) -> dict:
@@ -767,6 +2364,7 @@ def compact_packet_diagnostics(diagnostics: dict[str, Any]) -> dict[str, Any]:
     return {
         "matched_terms": query_to_corpus.get("matched_terms", []),
         "weak_terms": query_to_corpus.get("weak_terms", []),
+        "semantic_similarity_summary": query_to_corpus.get("semantic_similarity_summary", {}),
         "field_phrases": neighborhood.get("field_phrases", []),
         "query_variants": diagnostics.get("query_variants", []),
         "drift_risk": stability.get("status") or "needs_caution",

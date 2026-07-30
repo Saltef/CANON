@@ -63,6 +63,7 @@ def run_stage1_optimizer(
             benchmark_oracle_expansion=benchmark_oracle_expansion,
             parent_qrels=parent_qrels,
             parent_expansion_limit=parent_expansion_limit,
+            query_cache_dir=settings.reports_dir / "automated_benchmark_query_cache" / suite["suite_id"],
         )
     ]
     report = {
@@ -118,6 +119,7 @@ def run_benchmark_trials(
     benchmark_oracle_expansion: bool,
     parent_qrels: bool,
     parent_expansion_limit: int,
+    query_cache_dir: Path,
 ) -> list[dict[str, Any]]:
     qrels_path = resolve_path(root, Path(benchmark["qrels"]))
     qrels = load_qrels(qrels_path)
@@ -140,6 +142,7 @@ def run_benchmark_trials(
             benchmark_oracle_expansion=benchmark_oracle_expansion,
             parent_qrels=parent_qrels,
             parent_expansion_limit=parent_expansion_limit,
+            query_cache_dir=query_cache_dir,
         )
         for candidate_k in candidate_values
         for fusion in fusion_methods
@@ -166,6 +169,7 @@ def run_trial(
     benchmark_oracle_expansion: bool,
     parent_qrels: bool,
     parent_expansion_limit: int,
+    query_cache_dir: Path,
 ) -> dict[str, Any]:
     cache_path = trial_cache_path(
         cache_dir,
@@ -207,6 +211,7 @@ def run_trial(
         benchmark_oracle_expansion=benchmark_oracle_expansion,
         parent_qrels=parent_qrels,
         parent_expansion_limit=parent_expansion_limit,
+        query_cache_dir=query_cache_dir,
     )
     reranker = first_or_empty(report.get("rerankers", []))
     summary = reranker.get("summary", {}) if reranker.get("status") == "ok" else {}

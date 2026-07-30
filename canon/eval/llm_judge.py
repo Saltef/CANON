@@ -249,7 +249,7 @@ Query diagnostics: {json.dumps(answer_payload.get('query_diagnostics') or {}, en
 def normalize_qrels_judgment(judgment: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
     relevance = int(float(judgment.get("judge_relevance", 0)))
     relevance = min(3, max(0, relevance))
-    confidence = min(1.0, max(0.0, float(judgment.get("judge_confidence", 0.0) or 0.0)))
+    confidence = normalized_confidence(judgment.get("judge_confidence", 0.0))
     audit_priority = qrels_audit_priority(row, relevance, confidence)
     return {
         "judge_relevance": str(relevance),
@@ -261,8 +261,8 @@ def normalize_qrels_judgment(judgment: dict[str, Any], row: dict[str, Any]) -> d
 
 
 def normalize_answer_judgment(judgment: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
-    confidence = min(1.0, max(0.0, float(judgment.get("judge_confidence", 0.0) or 0.0)))
-    unsupported = int(float(judgment.get("judge_unsupported_claim_count", 0) or 0))
+    confidence = normalized_confidence(judgment.get("judge_confidence", 0.0))
+    unsupported = nonnegative_int(judgment.get("judge_unsupported_claim_count", 0))
     audit_priority = answer_audit_priority(record, judgment, confidence)
     return {
         "judge_evidence_relevance": label(judgment, "judge_evidence_relevance", {"high", "medium", "low"}, "medium"),
@@ -331,6 +331,30 @@ def answer_audit_priority(record: dict[str, Any], judgment: dict[str, Any], conf
 def label(judgment: dict[str, Any], key: str, allowed: set[str], default: str) -> str:
     value = str(judgment.get(key) or "").strip()
     return value if value in allowed else default
+
+
+def normalized_confidence(value: Any) -> float:
+    try:
+        return min(1.0, max(0.0, float(value or 0.0)))
+    except (TypeError, ValueError):
+        pass
+    mapped = {
+        "low": 0.33,
+        "medium": 0.66,
+        "moderate": 0.66,
+        "high": 0.9,
+    }.get(str(value or "").strip().lower(), 0.0)
+    return mapped
+
+
+def nonnegative_int(value: Any) -> int:
+    try:
+        return max(0, int(float(value or 0)))
+    except (TypeError, ValueError):
+        normalized = str(value or "").strip().lower()
+        if normalized in {"none", "no", "zero"}:
+            return 0
+        return 0
 
 
 def parse_json_object(text: str) -> dict[str, Any]:

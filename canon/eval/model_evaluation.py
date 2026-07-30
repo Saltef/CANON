@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from canon.config import load_settings
+from canon.embeddings.store import build_embedding_store, embedding_store_path, load_embedding_records
 from canon.embeddings.providers import (
     EmbeddingResult,
     embedding_preparation,
@@ -74,7 +75,7 @@ def evaluate_semantic_models(
     queries = load_eval_queries(queries_path, qrels_path)
     provider_names = providers or DEFAULT_PROVIDERS
     provider_reports = [
-        evaluate_provider(provider_name, documents, queries, k=k, batch_size=batch_size)
+        evaluate_provider(provider_name, mode, documents, queries, k=k, batch_size=batch_size)
         for provider_name in provider_names
     ]
     report = {
@@ -94,6 +95,7 @@ def evaluate_semantic_models(
 
 def evaluate_provider(
     provider_name: str,
+    mode: str,
     documents: list[RetrievalDocument],
     queries: list[dict[str, Any]],
     k: int,
@@ -103,7 +105,12 @@ def evaluate_provider(
     provider_key, model = parse_provider_spec(provider_name)
     try:
         provider = get_embedding_provider(provider_key, model)
-        document_vectors = embed_documents(provider, documents, batch_size=batch_size)
+        document_vectors, document_cache = embed_documents(
+            provider,
+            documents,
+            mode=mode,
+            batch_size=batch_size,
+        )
         query_reports = [
             evaluate_query(provider, document_vectors, query, k=k)
             for query in queries
@@ -126,6 +133,7 @@ def evaluate_provider(
         "preparation": embedding_preparation(provider),
         "status": "ok",
         "dimensions": document_vectors[0]["dimensions"] if document_vectors else 0,
+        "document_embedding_cache": document_cache,
         "elapsed_ms": elapsed_ms,
         "query_count": len(query_reports),
         "summary": summary,
@@ -134,26 +142,80 @@ def evaluate_provider(
     }
 
 
-def embed_documents(provider: Any, documents: list[RetrievalDocument], batch_size: int) -> list[dict[str, Any]]:
+def embed_documents(
+    provider: Any,
+    documents: list[RetrievalDocument],
+    mode: str,
+    batch_size: int,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    settings = load_settings()
+    cache_path = embedding_store_path(settings.data_dir, mode, provider.provider, provider.model)
+    records = load_embedding_records(cache_path)
+    if len(records) < len(documents):
+        build_embedding_store(mode, provider.provider, provider.model, batch_size=batch_size)
+        records = load_embedding_records(cache_path)
+    if len(records) >= len(documents):
+        by_chunk = {str(record["chunk_id"]): record for record in records}
+        rows = [
+            document_vector_from_record(document, by_chunk[str(document.chunk_id)])
+            for document in documents
+            if str(document.chunk_id) in by_chunk
+        ]
+        if len(rows) == len(documents):
+            return rows, {
+                "status": "hit",
+                "path": str(cache_path).replace("\\", "/"),
+                "record_count": len(records),
+            }
+    rows = embed_documents_uncached(provider, documents, batch_size=batch_size)
+    return rows, {
+        "status": "miss",
+        "path": str(cache_path).replace("\\", "/"),
+        "record_count": len(records),
+    }
+
+
+def document_vector_from_record(document: RetrievalDocument, record: dict[str, Any]) -> dict[str, Any]:
+    embedding = EmbeddingResult(
+        provider=str(record["provider"]),
+        model=str(record["model"]),
+        dimensions=int(record["dimensions"]),
+        vector=[float(value) for value in record["vector"]],
+    )
+    return document_vector_row(document, embedding)
+
+
+def embed_documents_uncached(
+    provider: Any,
+    documents: list[RetrievalDocument],
+    batch_size: int,
+) -> list[dict[str, Any]]:
     rows = []
     for start in range(0, len(documents), batch_size):
         batch = documents[start : start + batch_size]
         embeddings = provider_embed_documents(provider, [document.text for document in batch])
         rows.extend(
-            {
-                "chunk_id": document.chunk_id,
-                "work_id": document.work_id,
-                "title": document.title,
-                "source_name": document.source_name,
-                "document_type": document.work_signals.get("document_type"),
-                "domain": document.work_signals.get("domain") or document.work_signals.get("domain_profile"),
-                "text": document.text,
-                "embedding": embedding,
-                "dimensions": embedding.dimensions,
-            }
+            document_vector_row(document, embedding)
             for document, embedding in zip(batch, embeddings, strict=True)
         )
     return rows
+
+
+def document_vector_row(document: RetrievalDocument, embedding: EmbeddingResult) -> dict[str, Any]:
+    sparse = sparse_vector(embedding.vector)
+    return {
+        "chunk_id": document.chunk_id,
+        "work_id": document.work_id,
+        "title": document.title,
+        "source_name": document.source_name,
+        "document_type": document.work_signals.get("document_type"),
+        "domain": document.work_signals.get("domain") or document.work_signals.get("domain_profile"),
+        "text": document.text,
+        "embedding": embedding,
+        "embedding_sparse": sparse,
+        "embedding_norm": sparse_norm(sparse),
+        "dimensions": embedding.dimensions,
+    }
 
 
 def evaluate_query(provider: Any, document_vectors: list[dict[str, Any]], query: dict[str, Any], k: int) -> dict[str, Any]:
@@ -189,9 +251,16 @@ def evaluate_query(provider: Any, document_vectors: list[dict[str, Any]], query:
 
 
 def rank_vectors(query_embedding: EmbeddingResult, document_vectors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    query_sparse = sparse_vector(query_embedding.vector)
+    query_norm = sparse_norm(query_sparse)
     rows = []
     for row in document_vectors:
-        score = dense_cosine(query_embedding.vector, row["embedding"].vector)
+        score = sparse_cosine(
+            query_sparse,
+            query_norm,
+            row.get("embedding_sparse") or sparse_vector(row["embedding"].vector),
+            float(row.get("embedding_norm") or 0.0),
+        )
         rows.append({**row, "score": score})
     return sorted(rows, key=lambda item: (item["score"], item["chunk_id"]), reverse=True)
 
@@ -204,6 +273,28 @@ def dense_cosine(left: list[float], right: list[float]) -> float:
     right_norm = math.sqrt(sum(value * value for value in right))
     if left_norm <= 0 or right_norm <= 0:
         return 0.0
+    return numerator / (left_norm * right_norm)
+
+
+def sparse_vector(vector: list[float]) -> dict[int, float]:
+    return {index: float(value) for index, value in enumerate(vector) if float(value) != 0.0}
+
+
+def sparse_norm(vector: dict[int, float]) -> float:
+    return math.sqrt(sum(value * value for value in vector.values()))
+
+
+def sparse_cosine(
+    left: dict[int, float],
+    left_norm: float,
+    right: dict[int, float],
+    right_norm: float,
+) -> float:
+    if left_norm <= 0 or right_norm <= 0:
+        return 0.0
+    if len(left) > len(right):
+        left, right = right, left
+    numerator = sum(value * right.get(index, 0.0) for index, value in left.items())
     return numerator / (left_norm * right_norm)
 
 

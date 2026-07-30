@@ -123,6 +123,77 @@ class AutomatedBenchmarkSuiteTests(unittest.TestCase):
             "automated_fail",
         )
 
+    def test_suite_reuses_cached_benchmark_reports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports_dir = root / "reports"
+            gold_dir = root / "gold"
+            conf_dir = root / "conf" / "benchmark_suites"
+            reports_dir.mkdir()
+            gold_dir.mkdir()
+            conf_dir.mkdir(parents=True)
+            (gold_dir / "unit_qrels.json").write_text(
+                json.dumps(
+                    {
+                        "benchmark_id": "unit_qrels",
+                        "benchmark_kind": "public_qrels",
+                        "queries": [{"id": "q1", "query": "alpha", "relevant": {"chunk:a": 1}}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            suite_path = conf_dir / "suite.json"
+            suite_path.write_text(
+                json.dumps(
+                    {
+                        "suite_id": "unit_suite",
+                        "model_providers": ["local"],
+                        "rerankers": ["heuristic"],
+                        "thresholds": {"min_candidate_recall": 0.8, "min_rerank_recall_at_k": 0.5},
+                        "benchmarks": [{"id": "unit_benchmark", "mode": "unit_mode", "qrels": "gold/unit_qrels.json"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            settings = SimpleNamespace(root=root, reports_dir=reports_dir)
+            with patch("canon.product.automated_benchmark_suite.load_settings", return_value=settings):
+                with patch("canon.product.automated_benchmark_suite.evaluate_semantic_models") as semantic:
+                    with patch("canon.product.automated_benchmark_suite.evaluate_rerankers") as rerank:
+                        semantic.return_value = {
+                            "providers": [{"provider": "local", "status": "ok"}],
+                            "leaderboard": [{"rank": 1, "provider": "local", "primary_score": 0.7}],
+                        }
+                        rerank.return_value = {
+                            "candidate_generation": {"mode": "pooled_lexical_vector"},
+                            "rerankers": [
+                                {
+                                    "provider": "heuristic",
+                                    "status": "ok",
+                                    "queries": [
+                                        {
+                                            "candidate_recall": {"candidate_recall": 1.0},
+                                            "score_observability": {
+                                                "relevant_nonrelevant_score_gap": 0.2,
+                                                "low_confidence_top_k_count": 0,
+                                            },
+                                        }
+                                    ],
+                                }
+                            ],
+                            "leaderboard": [
+                                {"rank": 1, "provider": "heuristic", "primary_score": 0.6, "Recall@k": 1.0}
+                            ],
+                        }
+
+                        first = run_automated_benchmark_suite(suite_path=suite_path, write_report=False)
+                        second = run_automated_benchmark_suite(suite_path=suite_path, write_report=False)
+
+        self.assertEqual(semantic.call_count, 1)
+        self.assertEqual(rerank.call_count, 1)
+        self.assertFalse(first["benchmarks"][0]["cache_hit"])
+        self.assertTrue(second["benchmarks"][0]["cache_hit"])
+        self.assertEqual(second["cache"]["cached_benchmark_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

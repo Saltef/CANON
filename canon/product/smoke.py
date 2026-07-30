@@ -21,6 +21,7 @@ def build_smoke_report(
     results = {
         "health": service.health(),
         "summary": service.product_summary(mode),
+        "production_status": service.production_status({"mode": mode}),
         "answer": service.answer(
             {
                 "query": query,
@@ -63,6 +64,18 @@ def build_smoke_report(
                 },
             }
         ),
+        "production_workbench": service.production_evidence_workbench(
+            {
+                "session_id": "smoke_workbench",
+                "query": query,
+                "mode": mode,
+                "policy": service.DEFAULT_POLICY,
+                "top_k": 5,
+                "freedom_level": "balanced",
+                "suggest_external_expansion": True,
+                "write_telemetry": False,
+            }
+        ),
     }
     checks = smoke_checks(results)
     report = {
@@ -74,6 +87,8 @@ def build_smoke_report(
         "endpoints": [
             "GET /health",
             "GET /v1/summary",
+            "GET /v1/production/status",
+            "POST /v1/production/evidence-workbench",
             "POST /v1/answer",
             "POST /v1/compare",
             "POST /v1/query-diagnostics",
@@ -91,6 +106,11 @@ def smoke_checks(results: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         check("health_ok", results["health"].get("status") == "ok"),
         check("summary_has_claim_boundaries", bool(results["summary"].get("claim_boundaries"))),
+        check(
+            "production_status_has_boundaries",
+            bool(results["production_status"].get("shippable_without_human_review"))
+            and bool(results["production_status"].get("blocked_without_human_review")),
+        ),
         check("answer_has_citations", bool(results["answer"].get("citations"))),
         check("answer_has_evidence", bool(results["answer"].get("evidence"))),
         check("answer_has_query_diagnostics", bool(results["answer"].get("query_diagnostics"))),
@@ -107,6 +127,14 @@ def smoke_checks(results: dict[str, Any]) -> list[dict[str, Any]]:
             "evidence_packets_expansion_not_executed",
             not results["evidence_packets"].get("external_expansion", {}).get("executed"),
         ),
+        check(
+            "production_workbench_has_evidence_cards",
+            bool(results["production_workbench"].get("evidence_cards")),
+        ),
+        check(
+            "production_workbench_has_claim_boundary",
+            bool(results["production_workbench"].get("claim_boundary")),
+        ),
     ]
 
 
@@ -118,9 +146,11 @@ def compact_results(results: dict[str, Any]) -> dict[str, Any]:
     answer = results["answer"]
     diagnostics = results["query_diagnostics"]
     packets = results["evidence_packets"]
+    production = results["production_workbench"]
     return {
         "health_status": results["health"].get("status"),
         "summary_product": results["summary"].get("product"),
+        "production_status": results["production_status"].get("status"),
         "answer_citation_count": len(answer.get("citations") or []),
         "answer_evidence_count": len(answer.get("evidence") or []),
         "answer_support_level": (answer.get("support_assessment") or {}).get("support_level"),
@@ -131,6 +161,8 @@ def compact_results(results: dict[str, Any]) -> dict[str, Any]:
         "evidence_packet_count": len(packets.get("evidence_packets") or []),
         "evidence_packet_contract_status": (packets.get("contract_validation") or {}).get("status"),
         "external_expansion_status": (packets.get("external_expansion") or {}).get("status"),
+        "production_workbench_status": production.get("status"),
+        "production_workbench_evidence_count": len(production.get("evidence_cards") or []),
     }
 
 

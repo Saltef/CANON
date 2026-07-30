@@ -11,20 +11,28 @@ class ProductSmokeTests(unittest.TestCase):
                 "canon.product.smoke.service.product_summary",
                 return_value={"product": "CANON Evidence Workbench", "claim_boundaries": {"claim": "bounded"}},
             ):
-                with patch("canon.product.smoke.service.answer", return_value=answer_payload()):
-                    with patch("canon.product.smoke.service.compare_retrieval", return_value=compare_payload()):
-                        with patch(
-                            "canon.product.smoke.service.query_diagnostics",
-                            return_value=query_diagnostics_payload(),
-                        ):
+                with patch("canon.product.smoke.service.production_status", return_value=production_status_payload()):
+                    with patch("canon.product.smoke.service.answer", return_value=answer_payload()):
+                        with patch("canon.product.smoke.service.compare_retrieval", return_value=compare_payload()):
                             with patch(
-                                "canon.product.smoke.service.evidence_packets",
-                                return_value=evidence_packets_payload(),
+                                "canon.product.smoke.service.query_diagnostics",
+                                return_value=query_diagnostics_payload(),
                             ):
-                                report = build_smoke_report(mode="demo", write_report=False)
+                                with patch(
+                                    "canon.product.smoke.service.evidence_packets",
+                                    return_value=evidence_packets_payload(),
+                                ):
+                                    with patch(
+                                        "canon.product.smoke.service.production_evidence_workbench",
+                                        return_value=production_workbench_payload(),
+                                    ):
+                                        report = build_smoke_report(mode="demo", write_report=False)
         self.assertEqual(report["status"], "pass")
         self.assertEqual(report["result_summary"]["answer_citation_count"], 1)
         self.assertEqual(report["result_summary"]["evidence_packet_contract_status"], "pass")
+        self.assertEqual(report["result_summary"]["production_workbench_evidence_count"], 1)
+        self.assertIn("GET /v1/production/status", report["endpoints"])
+        self.assertIn("POST /v1/production/evidence-workbench", report["endpoints"])
         self.assertIn("POST /v1/query-diagnostics", report["endpoints"])
         self.assertIn("POST /v1/evidence-packets", report["endpoints"])
 
@@ -32,10 +40,12 @@ class ProductSmokeTests(unittest.TestCase):
         results = {
             "health": {"status": "ok"},
             "summary": {"claim_boundaries": {"claim": "bounded"}},
+            "production_status": production_status_payload(),
             "answer": {**answer_payload(), "citations": []},
             "compare": compare_payload(),
             "query_diagnostics": query_diagnostics_payload(),
             "evidence_packets": evidence_packets_payload(),
+            "production_workbench": production_workbench_payload(),
         }
         checks = smoke_checks(results)
         self.assertIn({"id": "answer_has_citations", "passed": False}, checks)
@@ -44,6 +54,7 @@ class ProductSmokeTests(unittest.TestCase):
         results = {
             "health": {"status": "ok"},
             "summary": {"claim_boundaries": {"claim": "bounded"}},
+            "production_status": production_status_payload(),
             "answer": answer_payload(),
             "compare": compare_payload(),
             "query_diagnostics": query_diagnostics_payload(),
@@ -51,6 +62,7 @@ class ProductSmokeTests(unittest.TestCase):
                 **evidence_packets_payload(),
                 "contract_validation": {"status": "fail"},
             },
+            "production_workbench": production_workbench_payload(),
         }
         checks = smoke_checks(results)
         self.assertIn({"id": "evidence_packets_contract_passed", "passed": False}, checks)
@@ -95,6 +107,22 @@ def evidence_packets_payload():
         ],
         "external_expansion": {"status": "planned", "executed": False},
         "contract_validation": {"status": "pass"},
+    }
+
+
+def production_status_payload():
+    return {
+        "status": "ship_user_experience_ready",
+        "shippable_without_human_review": ["corpus-backed evidence packets"],
+        "blocked_without_human_review": ["autonomous factual conclusions"],
+    }
+
+
+def production_workbench_payload():
+    return {
+        "status": "ready_for_user_inspection",
+        "claim_boundary": {"safe_to_use_for": ["finding evidence"]},
+        "evidence_cards": [{"evidence_id": "C1"}],
     }
 
 

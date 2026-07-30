@@ -14,8 +14,13 @@ class ProductServerRouteTests(unittest.TestCase):
 
         payload = handler.send_json.call_args.args[0]
         self.assertEqual(payload["service"], "canon")
+        self.assertIn("/app", payload["get"])
+        self.assertIn("/v1/production/status", payload["get"])
         self.assertIn("/v1/routes", payload["get"])
         self.assertGreater(payload["route_count"], 0)
+        self.assertIn("/v1/production/evidence-workbench", payload["post"])
+        self.assertIn("/v1/production/feedback", payload["post"])
+        self.assertIn("/v1/production/corpus-setup", payload["post"])
         self.assertIn("/v1/projects/start", payload["post"])
         self.assertIn("/v1/evidence-packets", payload["post"])
         self.assertIn("/v1/frame-coverage", payload["post"])
@@ -43,6 +48,17 @@ class ProductServerRouteTests(unittest.TestCase):
         handler.do_GET()
 
         handler.send_empty.assert_called_once()
+
+    def test_app_route_returns_workbench_html(self):
+        handler = object.__new__(CanonHandler)
+        handler.path = "/app"
+        handler.send_html = Mock()
+
+        handler.do_GET()
+
+        html = handler.send_html.call_args.args[0]
+        self.assertIn("CANON Evidence Discovery", html)
+        self.assertIn("/v1/production/evidence-workbench", html)
 
     def test_unknown_route_returns_route_discovery_hint(self):
         handler = object.__new__(CanonHandler)
@@ -79,6 +95,11 @@ class ProductServerRouteTests(unittest.TestCase):
         payload = handler.send_json.call_args.args[0]
         self.assertIn("human_review_boundary", payload)
         paths = {route["path"]: route for route in payload["routes"]}
+        self.assertEqual(paths["/app"]["method"], "GET")
+        self.assertEqual(paths["/v1/production/status"]["method"], "GET")
+        self.assertEqual(paths["/v1/production/evidence-workbench"]["method"], "POST")
+        self.assertEqual(paths["/v1/production/feedback"]["method"], "POST")
+        self.assertEqual(paths["/v1/production/corpus-setup"]["method"], "POST")
         self.assertEqual(paths["/v1/projects/start"]["method"], "POST")
         self.assertIn("project_name", paths["/v1/projects/start"]["required"])
         self.assertEqual(paths["/v1/flagship-handoff"]["method"], "POST")
@@ -109,6 +130,9 @@ class ProductServerRouteTests(unittest.TestCase):
 
     def test_post_routes_include_integration_endpoints(self):
         routes = {
+            "/v1/production/evidence-workbench": ("production_evidence_workbench", {"status": "ready_for_user_inspection"}),
+            "/v1/production/feedback": ("production_feedback", {"status": "feedback_recorded"}),
+            "/v1/production/corpus-setup": ("production_corpus_setup", {"status": "corpus_ready"}),
             "/v1/projects/start": ("start_project", {"status": "ready"}),
             "/v1/sources/profile": ("source_profile", {"source_shape": "document_file"}),
             "/v1/sources/ingest": ("source_ingest", {"mode": "m"}),

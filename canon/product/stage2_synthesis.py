@@ -447,11 +447,10 @@ def default_stage2_model(provider: str) -> str:
 def cluster_claim_candidates(candidates: list[tuple[str, dict[str, Any]]]) -> list[list[tuple[str, dict[str, Any]]]]:
     clusters: list[list[tuple[str, dict[str, Any]]]] = []
     for claim, item in candidates:
-        terms = content_terms(claim)
         placed = False
         for cluster in clusters:
-            cluster_terms = content_terms(representative_claim([row[0] for row in cluster]))
-            if jaccard(terms, cluster_terms) >= 0.42:
+            cluster_claim = representative_claim([row[0] for row in cluster])
+            if should_cluster_claims(claim, cluster_claim):
                 cluster.append((claim, item))
                 placed = True
                 break
@@ -461,10 +460,59 @@ def cluster_claim_candidates(candidates: list[tuple[str, dict[str, Any]]]) -> li
     return clusters
 
 
+def should_cluster_claims(left_claim: str, right_claim: str) -> bool:
+    left = content_terms(left_claim)
+    right = content_terms(right_claim)
+    if jaccard(left, right) >= 0.42:
+        return True
+    left_core = claim_core_terms(left_claim)
+    right_core = claim_core_terms(right_claim)
+    if jaccard(left_core, right_core) >= 0.34 and (
+        contains_contradiction_marker(left_claim.lower())
+        or contains_contradiction_marker(right_claim.lower())
+    ):
+        return True
+    return False
+
+
+def claim_core_terms(text: str) -> set[str]:
+    generic = {
+        "after",
+        "data",
+        "does",
+        "load",
+        "review",
+        "says",
+        "show",
+        "shows",
+        "the",
+    }
+    return {canonical_term(token) for token in content_terms(text) if token not in generic}
+
+
+def canonical_term(token: str) -> str:
+    aliases = {
+        "centers": "center",
+        "increased": "increase",
+        "increases": "increase",
+        "logs": "log",
+    }
+    if token in aliases:
+        return aliases[token]
+    if token.endswith("s") and len(token) > 4:
+        return token[:-1]
+    return token
+
+
 def representative_claim(claims: list[str]) -> str:
     if not claims:
         return ""
-    return sorted(claims, key=lambda claim: (len(content_terms(claim)), len(claim)), reverse=True)[0]
+    candidates = [
+        claim
+        for claim in claims
+        if not contains_contradiction_marker(claim.lower())
+    ] or claims
+    return sorted(candidates, key=lambda claim: (len(content_terms(claim)), len(claim)), reverse=True)[0]
 
 
 def build_evidence_link(claim: str, evidence: dict[str, Any]) -> EvidenceLink:
@@ -502,12 +550,23 @@ def classify_stance(claim: str, evidence: dict[str, Any]) -> tuple[Stance, float
 
 def contains_contradiction_marker(text: str) -> bool:
     markers = ("does not", "did not", "not attribute", "conflicting", "contradict", "opposite", "however")
-    return any(marker in text for marker in markers)
+    return contains_marker(text, markers)
 
 
 def contains_qualification_marker(text: str) -> bool:
     markers = ("but", "although", "while", "under certain", "limited", "not representative", "depends")
-    return any(marker in text for marker in markers)
+    return contains_marker(text, markers)
+
+
+def contains_marker(text: str, markers: tuple[str, ...]) -> bool:
+    tokens = set(tokenize(text))
+    for marker in markers:
+        if " " in marker:
+            if marker in text:
+                return True
+        elif marker in tokens or any(token.startswith(marker) for token in tokens if len(marker) >= 6):
+            return True
+    return False
 
 
 def hedge_score(text: str) -> float:

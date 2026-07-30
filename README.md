@@ -110,10 +110,32 @@ Start the product API:
 python -m canon.product.server --host 127.0.0.1 --port 8000
 ```
 
+Open the local Evidence Discovery Workbench:
+
+```text
+http://127.0.0.1:8000/app
+```
+
+The workbench runs local corpus retrieval, evidence cards, query diagnostics,
+coverage gaps, a cited draft preview, and product feedback capture. By default
+it does not call hosted models or external web search; external expansion is
+shown as reviewable suggestions only. Feedback is stored as local user
+experience telemetry, not as formal human-review labels.
+
+Use the Corpus Setup panel in the app to profile, ingest, and build a corpus
+from a local folder or file path. After setup, select the new mode in the Corpus
+dropdown and run a question. The production workbench also runs a relevance gate:
+if the selected corpus does not visibly match the query, it blocks the evidence
+note and marks retrieved rows as diagnostic candidates instead of usable
+supporting evidence.
+
 Check the API:
 
 ```powershell
 Invoke-WebRequest http://localhost:8000/health
+Invoke-RestMethod http://localhost:8000/v1/production/status
+Invoke-RestMethod -Method Post http://localhost:8000/v1/production/corpus-setup -ContentType "application/json" -Body '{"input_path":"data/my_docs","mode":"my_topic_v1","corpus_id":"my_topic_v1_corpus","build_corpus":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/production/evidence-workbench -ContentType "application/json" -Body '{"query":"What are the grid risks around AI data center expansion?","mode":"ai_infra_geo_risk_demo","top_k":12,"freedom_level":"balanced","suggest_external_expansion":true}'
 Invoke-RestMethod http://localhost:8000/v1/routes
 Invoke-RestMethod -Method Post http://localhost:8000/v1/projects/start -ContentType "application/json" -Body '{"project_name":"AI Infrastructure Geopolitical Risk","domain":"AI infrastructure and geopolitical risk","regions":["Latin America","Brazil","Chile","Mexico"],"languages":["English","Spanish","Portuguese"],"issue_categories":["energy demand","water and cooling","cloud dependency"],"desired_report_types":["weekly_intelligence_brief","alert_digest"],"source_boundaries":["G:/My Drive/CANON Corpus"]}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/sources/profile -ContentType "application/json" -Body '{"input_path":"data/my_docs","sample_size":25}'
@@ -185,6 +207,7 @@ See [docs/evaluation.md](docs/evaluation.md) and
 - [Evaluation and Human Review](docs/evaluation.md)
 - [Evidence-Grounded Intelligence Runner](docs/intelligence_runner.md)
 - [Human Review Rubric](docs/human_review_rubric.md)
+- [Publishable Evaluation Package](docs/publishable_evaluation_package.md)
 - [Testing on Your Own Documents](docs/test_own_documents.md)
 - [Use Case and Product Boundary](docs/use_case.md)
 - [Scientific Defensibility](docs/scientific_defensibility.md)

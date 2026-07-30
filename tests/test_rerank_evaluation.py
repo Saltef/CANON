@@ -198,6 +198,120 @@ class RerankEvaluationTests(unittest.TestCase):
 
         self.assertEqual(effective["chunk:candidate"], 1.0)
 
+    @patch("canon.eval.rerank_evaluation.run_retrieval")
+    def test_reranker_reuses_query_cache(self, run_retrieval):
+        run_retrieval.return_value = {
+            "results": [
+                result("chunk:a", "Economic Sanctions", "economic sanctions affect compliance"),
+            ]
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            qrels_path = root / "qrels.json"
+            cache_dir = root / "cache"
+            qrels_path.write_text(
+                json.dumps(
+                    {
+                        "benchmark_id": "unit",
+                        "queries": [
+                            {
+                                "id": "q1",
+                                "query": "economic sanctions compliance",
+                                "relevant": {"chunk:a": 3},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            first = evaluate_rerankers(
+                mode="unit",
+                qrels_path=qrels_path,
+                rerankers=["heuristic"],
+                candidate_k=1,
+                k=1,
+                query_cache_dir=cache_dir,
+            )
+            second = evaluate_rerankers(
+                mode="unit",
+                qrels_path=qrels_path,
+                rerankers=["heuristic"],
+                candidate_k=1,
+                k=1,
+                query_cache_dir=cache_dir,
+            )
+
+        self.assertEqual(run_retrieval.call_count, 1)
+        self.assertFalse(first["rerankers"][0]["queries"][0]["cache_hit"])
+        self.assertTrue(second["rerankers"][0]["queries"][0]["cache_hit"])
+        self.assertEqual(second["rerankers"][0]["cache"]["hit_count"], 1)
+
+    @patch("canon.eval.rerank_evaluation.build_candidate_pool")
+    def test_complete_query_cache_skips_pooled_context_build(self, build_candidate_pool):
+        build_candidate_pool.return_value = {
+            "source_counts": {"lexical": 1, "vector:local": 1},
+            "candidates": [
+                {
+                    "chunk_id": "chunk:a",
+                    "work_id": "work:a",
+                    "title": "Economic Sanctions",
+                    "source_name": "Journal",
+                    "year": 2024,
+                    "preview": "economic sanctions affect compliance",
+                    "scores": {"lexical": 1.0, "vector:local": 0.8},
+                    "ranks": {"lexical": 1, "vector:local": 1},
+                    "retrieval_sources": ["lexical", "vector:local"],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            qrels_path = root / "qrels.json"
+            cache_dir = root / "cache"
+            qrels_path.write_text(
+                json.dumps(
+                    {
+                        "benchmark_id": "unit",
+                        "queries": [
+                            {
+                                "id": "q1",
+                                "query": "economic sanctions compliance",
+                                "relevant": {"chunk:a": 3},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch("canon.eval.rerank_evaluation.build_pooled_candidate_context", return_value=None):
+                first = evaluate_rerankers(
+                    mode="unit",
+                    qrels_path=qrels_path,
+                    rerankers=["heuristic"],
+                    candidate_k=1,
+                    k=1,
+                    pooled_candidates=True,
+                    query_cache_dir=cache_dir,
+                )
+            with patch(
+                "canon.eval.rerank_evaluation.build_pooled_candidate_context",
+                side_effect=AssertionError("pooled context should not be rebuilt"),
+            ):
+                second = evaluate_rerankers(
+                    mode="unit",
+                    qrels_path=qrels_path,
+                    rerankers=["heuristic"],
+                    candidate_k=1,
+                    k=1,
+                    pooled_candidates=True,
+                    query_cache_dir=cache_dir,
+                )
+
+        self.assertFalse(first["rerankers"][0]["queries"][0]["cache_hit"])
+        self.assertTrue(second["rerankers"][0]["queries"][0]["cache_hit"])
+        self.assertEqual(build_candidate_pool.call_count, 1)
+
 
 def result(chunk_id, title, preview):
     return {

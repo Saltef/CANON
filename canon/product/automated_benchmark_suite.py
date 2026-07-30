@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -27,13 +28,16 @@ def run_automated_benchmark_suite(
     pooled_candidates: bool | None = None,
     fusion: str | None = None,
     document_format: str | None = None,
+    resume: bool = True,
     write_report: bool = True,
 ) -> dict[str, Any]:
     settings = load_settings()
     suite = load_suite(resolve_path(settings.root, suite_path or DEFAULT_SUITE_PATH))
+    cache_dir = settings.reports_dir / "automated_benchmark_cache" / suite["suite_id"]
     benchmarks = [
         run_benchmark(
             settings.root,
+            cache_dir,
             benchmark,
             model_providers=model_providers or suite.get("model_providers") or ["local"],
             rerankers=rerankers or suite.get("rerankers") or ["heuristic"],
@@ -46,6 +50,8 @@ def run_automated_benchmark_suite(
             else bool(suite.get("pooled_candidates", True)),
             fusion=fusion or str(suite.get("fusion", "union")),
             document_format=document_format or str(suite.get("document_format", "plain")),
+            resume=resume,
+            query_cache_dir=settings.reports_dir / "automated_benchmark_query_cache" / suite["suite_id"],
         )
         for benchmark in suite.get("benchmarks", [])
     ]
@@ -58,6 +64,12 @@ def run_automated_benchmark_suite(
         "model_matrix": model_matrix(benchmarks),
         "human_review_boundary": human_review_boundary(),
         "thresholds": thresholds,
+        "cache": {
+            "enabled": resume,
+            "path": relative(settings.root, cache_dir),
+            "query_cache_path": relative(settings.root, settings.reports_dir / "automated_benchmark_query_cache" / suite["suite_id"]),
+            "cached_benchmark_count": sum(1 for benchmark in benchmarks if benchmark.get("cache_hit")),
+        },
         "benchmark_count": len(benchmarks),
         "benchmark_topic_count": len(topic_summary(benchmarks)),
         "query_topic_count": len(query_topic_summary(benchmarks)),
@@ -83,6 +95,7 @@ def run_automated_benchmark_suite(
 
 def run_benchmark(
     root: Path,
+    cache_dir: Path,
     benchmark: dict[str, Any],
     model_providers: list[str],
     rerankers: list[str],
@@ -93,14 +106,35 @@ def run_benchmark(
     pooled_candidates: bool,
     fusion: str,
     document_format: str,
+    resume: bool,
+    query_cache_dir: Path,
 ) -> dict[str, Any]:
     qrels_path = resolve_path(root, Path(benchmark["qrels"]))
     qrels = load_qrels(qrels_path)
-    semantic = evaluate_semantic_models(
-        mode=benchmark["mode"],
+    cache_path = benchmark_cache_path(
+        cache_dir,
+        benchmark=benchmark,
+        model_providers=model_providers,
+        rerankers=rerankers,
+        top_k=top_k,
+        candidate_k=candidate_k,
+        lexical_k=lexical_k or int(benchmark.get("lexical_k", candidate_k)),
+        vector_k=vector_k or int(benchmark.get("vector_k", candidate_k)),
+        pooled_candidates=pooled_candidates,
+        fusion=str(benchmark.get("fusion", fusion)),
+        document_format=str(benchmark.get("document_format", document_format)),
+    )
+    if resume and cache_path.exists():
+        cached = json.loads(cache_path.read_text(encoding="utf-8"))
+        cached["cache_hit"] = True
+        return cached
+    semantic = cached_semantic_report(
+        cache_dir,
+        benchmark=benchmark,
         qrels_path=qrels_path,
-        providers=model_providers,
-        k=top_k,
+        model_providers=model_providers,
+        top_k=top_k,
+        resume=resume,
     )
     rerank = evaluate_rerankers(
         mode=benchmark["mode"],
@@ -116,8 +150,10 @@ def run_benchmark(
         fusion=str(benchmark.get("fusion", fusion)),
         document_format=str(benchmark.get("document_format", document_format)),
         query_variants=benchmark.get("query_variants") or [],
+        resume=resume,
+        query_cache_dir=query_cache_dir,
     )
-    return {
+    report = {
         "id": benchmark["id"],
         "topic": benchmark.get("topic", "unspecified"),
         "mode": benchmark["mode"],
@@ -135,7 +171,84 @@ def run_benchmark(
         "semantic": compact_semantic(semantic, top_k),
         "rerank": compact_rerank(rerank, top_k),
         "query_topics": query_topics(qrels, benchmark.get("query_topics") or {}),
+        "cache_hit": False,
     }
+    write_json(cache_path, report)
+    return report
+
+
+def cached_semantic_report(
+    cache_dir: Path,
+    benchmark: dict[str, Any],
+    qrels_path: Path,
+    model_providers: list[str],
+    top_k: int,
+    resume: bool,
+) -> dict[str, Any]:
+    path = semantic_cache_path(
+        cache_dir,
+        benchmark=benchmark,
+        model_providers=model_providers,
+        top_k=top_k,
+    )
+    if resume and path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
+    report = evaluate_semantic_models(
+        mode=benchmark["mode"],
+        qrels_path=qrels_path,
+        providers=model_providers,
+        k=top_k,
+    )
+    write_json(path, report)
+    return report
+
+
+def benchmark_cache_path(
+    cache_dir: Path,
+    *,
+    benchmark: dict[str, Any],
+    model_providers: list[str],
+    rerankers: list[str],
+    top_k: int,
+    candidate_k: int,
+    lexical_k: int,
+    vector_k: int,
+    pooled_candidates: bool,
+    fusion: str,
+    document_format: str,
+) -> Path:
+    payload = {
+        "benchmark": benchmark,
+        "model_providers": model_providers,
+        "rerankers": rerankers,
+        "top_k": top_k,
+        "candidate_k": candidate_k,
+        "lexical_k": lexical_k,
+        "vector_k": vector_k,
+        "pooled_candidates": pooled_candidates,
+        "fusion": fusion,
+        "document_format": document_format,
+    }
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return cache_dir / f"{safe_slug(str(benchmark['id']))}_{digest}.json"
+
+
+def semantic_cache_path(
+    cache_dir: Path,
+    *,
+    benchmark: dict[str, Any],
+    model_providers: list[str],
+    top_k: int,
+) -> Path:
+    payload = {
+        "benchmark_id": benchmark["id"],
+        "mode": benchmark["mode"],
+        "qrels": benchmark["qrels"],
+        "model_providers": model_providers,
+        "top_k": top_k,
+    }
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return cache_dir / f"semantic_{safe_slug(str(benchmark['id']))}_{digest}.json"
 
 
 def compact_semantic(report: dict[str, Any], k: int) -> dict[str, Any]:
@@ -352,6 +465,16 @@ def average(values: list[float]) -> float:
     return round(sum(values) / len(values), 6) if values else 0.0
 
 
+def safe_slug(text: str, limit: int = 80) -> str:
+    slug = "".join(character if character.isalnum() else "-" for character in text.lower())
+    return slug[:limit].strip("-") or "item"
+
+
+def write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 def human_review_boundary() -> dict[str, Any]:
     return {
         "status": "required_for_release_claims",
@@ -444,6 +567,7 @@ def main() -> None:
     parser.add_argument("--document-format", choices=["plain", "structured"], default=None)
     parser.add_argument("--pooled-candidates", action="store_true", default=None)
     parser.add_argument("--single-policy-candidates", action="store_false", dest="pooled_candidates")
+    parser.add_argument("--no-resume", action="store_true")
     args = parser.parse_args()
     print(
         json.dumps(
@@ -458,6 +582,7 @@ def main() -> None:
                 fusion=args.fusion,
                 document_format=args.document_format,
                 pooled_candidates=args.pooled_candidates,
+                resume=not args.no_resume,
             ),
             indent=2,
             ensure_ascii=True,

@@ -8,7 +8,10 @@ from canon.product.stage1_optimizer import run_stage1_optimizer
 
 class Stage1OptimizerTests(unittest.TestCase):
     def test_optimizer_ranks_complete_retrieval_stacks(self):
+        query_cache_dirs = []
+
         def fake_rerankers(**kwargs):
+            query_cache_dirs.append(kwargs.get("query_cache_dir"))
             vector_model = kwargs.get("vector_model")
             reranker = kwargs["rerankers"][0]
             ndcg = 0.9 if vector_model == "qwen/qwen3-embedding-8b" else 0.5
@@ -61,6 +64,8 @@ class Stage1OptimizerTests(unittest.TestCase):
         self.assertEqual(report["leaderboard"][0]["dense_retriever"], "openrouter:qwen/qwen3-embedding-8b")
         self.assertEqual(report["generation_metrics_boundary"]["status"], "not_stage1_objective")
         self.assertEqual(report["leaderboard"][0]["lexical_search"], "bm25")
+        self.assertTrue(query_cache_dirs)
+        self.assertTrue(all(path.name == "unit_suite" for path in query_cache_dirs))
 
     def test_optimizer_reuses_cached_trials(self):
         def fake_rerankers(**kwargs):

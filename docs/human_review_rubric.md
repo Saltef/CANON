@@ -8,6 +8,52 @@ and intelligence-brief review files such as
 CANON should be reviewed as a first-pass evidence briefing tool. Do not score it
 as an autonomous expert or final decision system.
 
+## Publishable Package Required Fields
+
+For the publishable evaluation package, first create the review scaffold:
+
+```powershell
+python -m canon.product.human_review_scaffold --suite conf/benchmark_suites/stage1_public_full.json --disagreement-benchmark gold/disagreement_preservation_publishable.json
+```
+
+Complete `reports/publishable_retrieval_review_scaffold.csv` with:
+
+- `reviewer_id`
+- `relevance`
+- `evidence_role`
+- `reviewer_notes`
+
+Use a stable `reviewer_id` so the handoff remains auditable. Use `relevance=2`
+for directly relevant evidence, `1` for partial/contextual evidence, and `0`
+for not relevant or misleading evidence. For positive labels, set
+`evidence_role` to one of `background`, `supports`, `contradicts`, `qualifies`,
+`methods`, or `context`.
+
+Complete `reports/publishable_synthesis_review_scaffold.csv` with:
+
+- `reviewer_id`
+- `citation_valid`
+- `stance_correct`
+- `claim_supported`
+- `missed_key_evidence`
+- `reviewer_action`
+- `reason`
+
+Use `reason` whenever a citation is invalid, stance or support is partial/no, a
+key evidence item was missed, or the reviewer action is `revise` or `reject`.
+
+After labels are filled, validate the suite-specific review status:
+
+```powershell
+python -m canon.product.publishable_review --retrieval-csv reports/publishable_retrieval_review_scaffold.csv --synthesis-csv reports/publishable_synthesis_review_scaffold.csv
+python -m canon.product.publishable_package --suite conf/benchmark_suites/stage1_public_full.json
+```
+
+The publishable package only passes `human_review_complete` when
+`reports/publishable_human_review_status_v1.json` is complete for the same
+suite, both retrieval and synthesis targets are met, and no validation errors
+remain.
+
 ## Intelligence Brief Required Fields
 
 For intelligence brief review packets, complete:

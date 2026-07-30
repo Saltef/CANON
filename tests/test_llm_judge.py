@@ -8,6 +8,7 @@ from unittest.mock import patch
 from canon.eval.llm_judge import (
     judge_answer_review_packet,
     judge_qrels_csv,
+    normalize_answer_judgment,
     parse_json_object,
 )
 
@@ -107,6 +108,25 @@ class LlmJudgeTests(unittest.TestCase):
         )
 
         self.assertEqual(parsed["judge_relevance"], 2)
+
+    def test_answer_judgment_accepts_labeled_confidence(self):
+        judgment = normalize_answer_judgment(
+            {
+                "judge_evidence_relevance": "high",
+                "judge_citation_support": "supported",
+                "judge_answer_usefulness": "usable",
+                "judge_unsupported_claim_count": "none",
+                "judge_final_review_status": "accepted",
+                "judge_query_lingo_ratings": "useful",
+                "judge_drift_risk_review": "acceptable",
+                "judge_confidence": "medium",
+                "judge_rationale": "Looks grounded.",
+            },
+            {"id": "unit", "category": "product_model_matrix"},
+        )
+
+        self.assertEqual(judgment["judge_confidence"], 0.66)
+        self.assertEqual(judgment["judge_unsupported_claim_count"], 0)
 
 
 def write_qrels_csv(path, rows):

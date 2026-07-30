@@ -1,0 +1,1426 @@
+{
+  "benchmark_id": "disagreement_preservation_publishable_v1",
+  "description": "Target-sized controlled Stage 2 fixture with support, contradiction, qualification, and neutral distractor evidence for synthesis review scaffolding.",
+  "case_count": 30,
+  "case_design": {
+    "per_case_evidence": [
+      "supporting evidence",
+      "contradicting evidence",
+      "qualifying evidence",
+      "neutral distractor evidence"
+    ],
+    "human_review_boundary": "The fixture is deterministic scaffolding for review and regression; it is not a claim about naturally occurring evidence quality."
+  },
+  "cases": [
+    {
+      "id": "grid_data_center_peak_load",
+      "question": "What does the evidence say about data center load and grid stress?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D01-S",
+          "title": "Grid Planning Support Memo",
+          "source_name": "Grid Planning Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "energy_policy",
+          "cluster_id": "grid_data_center_peak_load:main",
+          "expected_stance": "supports",
+          "text": "The grid planning assessment reports that data center load increased substation peak demand during 2025."
+        },
+        {
+          "evidence_id": "D01-C",
+          "title": "Grid Planning Audit Challenge",
+          "source_name": "Grid Planning Analyst B",
+          "source_type": "audit_review",
+          "domain": "energy_policy",
+          "cluster_id": "grid_data_center_peak_load:main",
+          "expected_stance": "contradicts",
+          "text": "The grid planning audit says data center load did not increase substation peak demand during 2025 after controls."
+        },
+        {
+          "evidence_id": "D01-Q",
+          "title": "Grid Planning Boundary Note",
+          "source_name": "Grid Planning Technical Panel",
+          "source_type": "technical_note",
+          "domain": "energy_policy",
+          "cluster_id": "grid_data_center_peak_load:main",
+          "expected_stance": "qualifies",
+          "text": "Although data center load increased substation peak demand in some observations, the grid planning finding depends on interconnection timing and cooling schedules and remains limited."
+        },
+        {
+          "evidence_id": "D01-N",
+          "title": "Grid Planning Administrative Notice",
+          "source_name": "Grid Planning Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "grid_data_center_peak_load:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes regional arts funding for routine operations and contains no analysis of the grid planning outcome."
+        }
+      ]
+    },
+    {
+      "id": "hospital_ai_triage_wait_times",
+      "question": "What does the evidence say about AI triage and emergency wait times?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D02-S",
+          "title": "Emergency Department Operations Support Memo",
+          "source_name": "Emergency Department Operations Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "health_operations",
+          "cluster_id": "hospital_ai_triage_wait_times:main",
+          "expected_stance": "supports",
+          "text": "The emergency department operations assessment reports that AI triage routing increased median emergency wait times during the winter pilot."
+        },
+        {
+          "evidence_id": "D02-C",
+          "title": "Emergency Department Operations Audit Challenge",
+          "source_name": "Emergency Department Operations Analyst B",
+          "source_type": "audit_review",
+          "domain": "health_operations",
+          "cluster_id": "hospital_ai_triage_wait_times:main",
+          "expected_stance": "contradicts",
+          "text": "The emergency department operations audit says AI triage routing did not increase median emergency wait times during the winter pilot after controls."
+        },
+        {
+          "evidence_id": "D02-Q",
+          "title": "Emergency Department Operations Boundary Note",
+          "source_name": "Emergency Department Operations Technical Panel",
+          "source_type": "technical_note",
+          "domain": "health_operations",
+          "cluster_id": "hospital_ai_triage_wait_times:main",
+          "expected_stance": "qualifies",
+          "text": "Although AI triage routing increased median emergency wait times in some observations, the emergency department operations finding depends on night-shift staffing and ambulance diversion and remains limited."
+        },
+        {
+          "evidence_id": "D02-N",
+          "title": "Emergency Department Operations Administrative Notice",
+          "source_name": "Emergency Department Operations Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "hospital_ai_triage_wait_times:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes cafeteria renovation for routine operations and contains no analysis of the emergency department operations outcome."
+        }
+      ]
+    },
+    {
+      "id": "remote_monitoring_readmissions",
+      "question": "What does the evidence say about remote monitoring and readmissions?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D03-S",
+          "title": "Cardiology Follow-Up Support Memo",
+          "source_name": "Cardiology Follow-Up Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "health_services",
+          "cluster_id": "remote_monitoring_readmissions:main",
+          "expected_stance": "supports",
+          "text": "The cardiology follow-up assessment reports that remote monitoring enrollment increased thirty-day readmissions during the 2024 rollout."
+        },
+        {
+          "evidence_id": "D03-C",
+          "title": "Cardiology Follow-Up Audit Challenge",
+          "source_name": "Cardiology Follow-Up Analyst B",
+          "source_type": "audit_review",
+          "domain": "health_services",
+          "cluster_id": "remote_monitoring_readmissions:main",
+          "expected_stance": "contradicts",
+          "text": "The cardiology follow-up audit says remote monitoring enrollment did not increase thirty-day readmissions during the 2024 rollout after controls."
+        },
+        {
+          "evidence_id": "D03-Q",
+          "title": "Cardiology Follow-Up Boundary Note",
+          "source_name": "Cardiology Follow-Up Technical Panel",
+          "source_type": "technical_note",
+          "domain": "health_services",
+          "cluster_id": "remote_monitoring_readmissions:main",
+          "expected_stance": "qualifies",
+          "text": "Although remote monitoring enrollment increased thirty-day readmissions in some observations, the cardiology follow-up finding depends on patient broadband access and nurse call capacity and remains limited."
+        },
+        {
+          "evidence_id": "D03-N",
+          "title": "Cardiology Follow-Up Administrative Notice",
+          "source_name": "Cardiology Follow-Up Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "remote_monitoring_readmissions:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes parking permits for routine operations and contains no analysis of the cardiology follow-up outcome."
+        }
+      ]
+    },
+    {
+      "id": "school_tutoring_math_scores",
+      "question": "What does the evidence say about tutoring and math scores?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D04-S",
+          "title": "Middle-School Instruction Support Memo",
+          "source_name": "Middle-School Instruction Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "education_policy",
+          "cluster_id": "school_tutoring_math_scores:main",
+          "expected_stance": "supports",
+          "text": "The middle-school instruction assessment reports that high-dosage tutoring increased eighth-grade math scores during the spring term."
+        },
+        {
+          "evidence_id": "D04-C",
+          "title": "Middle-School Instruction Audit Challenge",
+          "source_name": "Middle-School Instruction Analyst B",
+          "source_type": "audit_review",
+          "domain": "education_policy",
+          "cluster_id": "school_tutoring_math_scores:main",
+          "expected_stance": "contradicts",
+          "text": "The middle-school instruction audit says high-dosage tutoring did not increase eighth-grade math scores during the spring term after controls."
+        },
+        {
+          "evidence_id": "D04-Q",
+          "title": "Middle-School Instruction Boundary Note",
+          "source_name": "Middle-School Instruction Technical Panel",
+          "source_type": "technical_note",
+          "domain": "education_policy",
+          "cluster_id": "school_tutoring_math_scores:main",
+          "expected_stance": "qualifies",
+          "text": "Although high-dosage tutoring increased eighth-grade math scores in some observations, the middle-school instruction finding depends on attendance consistency and tutor training and remains limited."
+        },
+        {
+          "evidence_id": "D04-N",
+          "title": "Middle-School Instruction Administrative Notice",
+          "source_name": "Middle-School Instruction Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "school_tutoring_math_scores:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes library carpet replacement for routine operations and contains no analysis of the middle-school instruction outcome."
+        }
+      ]
+    },
+    {
+      "id": "transit_bus_lanes_commute_times",
+      "question": "What does the evidence say about bus lanes and commute times?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D05-S",
+          "title": "Urban Transit Operations Support Memo",
+          "source_name": "Urban Transit Operations Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "transportation",
+          "cluster_id": "transit_bus_lanes_commute_times:main",
+          "expected_stance": "supports",
+          "text": "The urban transit operations assessment reports that dedicated bus lanes increased morning commute times during the six-month corridor pilot."
+        },
+        {
+          "evidence_id": "D05-C",
+          "title": "Urban Transit Operations Audit Challenge",
+          "source_name": "Urban Transit Operations Analyst B",
+          "source_type": "audit_review",
+          "domain": "transportation",
+          "cluster_id": "transit_bus_lanes_commute_times:main",
+          "expected_stance": "contradicts",
+          "text": "The urban transit operations audit says dedicated bus lanes did not increase morning commute times during the six-month corridor pilot after controls."
+        },
+        {
+          "evidence_id": "D05-Q",
+          "title": "Urban Transit Operations Boundary Note",
+          "source_name": "Urban Transit Operations Technical Panel",
+          "source_type": "technical_note",
+          "domain": "transportation",
+          "cluster_id": "transit_bus_lanes_commute_times:main",
+          "expected_stance": "qualifies",
+          "text": "Although dedicated bus lanes increased morning commute times in some observations, the urban transit operations finding depends on signal priority and curb enforcement and remains limited."
+        },
+        {
+          "evidence_id": "D05-N",
+          "title": "Urban Transit Operations Administrative Notice",
+          "source_name": "Urban Transit Operations Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "transit_bus_lanes_commute_times:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes museum visitor badges for routine operations and contains no analysis of the urban transit operations outcome."
+        }
+      ]
+    },
+    {
+      "id": "ev_charging_feeder_overloads",
+      "question": "What does the evidence say about EV charging and feeder overloads?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D06-S",
+          "title": "Distribution-Grid Operations Support Memo",
+          "source_name": "Distribution-Grid Operations Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "energy_policy",
+          "cluster_id": "ev_charging_feeder_overloads:main",
+          "expected_stance": "supports",
+          "text": "The distribution-grid operations assessment reports that evening EV charging increased feeder overload events during summer 2025."
+        },
+        {
+          "evidence_id": "D06-C",
+          "title": "Distribution-Grid Operations Audit Challenge",
+          "source_name": "Distribution-Grid Operations Analyst B",
+          "source_type": "audit_review",
+          "domain": "energy_policy",
+          "cluster_id": "ev_charging_feeder_overloads:main",
+          "expected_stance": "contradicts",
+          "text": "The distribution-grid operations audit says evening EV charging did not increase feeder overload events during summer 2025 after controls."
+        },
+        {
+          "evidence_id": "D06-Q",
+          "title": "Distribution-Grid Operations Boundary Note",
+          "source_name": "Distribution-Grid Operations Technical Panel",
+          "source_type": "technical_note",
+          "domain": "energy_policy",
+          "cluster_id": "ev_charging_feeder_overloads:main",
+          "expected_stance": "qualifies",
+          "text": "Although evening EV charging increased feeder overload events in some observations, the distribution-grid operations finding depends on managed charging adoption and transformer age and remains limited."
+        },
+        {
+          "evidence_id": "D06-N",
+          "title": "Distribution-Grid Operations Administrative Notice",
+          "source_name": "Distribution-Grid Operations Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "ev_charging_feeder_overloads:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes community garden grants for routine operations and contains no analysis of the distribution-grid operations outcome."
+        }
+      ]
+    },
+    {
+      "id": "wildfire_cameras_detection_time",
+      "question": "What does the evidence say about wildfire cameras and detection time?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D07-S",
+          "title": "Wildfire Response Support Memo",
+          "source_name": "Wildfire Response Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "public_safety",
+          "cluster_id": "wildfire_cameras_detection_time:main",
+          "expected_stance": "supports",
+          "text": "The wildfire response assessment reports that camera-based smoke detection increased initial detection time during the dry-season deployment."
+        },
+        {
+          "evidence_id": "D07-C",
+          "title": "Wildfire Response Audit Challenge",
+          "source_name": "Wildfire Response Analyst B",
+          "source_type": "audit_review",
+          "domain": "public_safety",
+          "cluster_id": "wildfire_cameras_detection_time:main",
+          "expected_stance": "contradicts",
+          "text": "The wildfire response audit says camera-based smoke detection did not increase initial detection time during the dry-season deployment after controls."
+        },
+        {
+          "evidence_id": "D07-Q",
+          "title": "Wildfire Response Boundary Note",
+          "source_name": "Wildfire Response Technical Panel",
+          "source_type": "technical_note",
+          "domain": "public_safety",
+          "cluster_id": "wildfire_cameras_detection_time:main",
+          "expected_stance": "qualifies",
+          "text": "Although camera-based smoke detection increased initial detection time in some observations, the wildfire response finding depends on ridge visibility and dispatcher review latency and remains limited."
+        },
+        {
+          "evidence_id": "D07-N",
+          "title": "Wildfire Response Administrative Notice",
+          "source_name": "Wildfire Response Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "wildfire_cameras_detection_time:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes recreation trail signage for routine operations and contains no analysis of the wildfire response outcome."
+        }
+      ]
+    },
+    {
+      "id": "fertilizer_buffer_zones_nitrate_runoff",
+      "question": "What does the evidence say about buffer zones and nitrate runoff?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D08-S",
+          "title": "Watershed Management Support Memo",
+          "source_name": "Watershed Management Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "water_environment",
+          "cluster_id": "fertilizer_buffer_zones_nitrate_runoff:main",
+          "expected_stance": "supports",
+          "text": "The watershed management assessment reports that fertilizer buffer zones increased nitrate runoff concentrations during the planting season."
+        },
+        {
+          "evidence_id": "D08-C",
+          "title": "Watershed Management Audit Challenge",
+          "source_name": "Watershed Management Analyst B",
+          "source_type": "audit_review",
+          "domain": "water_environment",
+          "cluster_id": "fertilizer_buffer_zones_nitrate_runoff:main",
+          "expected_stance": "contradicts",
+          "text": "The watershed management audit says fertilizer buffer zones did not increase nitrate runoff concentrations during the planting season after controls."
+        },
+        {
+          "evidence_id": "D08-Q",
+          "title": "Watershed Management Boundary Note",
+          "source_name": "Watershed Management Technical Panel",
+          "source_type": "technical_note",
+          "domain": "water_environment",
+          "cluster_id": "fertilizer_buffer_zones_nitrate_runoff:main",
+          "expected_stance": "qualifies",
+          "text": "Although fertilizer buffer zones increased nitrate runoff concentrations in some observations, the watershed management finding depends on rainfall timing and field slope and remains limited."
+        },
+        {
+          "evidence_id": "D08-N",
+          "title": "Watershed Management Administrative Notice",
+          "source_name": "Watershed Management Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "fertilizer_buffer_zones_nitrate_runoff:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes sports field reservations for routine operations and contains no analysis of the watershed management outcome."
+        }
+      ]
+    },
+    {
+      "id": "telehealth_no_show_rates",
+      "question": "What does the evidence say about telehealth and appointment no-shows?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D09-S",
+          "title": "Outpatient Scheduling Support Memo",
+          "source_name": "Outpatient Scheduling Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "health_operations",
+          "cluster_id": "telehealth_no_show_rates:main",
+          "expected_stance": "supports",
+          "text": "The outpatient scheduling assessment reports that telehealth visit availability increased appointment no-show rates during the 2024 clinic cycle."
+        },
+        {
+          "evidence_id": "D09-C",
+          "title": "Outpatient Scheduling Audit Challenge",
+          "source_name": "Outpatient Scheduling Analyst B",
+          "source_type": "audit_review",
+          "domain": "health_operations",
+          "cluster_id": "telehealth_no_show_rates:main",
+          "expected_stance": "contradicts",
+          "text": "The outpatient scheduling audit says telehealth visit availability did not increase appointment no-show rates during the 2024 clinic cycle after controls."
+        },
+        {
+          "evidence_id": "D09-Q",
+          "title": "Outpatient Scheduling Boundary Note",
+          "source_name": "Outpatient Scheduling Technical Panel",
+          "source_type": "technical_note",
+          "domain": "health_operations",
+          "cluster_id": "telehealth_no_show_rates:main",
+          "expected_stance": "qualifies",
+          "text": "Although telehealth visit availability increased appointment no-show rates in some observations, the outpatient scheduling finding depends on language support and reminder workflows and remains limited."
+        },
+        {
+          "evidence_id": "D09-N",
+          "title": "Outpatient Scheduling Administrative Notice",
+          "source_name": "Outpatient Scheduling Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "telehealth_no_show_rates:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes wall paint procurement for routine operations and contains no analysis of the outpatient scheduling outcome."
+        }
+      ]
+    },
+    {
+      "id": "body_cameras_complaint_rates",
+      "question": "What does the evidence say about body cameras and complaint rates?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D10-S",
+          "title": "Police Oversight Support Memo",
+          "source_name": "Police Oversight Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "public_safety",
+          "cluster_id": "body_cameras_complaint_rates:main",
+          "expected_stance": "supports",
+          "text": "The police oversight assessment reports that body camera activation increased civilian complaint rates during the first policy year."
+        },
+        {
+          "evidence_id": "D10-C",
+          "title": "Police Oversight Audit Challenge",
+          "source_name": "Police Oversight Analyst B",
+          "source_type": "audit_review",
+          "domain": "public_safety",
+          "cluster_id": "body_cameras_complaint_rates:main",
+          "expected_stance": "contradicts",
+          "text": "The police oversight audit says body camera activation did not increase civilian complaint rates during the first policy year after controls."
+        },
+        {
+          "evidence_id": "D10-Q",
+          "title": "Police Oversight Boundary Note",
+          "source_name": "Police Oversight Technical Panel",
+          "source_type": "technical_note",
+          "domain": "public_safety",
+          "cluster_id": "body_cameras_complaint_rates:main",
+          "expected_stance": "qualifies",
+          "text": "Although body camera activation increased civilian complaint rates in some observations, the police oversight finding depends on supervisor audits and missing footage rules and remains limited."
+        },
+        {
+          "evidence_id": "D10-N",
+          "title": "Police Oversight Administrative Notice",
+          "source_name": "Police Oversight Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "body_cameras_complaint_rates:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes holiday parade logistics for routine operations and contains no analysis of the police oversight outcome."
+        }
+      ]
+    },
+    {
+      "id": "zoning_reform_rent_growth",
+      "question": "What does the evidence say about zoning reform and rent growth?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D11-S",
+          "title": "Rental Housing Markets Support Memo",
+          "source_name": "Rental Housing Markets Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "housing_policy",
+          "cluster_id": "zoning_reform_rent_growth:main",
+          "expected_stance": "supports",
+          "text": "The rental housing markets assessment reports that zoning reform increased median rent growth during the first two years."
+        },
+        {
+          "evidence_id": "D11-C",
+          "title": "Rental Housing Markets Audit Challenge",
+          "source_name": "Rental Housing Markets Analyst B",
+          "source_type": "audit_review",
+          "domain": "housing_policy",
+          "cluster_id": "zoning_reform_rent_growth:main",
+          "expected_stance": "contradicts",
+          "text": "The rental housing markets audit says zoning reform did not increase median rent growth during the first two years after controls."
+        },
+        {
+          "evidence_id": "D11-Q",
+          "title": "Rental Housing Markets Boundary Note",
+          "source_name": "Rental Housing Markets Technical Panel",
+          "source_type": "technical_note",
+          "domain": "housing_policy",
+          "cluster_id": "zoning_reform_rent_growth:main",
+          "expected_stance": "qualifies",
+          "text": "Although zoning reform increased median rent growth in some observations, the rental housing markets finding depends on permit processing and interest rates and remains limited."
+        },
+        {
+          "evidence_id": "D11-N",
+          "title": "Rental Housing Markets Administrative Notice",
+          "source_name": "Rental Housing Markets Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "zoning_reform_rent_growth:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes streetlight bulb inventory for routine operations and contains no analysis of the rental housing markets outcome."
+        }
+      ]
+    },
+    {
+      "id": "heat_pumps_winter_peak_demand",
+      "question": "What does the evidence say about heat pumps and winter peak demand?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D12-S",
+          "title": "Residential Electrification Support Memo",
+          "source_name": "Residential Electrification Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "energy_policy",
+          "cluster_id": "heat_pumps_winter_peak_demand:main",
+          "expected_stance": "supports",
+          "text": "The residential electrification assessment reports that heat pump adoption increased winter peak demand during January cold snaps."
+        },
+        {
+          "evidence_id": "D12-C",
+          "title": "Residential Electrification Audit Challenge",
+          "source_name": "Residential Electrification Analyst B",
+          "source_type": "audit_review",
+          "domain": "energy_policy",
+          "cluster_id": "heat_pumps_winter_peak_demand:main",
+          "expected_stance": "contradicts",
+          "text": "The residential electrification audit says heat pump adoption did not increase winter peak demand during January cold snaps after controls."
+        },
+        {
+          "evidence_id": "D12-Q",
+          "title": "Residential Electrification Boundary Note",
+          "source_name": "Residential Electrification Technical Panel",
+          "source_type": "technical_note",
+          "domain": "energy_policy",
+          "cluster_id": "heat_pumps_winter_peak_demand:main",
+          "expected_stance": "qualifies",
+          "text": "Although heat pump adoption increased winter peak demand in some observations, the residential electrification finding depends on building insulation and backup heat use and remains limited."
+        },
+        {
+          "evidence_id": "D12-N",
+          "title": "Residential Electrification Administrative Notice",
+          "source_name": "Residential Electrification Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "heat_pumps_winter_peak_demand:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes farmers market vendor fees for routine operations and contains no analysis of the residential electrification outcome."
+        }
+      ]
+    },
+    {
+      "id": "nutrition_labels_sugar_purchases",
+      "question": "What does the evidence say about nutrition labels and sugar purchases?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D13-S",
+          "title": "Retail Food Policy Support Memo",
+          "source_name": "Retail Food Policy Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "public_health",
+          "cluster_id": "nutrition_labels_sugar_purchases:main",
+          "expected_stance": "supports",
+          "text": "The retail food policy assessment reports that front-of-package nutrition labels increased sugar-sweetened purchases during the store trial."
+        },
+        {
+          "evidence_id": "D13-C",
+          "title": "Retail Food Policy Audit Challenge",
+          "source_name": "Retail Food Policy Analyst B",
+          "source_type": "audit_review",
+          "domain": "public_health",
+          "cluster_id": "nutrition_labels_sugar_purchases:main",
+          "expected_stance": "contradicts",
+          "text": "The retail food policy audit says front-of-package nutrition labels did not increase sugar-sweetened purchases during the store trial after controls."
+        },
+        {
+          "evidence_id": "D13-Q",
+          "title": "Retail Food Policy Boundary Note",
+          "source_name": "Retail Food Policy Technical Panel",
+          "source_type": "technical_note",
+          "domain": "public_health",
+          "cluster_id": "nutrition_labels_sugar_purchases:main",
+          "expected_stance": "qualifies",
+          "text": "Although front-of-package nutrition labels increased sugar-sweetened purchases in some observations, the retail food policy finding depends on price promotions and shelf placement and remains limited."
+        },
+        {
+          "evidence_id": "D13-N",
+          "title": "Retail Food Policy Administrative Notice",
+          "source_name": "Retail Food Policy Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "nutrition_labels_sugar_purchases:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes delivery dock schedules for routine operations and contains no analysis of the retail food policy outcome."
+        }
+      ]
+    },
+    {
+      "id": "cash_transfers_food_security",
+      "question": "What does the evidence say about cash transfers and food security?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D14-S",
+          "title": "Household Assistance Support Memo",
+          "source_name": "Household Assistance Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "social_policy",
+          "cluster_id": "cash_transfers_food_security:main",
+          "expected_stance": "supports",
+          "text": "The household assistance assessment reports that monthly cash transfers increased food security scores during the benefit expansion."
+        },
+        {
+          "evidence_id": "D14-C",
+          "title": "Household Assistance Audit Challenge",
+          "source_name": "Household Assistance Analyst B",
+          "source_type": "audit_review",
+          "domain": "social_policy",
+          "cluster_id": "cash_transfers_food_security:main",
+          "expected_stance": "contradicts",
+          "text": "The household assistance audit says monthly cash transfers did not increase food security scores during the benefit expansion after controls."
+        },
+        {
+          "evidence_id": "D14-Q",
+          "title": "Household Assistance Boundary Note",
+          "source_name": "Household Assistance Technical Panel",
+          "source_type": "technical_note",
+          "domain": "social_policy",
+          "cluster_id": "cash_transfers_food_security:main",
+          "expected_stance": "qualifies",
+          "text": "Although monthly cash transfers increased food security scores in some observations, the household assistance finding depends on rent burden and local food prices and remains limited."
+        },
+        {
+          "evidence_id": "D14-N",
+          "title": "Household Assistance Administrative Notice",
+          "source_name": "Household Assistance Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "cash_transfers_food_security:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes office furniture auctions for routine operations and contains no analysis of the household assistance outcome."
+        }
+      ]
+    },
+    {
+      "id": "traffic_calming_crash_rates",
+      "question": "What does the evidence say about traffic calming and crash rates?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D15-S",
+          "title": "Street Safety Support Memo",
+          "source_name": "Street Safety Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "transportation",
+          "cluster_id": "traffic_calming_crash_rates:main",
+          "expected_stance": "supports",
+          "text": "The street safety assessment reports that traffic calming installations increased reported crash rates during the first twelve months."
+        },
+        {
+          "evidence_id": "D15-C",
+          "title": "Street Safety Audit Challenge",
+          "source_name": "Street Safety Analyst B",
+          "source_type": "audit_review",
+          "domain": "transportation",
+          "cluster_id": "traffic_calming_crash_rates:main",
+          "expected_stance": "contradicts",
+          "text": "The street safety audit says traffic calming installations did not increase reported crash rates during the first twelve months after controls."
+        },
+        {
+          "evidence_id": "D15-Q",
+          "title": "Street Safety Boundary Note",
+          "source_name": "Street Safety Technical Panel",
+          "source_type": "technical_note",
+          "domain": "transportation",
+          "cluster_id": "traffic_calming_crash_rates:main",
+          "expected_stance": "qualifies",
+          "text": "Although traffic calming installations increased reported crash rates in some observations, the street safety finding depends on intersection design and enforcement intensity and remains limited."
+        },
+        {
+          "evidence_id": "D15-N",
+          "title": "Street Safety Administrative Notice",
+          "source_name": "Street Safety Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "traffic_calming_crash_rates:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes concert venue seating for routine operations and contains no analysis of the street safety outcome."
+        }
+      ]
+    },
+    {
+      "id": "solar_rooftops_feeder_voltage",
+      "question": "What does the evidence say about rooftop solar and feeder voltage?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D16-S",
+          "title": "Distribution-Grid Planning Support Memo",
+          "source_name": "Distribution-Grid Planning Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "energy_policy",
+          "cluster_id": "solar_rooftops_feeder_voltage:main",
+          "expected_stance": "supports",
+          "text": "The distribution-grid planning assessment reports that rooftop solar penetration increased feeder voltage excursions during midday summer hours."
+        },
+        {
+          "evidence_id": "D16-C",
+          "title": "Distribution-Grid Planning Audit Challenge",
+          "source_name": "Distribution-Grid Planning Analyst B",
+          "source_type": "audit_review",
+          "domain": "energy_policy",
+          "cluster_id": "solar_rooftops_feeder_voltage:main",
+          "expected_stance": "contradicts",
+          "text": "The distribution-grid planning audit says rooftop solar penetration did not increase feeder voltage excursions during midday summer hours after controls."
+        },
+        {
+          "evidence_id": "D16-Q",
+          "title": "Distribution-Grid Planning Boundary Note",
+          "source_name": "Distribution-Grid Planning Technical Panel",
+          "source_type": "technical_note",
+          "domain": "energy_policy",
+          "cluster_id": "solar_rooftops_feeder_voltage:main",
+          "expected_stance": "qualifies",
+          "text": "Although rooftop solar penetration increased feeder voltage excursions in some observations, the distribution-grid planning finding depends on inverter settings and feeder topology and remains limited."
+        },
+        {
+          "evidence_id": "D16-N",
+          "title": "Distribution-Grid Planning Administrative Notice",
+          "source_name": "Distribution-Grid Planning Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "solar_rooftops_feeder_voltage:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes park bench repair for routine operations and contains no analysis of the distribution-grid planning outcome."
+        }
+      ]
+    },
+    {
+      "id": "nurse_staffing_patient_falls",
+      "question": "What does the evidence say about nurse staffing and patient falls?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D17-S",
+          "title": "Inpatient Safety Support Memo",
+          "source_name": "Inpatient Safety Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "health_operations",
+          "cluster_id": "nurse_staffing_patient_falls:main",
+          "expected_stance": "supports",
+          "text": "The inpatient safety assessment reports that higher nurse staffing ratios increased patient fall incidents during the pilot quarter."
+        },
+        {
+          "evidence_id": "D17-C",
+          "title": "Inpatient Safety Audit Challenge",
+          "source_name": "Inpatient Safety Analyst B",
+          "source_type": "audit_review",
+          "domain": "health_operations",
+          "cluster_id": "nurse_staffing_patient_falls:main",
+          "expected_stance": "contradicts",
+          "text": "The inpatient safety audit says higher nurse staffing ratios did not increase patient fall incidents during the pilot quarter after controls."
+        },
+        {
+          "evidence_id": "D17-Q",
+          "title": "Inpatient Safety Boundary Note",
+          "source_name": "Inpatient Safety Technical Panel",
+          "source_type": "technical_note",
+          "domain": "health_operations",
+          "cluster_id": "nurse_staffing_patient_falls:main",
+          "expected_stance": "qualifies",
+          "text": "Although higher nurse staffing ratios increased patient fall incidents in some observations, the inpatient safety finding depends on case mix and bed occupancy and remains limited."
+        },
+        {
+          "evidence_id": "D17-N",
+          "title": "Inpatient Safety Administrative Notice",
+          "source_name": "Inpatient Safety Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "nurse_staffing_patient_falls:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes gift shop inventory for routine operations and contains no analysis of the inpatient safety outcome."
+        }
+      ]
+    },
+    {
+      "id": "air_filters_asthma_visits",
+      "question": "What does the evidence say about classroom air filters and asthma visits?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D18-S",
+          "title": "School Health Support Memo",
+          "source_name": "School Health Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "public_health",
+          "cluster_id": "air_filters_asthma_visits:main",
+          "expected_stance": "supports",
+          "text": "The school health assessment reports that classroom air filter installation increased student asthma visits during the school year."
+        },
+        {
+          "evidence_id": "D18-C",
+          "title": "School Health Audit Challenge",
+          "source_name": "School Health Analyst B",
+          "source_type": "audit_review",
+          "domain": "public_health",
+          "cluster_id": "air_filters_asthma_visits:main",
+          "expected_stance": "contradicts",
+          "text": "The school health audit says classroom air filter installation did not increase student asthma visits during the school year after controls."
+        },
+        {
+          "evidence_id": "D18-Q",
+          "title": "School Health Boundary Note",
+          "source_name": "School Health Technical Panel",
+          "source_type": "technical_note",
+          "domain": "public_health",
+          "cluster_id": "air_filters_asthma_visits:main",
+          "expected_stance": "qualifies",
+          "text": "Although classroom air filter installation increased student asthma visits in some observations, the school health finding depends on filter maintenance and outdoor smoke days and remains limited."
+        },
+        {
+          "evidence_id": "D18-N",
+          "title": "School Health Administrative Notice",
+          "source_name": "School Health Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "air_filters_asthma_visits:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes yearbook photography for routine operations and contains no analysis of the school health outcome."
+        }
+      ]
+    },
+    {
+      "id": "recycling_bins_contamination",
+      "question": "What does the evidence say about recycling bins and contamination?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D19-S",
+          "title": "Waste Management Support Memo",
+          "source_name": "Waste Management Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "municipal_operations",
+          "cluster_id": "recycling_bins_contamination:main",
+          "expected_stance": "supports",
+          "text": "The waste management assessment reports that standardized recycling bins increased recycling contamination rates during the curbside rollout."
+        },
+        {
+          "evidence_id": "D19-C",
+          "title": "Waste Management Audit Challenge",
+          "source_name": "Waste Management Analyst B",
+          "source_type": "audit_review",
+          "domain": "municipal_operations",
+          "cluster_id": "recycling_bins_contamination:main",
+          "expected_stance": "contradicts",
+          "text": "The waste management audit says standardized recycling bins did not increase recycling contamination rates during the curbside rollout after controls."
+        },
+        {
+          "evidence_id": "D19-Q",
+          "title": "Waste Management Boundary Note",
+          "source_name": "Waste Management Technical Panel",
+          "source_type": "technical_note",
+          "domain": "municipal_operations",
+          "cluster_id": "recycling_bins_contamination:main",
+          "expected_stance": "qualifies",
+          "text": "Although standardized recycling bins increased recycling contamination rates in some observations, the waste management finding depends on resident education and hauler feedback and remains limited."
+        },
+        {
+          "evidence_id": "D19-N",
+          "title": "Waste Management Administrative Notice",
+          "source_name": "Waste Management Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "recycling_bins_contamination:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes festival banner permits for routine operations and contains no analysis of the waste management outcome."
+        }
+      ]
+    },
+    {
+      "id": "small_business_grants_closures",
+      "question": "What does the evidence say about business grants and closures?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D20-S",
+          "title": "Small-Business Recovery Support Memo",
+          "source_name": "Small-Business Recovery Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "economic_policy",
+          "cluster_id": "small_business_grants_closures:main",
+          "expected_stance": "supports",
+          "text": "The small-business recovery assessment reports that emergency business grants increased business closure rates during the recovery year."
+        },
+        {
+          "evidence_id": "D20-C",
+          "title": "Small-Business Recovery Audit Challenge",
+          "source_name": "Small-Business Recovery Analyst B",
+          "source_type": "audit_review",
+          "domain": "economic_policy",
+          "cluster_id": "small_business_grants_closures:main",
+          "expected_stance": "contradicts",
+          "text": "The small-business recovery audit says emergency business grants did not increase business closure rates during the recovery year after controls."
+        },
+        {
+          "evidence_id": "D20-Q",
+          "title": "Small-Business Recovery Boundary Note",
+          "source_name": "Small-Business Recovery Technical Panel",
+          "source_type": "technical_note",
+          "domain": "economic_policy",
+          "cluster_id": "small_business_grants_closures:main",
+          "expected_stance": "qualifies",
+          "text": "Although emergency business grants increased business closure rates in some observations, the small-business recovery finding depends on sector mix and landlord negotiations and remains limited."
+        },
+        {
+          "evidence_id": "D20-N",
+          "title": "Small-Business Recovery Administrative Notice",
+          "source_name": "Small-Business Recovery Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "small_business_grants_closures:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes dog-license renewal forms for routine operations and contains no analysis of the small-business recovery outcome."
+        }
+      ]
+    },
+    {
+      "id": "language_access_claim_denials",
+      "question": "What does the evidence say about language access and claim denials?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D21-S",
+          "title": "Insurance Navigation Support Memo",
+          "source_name": "Insurance Navigation Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "health_equity",
+          "cluster_id": "language_access_claim_denials:main",
+          "expected_stance": "supports",
+          "text": "The insurance navigation assessment reports that language access services increased claim denial rates during the enrollment season."
+        },
+        {
+          "evidence_id": "D21-C",
+          "title": "Insurance Navigation Audit Challenge",
+          "source_name": "Insurance Navigation Analyst B",
+          "source_type": "audit_review",
+          "domain": "health_equity",
+          "cluster_id": "language_access_claim_denials:main",
+          "expected_stance": "contradicts",
+          "text": "The insurance navigation audit says language access services did not increase claim denial rates during the enrollment season after controls."
+        },
+        {
+          "evidence_id": "D21-Q",
+          "title": "Insurance Navigation Boundary Note",
+          "source_name": "Insurance Navigation Technical Panel",
+          "source_type": "technical_note",
+          "domain": "health_equity",
+          "cluster_id": "language_access_claim_denials:main",
+          "expected_stance": "qualifies",
+          "text": "Although language access services increased claim denial rates in some observations, the insurance navigation finding depends on plan complexity and interpreter availability and remains limited."
+        },
+        {
+          "evidence_id": "D21-N",
+          "title": "Insurance Navigation Administrative Notice",
+          "source_name": "Insurance Navigation Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "language_access_claim_denials:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes printer toner orders for routine operations and contains no analysis of the insurance navigation outcome."
+        }
+      ]
+    },
+    {
+      "id": "stormwater_gardens_flood_calls",
+      "question": "What does the evidence say about stormwater gardens and flood calls?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D22-S",
+          "title": "Neighborhood Drainage Support Memo",
+          "source_name": "Neighborhood Drainage Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "water_environment",
+          "cluster_id": "stormwater_gardens_flood_calls:main",
+          "expected_stance": "supports",
+          "text": "The neighborhood drainage assessment reports that stormwater garden installation increased basement flood service calls during the rainy season."
+        },
+        {
+          "evidence_id": "D22-C",
+          "title": "Neighborhood Drainage Audit Challenge",
+          "source_name": "Neighborhood Drainage Analyst B",
+          "source_type": "audit_review",
+          "domain": "water_environment",
+          "cluster_id": "stormwater_gardens_flood_calls:main",
+          "expected_stance": "contradicts",
+          "text": "The neighborhood drainage audit says stormwater garden installation did not increase basement flood service calls during the rainy season after controls."
+        },
+        {
+          "evidence_id": "D22-Q",
+          "title": "Neighborhood Drainage Boundary Note",
+          "source_name": "Neighborhood Drainage Technical Panel",
+          "source_type": "technical_note",
+          "domain": "water_environment",
+          "cluster_id": "stormwater_gardens_flood_calls:main",
+          "expected_stance": "qualifies",
+          "text": "Although stormwater garden installation increased basement flood service calls in some observations, the neighborhood drainage finding depends on soil saturation and sewer maintenance and remains limited."
+        },
+        {
+          "evidence_id": "D22-N",
+          "title": "Neighborhood Drainage Administrative Notice",
+          "source_name": "Neighborhood Drainage Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "stormwater_gardens_flood_calls:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes library summer reading for routine operations and contains no analysis of the neighborhood drainage outcome."
+        }
+      ]
+    },
+    {
+      "id": "mental_health_teams_arrests",
+      "question": "What does the evidence say about mental health teams and arrests?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D23-S",
+          "title": "Crisis Response Support Memo",
+          "source_name": "Crisis Response Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "public_safety",
+          "cluster_id": "mental_health_teams_arrests:main",
+          "expected_stance": "supports",
+          "text": "The crisis response assessment reports that mobile mental health teams increased behavioral-health arrest rates during the dispatch pilot."
+        },
+        {
+          "evidence_id": "D23-C",
+          "title": "Crisis Response Audit Challenge",
+          "source_name": "Crisis Response Analyst B",
+          "source_type": "audit_review",
+          "domain": "public_safety",
+          "cluster_id": "mental_health_teams_arrests:main",
+          "expected_stance": "contradicts",
+          "text": "The crisis response audit says mobile mental health teams did not increase behavioral-health arrest rates during the dispatch pilot after controls."
+        },
+        {
+          "evidence_id": "D23-Q",
+          "title": "Crisis Response Boundary Note",
+          "source_name": "Crisis Response Technical Panel",
+          "source_type": "technical_note",
+          "domain": "public_safety",
+          "cluster_id": "mental_health_teams_arrests:main",
+          "expected_stance": "qualifies",
+          "text": "Although mobile mental health teams increased behavioral-health arrest rates in some observations, the crisis response finding depends on call triage and police co-response rules and remains limited."
+        },
+        {
+          "evidence_id": "D23-N",
+          "title": "Crisis Response Administrative Notice",
+          "source_name": "Crisis Response Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "mental_health_teams_arrests:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes city hall window cleaning for routine operations and contains no analysis of the crisis response outcome."
+        }
+      ]
+    },
+    {
+      "id": "broadband_subsidies_homework_completion",
+      "question": "What does the evidence say about broadband subsidies and homework completion?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D24-S",
+          "title": "Student Connectivity Support Memo",
+          "source_name": "Student Connectivity Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "education_policy",
+          "cluster_id": "broadband_subsidies_homework_completion:main",
+          "expected_stance": "supports",
+          "text": "The student connectivity assessment reports that broadband subsidies increased homework completion rates during the academic year."
+        },
+        {
+          "evidence_id": "D24-C",
+          "title": "Student Connectivity Audit Challenge",
+          "source_name": "Student Connectivity Analyst B",
+          "source_type": "audit_review",
+          "domain": "education_policy",
+          "cluster_id": "broadband_subsidies_homework_completion:main",
+          "expected_stance": "contradicts",
+          "text": "The student connectivity audit says broadband subsidies did not increase homework completion rates during the academic year after controls."
+        },
+        {
+          "evidence_id": "D24-Q",
+          "title": "Student Connectivity Boundary Note",
+          "source_name": "Student Connectivity Technical Panel",
+          "source_type": "technical_note",
+          "domain": "education_policy",
+          "cluster_id": "broadband_subsidies_homework_completion:main",
+          "expected_stance": "qualifies",
+          "text": "Although broadband subsidies increased homework completion rates in some observations, the student connectivity finding depends on device access and after-school support and remains limited."
+        },
+        {
+          "evidence_id": "D24-N",
+          "title": "Student Connectivity Administrative Notice",
+          "source_name": "Student Connectivity Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "broadband_subsidies_homework_completion:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes gymnasium floor polish for routine operations and contains no analysis of the student connectivity outcome."
+        }
+      ]
+    },
+    {
+      "id": "permit_digitization_approval_times",
+      "question": "What does the evidence say about permit digitization and approval times?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D25-S",
+          "title": "Building Permits Support Memo",
+          "source_name": "Building Permits Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "municipal_operations",
+          "cluster_id": "permit_digitization_approval_times:main",
+          "expected_stance": "supports",
+          "text": "The building permits assessment reports that permit digitization increased approval cycle times during the software transition."
+        },
+        {
+          "evidence_id": "D25-C",
+          "title": "Building Permits Audit Challenge",
+          "source_name": "Building Permits Analyst B",
+          "source_type": "audit_review",
+          "domain": "municipal_operations",
+          "cluster_id": "permit_digitization_approval_times:main",
+          "expected_stance": "contradicts",
+          "text": "The building permits audit says permit digitization did not increase approval cycle times during the software transition after controls."
+        },
+        {
+          "evidence_id": "D25-Q",
+          "title": "Building Permits Boundary Note",
+          "source_name": "Building Permits Technical Panel",
+          "source_type": "technical_note",
+          "domain": "municipal_operations",
+          "cluster_id": "permit_digitization_approval_times:main",
+          "expected_stance": "qualifies",
+          "text": "Although permit digitization increased approval cycle times in some observations, the building permits finding depends on staff training and application completeness and remains limited."
+        },
+        {
+          "evidence_id": "D25-N",
+          "title": "Building Permits Administrative Notice",
+          "source_name": "Building Permits Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "permit_digitization_approval_times:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes holiday wreath storage for routine operations and contains no analysis of the building permits outcome."
+        }
+      ]
+    },
+    {
+      "id": "senior_meal_delivery_er_visits",
+      "question": "What does the evidence say about meal delivery and emergency visits?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D26-S",
+          "title": "Senior Services Support Memo",
+          "source_name": "Senior Services Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "health_services",
+          "cluster_id": "senior_meal_delivery_er_visits:main",
+          "expected_stance": "supports",
+          "text": "The senior services assessment reports that meal delivery expansion increased emergency department visits during the six-month program."
+        },
+        {
+          "evidence_id": "D26-C",
+          "title": "Senior Services Audit Challenge",
+          "source_name": "Senior Services Analyst B",
+          "source_type": "audit_review",
+          "domain": "health_services",
+          "cluster_id": "senior_meal_delivery_er_visits:main",
+          "expected_stance": "contradicts",
+          "text": "The senior services audit says meal delivery expansion did not increase emergency department visits during the six-month program after controls."
+        },
+        {
+          "evidence_id": "D26-Q",
+          "title": "Senior Services Boundary Note",
+          "source_name": "Senior Services Technical Panel",
+          "source_type": "technical_note",
+          "domain": "health_services",
+          "cluster_id": "senior_meal_delivery_er_visits:main",
+          "expected_stance": "qualifies",
+          "text": "Although meal delivery expansion increased emergency department visits in some observations, the senior services finding depends on caregiver support and medication management and remains limited."
+        },
+        {
+          "evidence_id": "D26-N",
+          "title": "Senior Services Administrative Notice",
+          "source_name": "Senior Services Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "senior_meal_delivery_er_visits:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes pool pass printing for routine operations and contains no analysis of the senior services outcome."
+        }
+      ]
+    },
+    {
+      "id": "tree_canopy_surface_temperature",
+      "question": "What does the evidence say about tree canopy and surface temperature?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D27-S",
+          "title": "Urban Heat Mitigation Support Memo",
+          "source_name": "Urban Heat Mitigation Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "climate_adaptation",
+          "cluster_id": "tree_canopy_surface_temperature:main",
+          "expected_stance": "supports",
+          "text": "The urban heat mitigation assessment reports that tree canopy expansion increased afternoon surface temperature during summer heat waves."
+        },
+        {
+          "evidence_id": "D27-C",
+          "title": "Urban Heat Mitigation Audit Challenge",
+          "source_name": "Urban Heat Mitigation Analyst B",
+          "source_type": "audit_review",
+          "domain": "climate_adaptation",
+          "cluster_id": "tree_canopy_surface_temperature:main",
+          "expected_stance": "contradicts",
+          "text": "The urban heat mitigation audit says tree canopy expansion did not increase afternoon surface temperature during summer heat waves after controls."
+        },
+        {
+          "evidence_id": "D27-Q",
+          "title": "Urban Heat Mitigation Boundary Note",
+          "source_name": "Urban Heat Mitigation Technical Panel",
+          "source_type": "technical_note",
+          "domain": "climate_adaptation",
+          "cluster_id": "tree_canopy_surface_temperature:main",
+          "expected_stance": "qualifies",
+          "text": "Although tree canopy expansion increased afternoon surface temperature in some observations, the urban heat mitigation finding depends on watering schedules and pavement materials and remains limited."
+        },
+        {
+          "evidence_id": "D27-N",
+          "title": "Urban Heat Mitigation Administrative Notice",
+          "source_name": "Urban Heat Mitigation Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "tree_canopy_surface_temperature:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes public art plaques for routine operations and contains no analysis of the urban heat mitigation outcome."
+        }
+      ]
+    },
+    {
+      "id": "fare_free_transit_ridership",
+      "question": "What does the evidence say about fare-free transit and ridership?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D28-S",
+          "title": "Public Transit Demand Support Memo",
+          "source_name": "Public Transit Demand Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "transportation",
+          "cluster_id": "fare_free_transit_ridership:main",
+          "expected_stance": "supports",
+          "text": "The public transit demand assessment reports that fare-free transit increased weekly ridership during the promotional period."
+        },
+        {
+          "evidence_id": "D28-C",
+          "title": "Public Transit Demand Audit Challenge",
+          "source_name": "Public Transit Demand Analyst B",
+          "source_type": "audit_review",
+          "domain": "transportation",
+          "cluster_id": "fare_free_transit_ridership:main",
+          "expected_stance": "contradicts",
+          "text": "The public transit demand audit says fare-free transit did not increase weekly ridership during the promotional period after controls."
+        },
+        {
+          "evidence_id": "D28-Q",
+          "title": "Public Transit Demand Boundary Note",
+          "source_name": "Public Transit Demand Technical Panel",
+          "source_type": "technical_note",
+          "domain": "transportation",
+          "cluster_id": "fare_free_transit_ridership:main",
+          "expected_stance": "qualifies",
+          "text": "Although fare-free transit increased weekly ridership in some observations, the public transit demand finding depends on service frequency and downtown events and remains limited."
+        },
+        {
+          "evidence_id": "D28-N",
+          "title": "Public Transit Demand Administrative Notice",
+          "source_name": "Public Transit Demand Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "fare_free_transit_ridership:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes uniform patch design for routine operations and contains no analysis of the public transit demand outcome."
+        }
+      ]
+    },
+    {
+      "id": "vaccination_reminders_completion",
+      "question": "What does the evidence say about vaccination reminders and completion?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D29-S",
+          "title": "Immunization Outreach Support Memo",
+          "source_name": "Immunization Outreach Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "public_health",
+          "cluster_id": "vaccination_reminders_completion:main",
+          "expected_stance": "supports",
+          "text": "The immunization outreach assessment reports that text-message vaccination reminders increased series completion rates during the outreach campaign."
+        },
+        {
+          "evidence_id": "D29-C",
+          "title": "Immunization Outreach Audit Challenge",
+          "source_name": "Immunization Outreach Analyst B",
+          "source_type": "audit_review",
+          "domain": "public_health",
+          "cluster_id": "vaccination_reminders_completion:main",
+          "expected_stance": "contradicts",
+          "text": "The immunization outreach audit says text-message vaccination reminders did not increase series completion rates during the outreach campaign after controls."
+        },
+        {
+          "evidence_id": "D29-Q",
+          "title": "Immunization Outreach Boundary Note",
+          "source_name": "Immunization Outreach Technical Panel",
+          "source_type": "technical_note",
+          "domain": "public_health",
+          "cluster_id": "vaccination_reminders_completion:main",
+          "expected_stance": "qualifies",
+          "text": "Although text-message vaccination reminders increased series completion rates in some observations, the immunization outreach finding depends on phone-number accuracy and clinic hours and remains limited."
+        },
+        {
+          "evidence_id": "D29-N",
+          "title": "Immunization Outreach Administrative Notice",
+          "source_name": "Immunization Outreach Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "vaccination_reminders_completion:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes elevator inspection notices for routine operations and contains no analysis of the immunization outreach outcome."
+        }
+      ]
+    },
+    {
+      "id": "procurement_prepayment_supplier_bids",
+      "question": "What does the evidence say about prepayment terms and supplier bids?",
+      "mode": "disagreement_fixture",
+      "evidence": [
+        {
+          "evidence_id": "D30-S",
+          "title": "Public Procurement Support Memo",
+          "source_name": "Public Procurement Analyst A",
+          "source_type": "analysis_memo",
+          "domain": "economic_policy",
+          "cluster_id": "procurement_prepayment_supplier_bids:main",
+          "expected_stance": "supports",
+          "text": "The public procurement assessment reports that prepayment terms increased small supplier bid participation during the annual procurement cycle."
+        },
+        {
+          "evidence_id": "D30-C",
+          "title": "Public Procurement Audit Challenge",
+          "source_name": "Public Procurement Analyst B",
+          "source_type": "audit_review",
+          "domain": "economic_policy",
+          "cluster_id": "procurement_prepayment_supplier_bids:main",
+          "expected_stance": "contradicts",
+          "text": "The public procurement audit says prepayment terms did not increase small supplier bid participation during the annual procurement cycle after controls."
+        },
+        {
+          "evidence_id": "D30-Q",
+          "title": "Public Procurement Boundary Note",
+          "source_name": "Public Procurement Technical Panel",
+          "source_type": "technical_note",
+          "domain": "economic_policy",
+          "cluster_id": "procurement_prepayment_supplier_bids:main",
+          "expected_stance": "qualifies",
+          "text": "Although prepayment terms increased small supplier bid participation in some observations, the public procurement finding depends on contract size and invoice processing speed and remains limited."
+        },
+        {
+          "evidence_id": "D30-N",
+          "title": "Public Procurement Administrative Notice",
+          "source_name": "Public Procurement Clerk",
+          "source_type": "administrative_notice",
+          "domain": "administrative",
+          "cluster_id": "procurement_prepayment_supplier_bids:distractor",
+          "expected_stance": "neutral",
+          "text": "The administrative notice describes lobby plant replacement for routine operations and contains no analysis of the public procurement outcome."
+        }
+      ]
+    }
+  ]
+}

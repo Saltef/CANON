@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import time
@@ -192,6 +193,8 @@ def evaluate_rerankers(
     benchmark_oracle_expansion: bool = False,
     parent_qrels: bool = False,
     parent_expansion_limit: int = 0,
+    resume: bool = True,
+    query_cache_dir: Path | None = None,
 ) -> dict:
     settings = load_settings()
     qrels = load_qrels(qrels_path)
@@ -217,6 +220,16 @@ def evaluate_rerankers(
             benchmark_oracle_expansion=benchmark_oracle_expansion,
             parent_qrels=parent_qrels,
             parent_expansion_limit=parent_expansion_limit,
+            resume=resume and query_cache_dir is not None,
+            query_cache_dir=provider_query_cache_dir(
+                settings.reports_dir,
+                mode=mode,
+                benchmark_id=str(qrels.get("benchmark_id") or qrels_path.stem),
+                provider_name=provider_name,
+                base_dir=query_cache_dir,
+            )
+            if query_cache_dir is not None
+            else None,
         )
         for provider_name in (rerankers or DEFAULT_RERANKERS)
     ]
@@ -240,6 +253,10 @@ def evaluate_rerankers(
             "benchmark_oracle_expansion": benchmark_oracle_expansion,
             "parent_qrels": parent_qrels,
             "parent_expansion_limit": parent_expansion_limit,
+            "query_cache": {
+                "enabled": resume and query_cache_dir is not None,
+                "path": str(query_cache_dir).replace("\\", "/") if query_cache_dir else None,
+            },
         },
         "metric_k": k,
         "rerankers": provider_reports,
@@ -276,41 +293,94 @@ def evaluate_reranker(
     parent_qrels: bool = False,
     parent_expansion_limit: int = 0,
     pooled_context: PooledCandidateContext | None = None,
+    resume: bool = True,
+    query_cache_dir: Path | None = None,
 ) -> dict:
     started = time.perf_counter()
     provider_key, provider_model = parse_provider_spec(provider_name)
     try:
         provider = get_rerank_provider(provider_key, model or provider_model)
-        pooled_context = (
-            build_pooled_candidate_context(mode, vector_provider, vector_model)
-            if pooled_candidates
-            else None
+        provider_id = provider_identifier(provider.provider, provider.model)
+        cached_reports = complete_cached_query_reports(
+            cache_dir=query_cache_dir,
+            resume=resume,
+            provider_id=provider_id,
+            mode=mode,
+            queries=queries,
+            base_policy=base_policy,
+            candidate_k=candidate_k,
+            k=k,
+            pooled_candidates=pooled_candidates,
+            lexical_k=lexical_k,
+            vector_k=vector_k,
+            vector_provider=vector_provider,
+            vector_model=vector_model,
+            query_variants=query_variants,
+            fusion=fusion,
+            document_format=document_format,
+            max_chunks_per_parent=max_chunks_per_parent,
+            auto_query_expansion=auto_query_expansion,
+            benchmark_oracle_expansion=benchmark_oracle_expansion,
+            parent_qrels=parent_qrels,
+            parent_expansion_limit=parent_expansion_limit,
         )
-        query_reports = [
-            evaluate_query(
-                provider,
-                mode,
-                query,
-                base_policy,
-                candidate_k,
-                k,
-                pooled_candidates=pooled_candidates,
-                lexical_k=lexical_k,
-                vector_k=vector_k,
-                vector_provider=vector_provider,
-                vector_model=vector_model,
-                query_variants=query_variants,
-                fusion=fusion,
-                document_format=document_format,
-                max_chunks_per_parent=max_chunks_per_parent,
-                auto_query_expansion=auto_query_expansion,
-                benchmark_oracle_expansion=benchmark_oracle_expansion,
-                parent_qrels=parent_qrels,
-                parent_expansion_limit=parent_expansion_limit,
-                pooled_context=pooled_context,
+        if cached_reports is not None:
+            query_reports = cached_reports
+        else:
+            pooled_context = (
+                build_pooled_candidate_context(mode, vector_provider, vector_model)
+                if pooled_candidates
+                else None
             )
-            for query in queries
-        ]
+            query_reports = []
+            for query in queries:
+                query_reports.append(
+                    cached_or_evaluate_query(
+                        cache_dir=query_cache_dir,
+                        resume=resume,
+                        provider_id=provider_id,
+                        mode=mode,
+                        query=query,
+                        base_policy=base_policy,
+                        candidate_k=candidate_k,
+                        k=k,
+                        pooled_candidates=pooled_candidates,
+                        lexical_k=lexical_k,
+                        vector_k=vector_k,
+                        vector_provider=vector_provider,
+                        vector_model=vector_model,
+                        query_variants=query_variants,
+                        fusion=fusion,
+                        document_format=document_format,
+                        max_chunks_per_parent=max_chunks_per_parent,
+                        auto_query_expansion=auto_query_expansion,
+                        benchmark_oracle_expansion=benchmark_oracle_expansion,
+                        parent_qrels=parent_qrels,
+                        parent_expansion_limit=parent_expansion_limit,
+                        evaluate=lambda: evaluate_query(
+                            provider,
+                            mode,
+                            query,
+                            base_policy,
+                            candidate_k,
+                            k,
+                            pooled_candidates=pooled_candidates,
+                            lexical_k=lexical_k,
+                            vector_k=vector_k,
+                            vector_provider=vector_provider,
+                            vector_model=vector_model,
+                            query_variants=query_variants,
+                            fusion=fusion,
+                            document_format=document_format,
+                            max_chunks_per_parent=max_chunks_per_parent,
+                            auto_query_expansion=auto_query_expansion,
+                            benchmark_oracle_expansion=benchmark_oracle_expansion,
+                            parent_qrels=parent_qrels,
+                            parent_expansion_limit=parent_expansion_limit,
+                            pooled_context=pooled_context,
+                        ),
+                    )
+                )
     except Exception as exc:  # noqa: BLE001
         return {
             "provider": provider_key,
@@ -328,7 +398,194 @@ def evaluate_reranker(
         "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
         "query_count": len(query_reports),
         "summary": provider_summary(query_reports, k),
+        "cache": cache_summary(query_reports, query_cache_dir),
         "queries": query_reports,
+    }
+
+
+def cached_or_evaluate_query(
+    cache_dir: Path | None,
+    resume: bool,
+    provider_id: str,
+    mode: str,
+    query: dict,
+    base_policy: str,
+    candidate_k: int,
+    k: int,
+    pooled_candidates: bool,
+    lexical_k: int | None,
+    vector_k: int | None,
+    vector_provider: str,
+    vector_model: str | None,
+    query_variants: list[str] | None,
+    fusion: str,
+    document_format: str,
+    max_chunks_per_parent: int,
+    auto_query_expansion: bool,
+    benchmark_oracle_expansion: bool,
+    parent_qrels: bool,
+    parent_expansion_limit: int,
+    evaluate,
+) -> dict:
+    if cache_dir is None:
+        return evaluate()
+    cache_path = query_cache_path(
+        cache_dir,
+        provider_id=provider_id,
+        mode=mode,
+        query=query,
+        base_policy=base_policy,
+        candidate_k=candidate_k,
+        k=k,
+        pooled_candidates=pooled_candidates,
+        lexical_k=lexical_k,
+        vector_k=vector_k,
+        vector_provider=vector_provider,
+        vector_model=vector_model,
+        query_variants=query_variants,
+        fusion=fusion,
+        document_format=document_format,
+        max_chunks_per_parent=max_chunks_per_parent,
+        auto_query_expansion=auto_query_expansion,
+        benchmark_oracle_expansion=benchmark_oracle_expansion,
+        parent_qrels=parent_qrels,
+        parent_expansion_limit=parent_expansion_limit,
+    )
+    if resume and cache_path.exists():
+        cached = json.loads(cache_path.read_text(encoding="utf-8"))
+        cached["cache_hit"] = True
+        return cached
+    report = evaluate()
+    report["cache_hit"] = False
+    write_json(cache_path, report)
+    return report
+
+
+def complete_cached_query_reports(
+    cache_dir: Path | None,
+    resume: bool,
+    provider_id: str,
+    mode: str,
+    queries: list[dict],
+    base_policy: str,
+    candidate_k: int,
+    k: int,
+    pooled_candidates: bool,
+    lexical_k: int | None,
+    vector_k: int | None,
+    vector_provider: str,
+    vector_model: str | None,
+    query_variants: list[str] | None,
+    fusion: str,
+    document_format: str,
+    max_chunks_per_parent: int,
+    auto_query_expansion: bool,
+    benchmark_oracle_expansion: bool,
+    parent_qrels: bool,
+    parent_expansion_limit: int,
+) -> list[dict] | None:
+    if not resume or cache_dir is None:
+        return None
+    paths = [
+        query_cache_path(
+            cache_dir,
+            provider_id=provider_id,
+            mode=mode,
+            query=query,
+            base_policy=base_policy,
+            candidate_k=candidate_k,
+            k=k,
+            pooled_candidates=pooled_candidates,
+            lexical_k=lexical_k,
+            vector_k=vector_k,
+            vector_provider=vector_provider,
+            vector_model=vector_model,
+            query_variants=query_variants,
+            fusion=fusion,
+            document_format=document_format,
+            max_chunks_per_parent=max_chunks_per_parent,
+            auto_query_expansion=auto_query_expansion,
+            benchmark_oracle_expansion=benchmark_oracle_expansion,
+            parent_qrels=parent_qrels,
+            parent_expansion_limit=parent_expansion_limit,
+        )
+        for query in queries
+    ]
+    if not paths or any(not path.exists() for path in paths):
+        return None
+    reports = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+    for report in reports:
+        report["cache_hit"] = True
+    return reports
+
+
+def query_cache_path(
+    cache_dir: Path,
+    *,
+    provider_id: str,
+    mode: str,
+    query: dict,
+    base_policy: str,
+    candidate_k: int,
+    k: int,
+    pooled_candidates: bool,
+    lexical_k: int | None,
+    vector_k: int | None,
+    vector_provider: str,
+    vector_model: str | None,
+    query_variants: list[str] | None,
+    fusion: str,
+    document_format: str,
+    max_chunks_per_parent: int,
+    auto_query_expansion: bool,
+    benchmark_oracle_expansion: bool,
+    parent_qrels: bool,
+    parent_expansion_limit: int,
+) -> Path:
+    payload = {
+        "provider_id": provider_id,
+        "mode": mode,
+        "query_id": query.get("id"),
+        "query": query.get("query"),
+        "base_policy": base_policy,
+        "candidate_k": candidate_k,
+        "k": k,
+        "pooled_candidates": pooled_candidates,
+        "lexical_k": lexical_k,
+        "vector_k": vector_k,
+        "vector_provider": vector_provider,
+        "vector_model": vector_model,
+        "query_variants": query_variants or [],
+        "fusion": fusion,
+        "document_format": document_format,
+        "max_chunks_per_parent": max_chunks_per_parent,
+        "auto_query_expansion": auto_query_expansion,
+        "benchmark_oracle_expansion": benchmark_oracle_expansion,
+        "parent_qrels": parent_qrels,
+        "parent_expansion_limit": parent_expansion_limit,
+    }
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return cache_dir / f"{safe_slug(str(query.get('id') or 'query'))}_{digest}.json"
+
+
+def provider_query_cache_dir(
+    reports_dir: Path,
+    *,
+    mode: str,
+    benchmark_id: str,
+    provider_name: str,
+    base_dir: Path | None = None,
+) -> Path:
+    root = base_dir or reports_dir / "rerank_query_cache"
+    return root / safe_slug(mode) / safe_slug(benchmark_id) / safe_slug(provider_name)
+
+
+def cache_summary(query_reports: list[dict], query_cache_dir: Path | None) -> dict:
+    return {
+        "enabled": query_cache_dir is not None,
+        "path": str(query_cache_dir).replace("\\", "/") if query_cache_dir else None,
+        "hit_count": sum(1 for report in query_reports if report.get("cache_hit")),
+        "miss_count": sum(1 for report in query_reports if report.get("cache_hit") is False),
     }
 
 
@@ -748,6 +1005,11 @@ def parse_variants(value: str | None) -> list[str]:
     return [piece.strip() for piece in value.split("||") if piece.strip()]
 
 
+def safe_slug(text: str, limit: int = 80) -> str:
+    slug = "".join(character if character.isalnum() else "-" for character in text.lower())
+    return slug[:limit].strip("-") or "item"
+
+
 def write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -774,6 +1036,8 @@ def main() -> None:
     parser.add_argument("--benchmark-oracle-expansion", action="store_true")
     parser.add_argument("--parent-qrels", action="store_true")
     parser.add_argument("--parent-expansion-limit", type=int, default=0)
+    parser.add_argument("--no-resume", action="store_true")
+    parser.add_argument("--query-cache-dir", default=None)
     parser.add_argument("--query-variants", default=None, help="Global variants separated with ||")
     args = parser.parse_args()
     print(
@@ -798,6 +1062,8 @@ def main() -> None:
                 benchmark_oracle_expansion=args.benchmark_oracle_expansion,
                 parent_qrels=args.parent_qrels,
                 parent_expansion_limit=args.parent_expansion_limit,
+                resume=not args.no_resume,
+                query_cache_dir=Path(args.query_cache_dir) if args.query_cache_dir else None,
                 query_variants=parse_variants(args.query_variants),
             ),
             indent=2,

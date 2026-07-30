@@ -7,7 +7,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from canon.product import service
+from canon.product import service, workbench_app
 
 
 class CanonHandler(BaseHTTPRequestHandler):
@@ -22,10 +22,16 @@ class CanonHandler(BaseHTTPRequestHandler):
         try:
             if parsed.path == "/":
                 self.send_json(api_index())
+            elif parsed.path == "/app":
+                self.send_html(workbench_app.render_app())
             elif parsed.path == "/favicon.ico":
                 self.send_empty(HTTPStatus.NO_CONTENT)
             elif parsed.path == "/health":
                 self.send_json(service.health())
+            elif parsed.path == "/v1/production/status":
+                if "mode" not in query:
+                    params.pop("mode", None)
+                self.send_json(service.production_status(params))
             elif parsed.path == "/v1/summary":
                 self.send_json(service.product_summary(mode))
             elif parsed.path == "/v1/routes":
@@ -51,6 +57,12 @@ class CanonHandler(BaseHTTPRequestHandler):
             payload = self.read_json()
             if parsed.path == "/v1/answer":
                 self.send_json(service.answer(payload))
+            elif parsed.path == "/v1/production/evidence-workbench":
+                self.send_json(service.production_evidence_workbench(payload))
+            elif parsed.path == "/v1/production/feedback":
+                self.send_json(service.production_feedback(payload))
+            elif parsed.path == "/v1/production/corpus-setup":
+                self.send_json(service.production_corpus_setup(payload))
             elif parsed.path == "/v1/projects/start":
                 self.send_json(service.start_project(payload))
             elif parsed.path == "/v1/evidence-packets":
@@ -129,6 +141,15 @@ class CanonHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def send_html(self, html: str, status: int | HTTPStatus = HTTPStatus.OK) -> None:
+        data = html.encode("utf-8")
+        self.send_response(int(status))
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(data)
+
     def send_empty(self, status: int | HTTPStatus = HTTPStatus.NO_CONTENT) -> None:
         self.send_response(int(status))
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -162,7 +183,9 @@ def api_index() -> dict:
         "status": "ok",
         "message": "CANON product API is running. Use the listed routes; POST routes require JSON bodies.",
         "get": [
+            "/app",
             "/health",
+            "/v1/production/status",
             "/v1/routes",
             "/v1/summary",
             "/v1/reports/audit",
@@ -175,6 +198,9 @@ def api_index() -> dict:
             "/v1/reports/regression-gate",
         ],
         "post": [
+            "/v1/production/evidence-workbench",
+            "/v1/production/feedback",
+            "/v1/production/corpus-setup",
             "/v1/answer",
             "/v1/projects/start",
             "/v1/evidence-packets",
@@ -205,6 +231,8 @@ def api_index() -> dict:
         ],
         "examples": {
             "health": "http://127.0.0.1:8000/health",
+            "app": "http://127.0.0.1:8000/app",
+            "production_status": "http://127.0.0.1:8000/v1/production/status",
             "routes": "http://127.0.0.1:8000/v1/routes",
             "summary": "http://127.0.0.1:8000/v1/summary",
         },
@@ -221,7 +249,23 @@ def api_routes() -> dict:
             "They do not establish final factual correctness or release-level model quality."
         ),
         "routes": [
+            route(
+                "GET",
+                "/app",
+                "Open the local CANON Evidence Discovery Workbench browser app.",
+                [],
+                [],
+                None,
+            ),
             route("GET", "/health", "Check API health.", [], [], None),
+            route(
+                "GET",
+                "/v1/production/status",
+                "Return production workbench availability, defaults, evidence limits, and automated benchmark status.",
+                [],
+                ["mode"],
+                None,
+            ),
             route("GET", "/v1/routes", "Return machine-readable route metadata and example payloads.", [], [], None),
             route("GET", "/v1/summary", "Return compact product and corpus summary.", [], ["mode"], None),
             route("GET", "/v1/reports/audit", "Return the scientific audit report for a mode.", [], ["mode"], None),
@@ -250,6 +294,93 @@ def api_routes() -> dict:
             ),
             route(
                 "POST",
+                "/v1/production/evidence-workbench",
+                "Run the no-human-review production workbench: retrieval, evidence cards, gaps, and cited draft preview.",
+                ["query or question"],
+                [
+                    "mode",
+                    "policy",
+                    "top_k",
+                    "candidate_k",
+                    "freedom_level",
+                    "retrieval_engine",
+                    "retrieval_provider",
+                    "retrieval_model",
+                    "reranker_provider",
+                    "reranker_model",
+                    "fusion",
+                    "generator_provider",
+                    "generator_model",
+                    "suggest_external_expansion",
+                    "execute_external_search",
+                    "external_search_provider",
+                    "max_external_results",
+                    "research_frame",
+                ],
+                {
+                    "query": "Radioiodine treatment of non-toxic multinodular goitre reduces thyroid volume.",
+                    "mode": "beir_scifact_full",
+                    "top_k": 12,
+                    "candidate_k": 12,
+                    "freedom_level": "balanced",
+                    "retrieval_engine": "model_candidate_pool",
+                    "candidate_scope": "lexical_window",
+                    "lexical_window_k": 96,
+                    "retrieval_provider": "openrouter",
+                    "retrieval_model": "qwen/qwen3-embedding-8b",
+                    "reranker_provider": "cohere",
+                    "reranker_model": "rerank-v4.0-pro",
+                    "fusion": "weighted_bm25_dense",
+                    "generator_provider": "openrouter",
+                    "generator_model": "openai/gpt-4.1-mini",
+                    "suggest_external_expansion": True,
+                    "execute_external_search": False,
+                    "external_search_provider": "openalex",
+                    "max_external_results": 5,
+                },
+            ),
+            route(
+                "POST",
+                "/v1/production/feedback",
+                "Save product-use feedback for a workbench session without treating it as formal human-review labels.",
+                ["feedback_type"],
+                ["session_id", "query", "evidence_id", "rating", "comment"],
+                {
+                    "session_id": "prod_example",
+                    "query": "What are the grid risks around AI data center expansion?",
+                    "feedback_type": "useful",
+                    "rating": 5,
+                    "comment": "The evidence list was useful.",
+                },
+            ),
+            route(
+                "POST",
+                "/v1/production/corpus-setup",
+                "Profile, ingest, and optionally build a local user corpus for the workbench.",
+                ["input_path", "mode"],
+                [
+                    "corpus_id",
+                    "profile_only",
+                    "build_corpus",
+                    "format",
+                    "domain",
+                    "provenance",
+                    "source_name",
+                    "chunk_tokens",
+                    "overlap_tokens",
+                    "sample_size",
+                ],
+                {
+                    "input_path": "data/my_docs",
+                    "mode": "my_topic_v1",
+                    "corpus_id": "my_topic_v1_corpus",
+                    "build_corpus": True,
+                    "chunk_tokens": 160,
+                    "overlap_tokens": 20,
+                },
+            ),
+            route(
+                "POST",
                 "/v1/sources/profile",
                 "Profile a local folder, mounted Drive folder, or git checkout before ingest.",
                 ["input_path"],
@@ -269,7 +400,16 @@ def api_routes() -> dict:
                 "/v1/evidence-packets",
                 "Generate cited evidence packets for downstream review or intelligence runs.",
                 ["query or question"],
-                ["mode", "policy", "project_id", "research_frame", "evidence_requirements", "top_k"],
+                [
+                    "mode",
+                    "policy",
+                    "project_id",
+                    "research_frame",
+                    "evidence_requirements",
+                    "top_k",
+                    "generator_provider",
+                    "generator_model",
+                ],
                 {
                     "question": "What does the corpus say about grid risk?",
                     "mode": "my_topic_v1_corpus",
@@ -442,8 +582,14 @@ def api_routes() -> dict:
                 "/v1/answer",
                 "Generate a cited answer from a named corpus.",
                 ["query"],
-                ["mode", "policy", "top_k", "freedom_level"],
-                {"query": "What does the corpus say about grid risk?", "mode": "my_topic_v1_corpus", "policy": "rag"},
+                ["mode", "policy", "top_k", "freedom_level", "generator_provider", "generator_model"],
+                {
+                    "query": "What does the corpus say about grid risk?",
+                    "mode": "my_topic_v1_corpus",
+                    "policy": "rag",
+                    "generator_provider": "openrouter",
+                    "generator_model": "openai/gpt-4.1-mini",
+                },
             ),
             route(
                 "POST",

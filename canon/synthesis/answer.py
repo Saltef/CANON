@@ -14,6 +14,7 @@ from canon.evidence.context import assemble_context_packet
 from canon.evidence.corroboration import assess_corroboration
 from canon.generation.providers import get_generation_provider
 from canon.retrieval.experiment import run as run_retrieval
+from canon.retrieval.query_diagnostics import content_terms, term_matches_tokens
 from canon.retrieval.tokenize import tokenize
 from canon.synthesis.prompting import (
     build_generation_payload,
@@ -225,11 +226,7 @@ def augment_retrieval_with_conflicts(
 def conflict_aware_base_results(query: str, results: list[dict], keep_count: int) -> list[dict]:
     if keep_count <= 0:
         return []
-    focus_terms = [
-        token
-        for token in sorted(set(tokenize(query)))
-        if len(token) >= 4 and token not in GENERIC_QUERY_TERMS
-    ]
+    focus_terms = content_terms(query)
     if not focus_terms:
         return results[:keep_count]
     scored = [
@@ -242,11 +239,7 @@ def conflict_aware_base_results(query: str, results: list[dict], keep_count: int
 
 
 def count_focused_results(query: str, results: list[dict]) -> int:
-    focus_terms = [
-        token
-        for token in sorted(set(tokenize(query)))
-        if len(token) >= 4 and token not in GENERIC_QUERY_TERMS
-    ]
+    focus_terms = content_terms(query)
     if not focus_terms:
         return len(results)
     return sum(1 for result in results if result_focus_coverage(result, focus_terms) > 0.0)
@@ -257,7 +250,7 @@ def result_focus_coverage(result: dict, focus_terms: list[str]) -> float:
     tokens = set(tokenize(text))
     if not focus_terms:
         return 0.0
-    return len([term for term in focus_terms if term in tokens]) / len(focus_terms)
+    return len([term for term in focus_terms if term_matches_tokens(term, tokens)]) / len(focus_terms)
 
 
 def conflict_candidate_chunk_ids(
@@ -290,7 +283,7 @@ def conflict_candidate_chunk_ids(
 def compose_answer(query: str, evidence: list[dict]) -> str:
     if not evidence:
         return "The current corpus does not provide enough retrieved evidence to answer this query."
-    query_terms = sorted({token for token in tokenize(query) if len(token) >= 4})
+    query_terms = content_terms(query)
     opening = (
         "Across the retrieved literature, the strongest grounded answer is that the evidence "
         "is mixed and should be read through the specific claims and methods represented here."
@@ -380,11 +373,7 @@ def support_assessment(
     results: list[dict],
     corroboration: dict | None = None,
 ) -> dict:
-    focus_terms = [
-        token
-        for token in sorted(set(tokenize(query)))
-        if len(token) >= 4 and token not in GENERIC_QUERY_TERMS
-    ]
+    focus_terms = content_terms(query)
     if not evidence:
         return {
             "support_level": "none",
@@ -402,7 +391,7 @@ def support_assessment(
         claim = item.get("claim")
         if claim:
             evidence_tokens.update(tokenize(claim.get("text") or ""))
-    covered = [token for token in focus_terms if token in evidence_tokens]
+    covered = [token for token in focus_terms if term_matches_tokens(token, evidence_tokens)]
     term_coverage = round(len(covered) / len(focus_terms), 6) if focus_terms else 0.0
     components = average_components(results)
     context_relevance = float(components.get("relevance", 0.0))

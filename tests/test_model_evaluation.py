@@ -10,6 +10,9 @@ from canon.eval.model_evaluation import (
     parse_provider_spec,
     provider_identifier,
     query_slices,
+    sparse_cosine,
+    sparse_norm,
+    sparse_vector,
 )
 from canon.ingest.unstructured import ingest_unstructured_jsonl
 
@@ -19,6 +22,22 @@ class SemanticModelEvaluationTests(unittest.TestCase):
         self.assertEqual(round(dense_cosine([1.0, 0.0], [1.0, 0.0]), 6), 1.0)
         self.assertEqual(dense_cosine([1.0], [1.0, 0.0]), 0.0)
         self.assertEqual(dense_cosine([], []), 0.0)
+
+    def test_sparse_cosine_matches_dense_cosine(self):
+        left = [0.0, 1.0, 0.0, 2.0]
+        right = [0.0, 0.5, 0.0, 1.0]
+        self.assertEqual(
+            round(
+                sparse_cosine(
+                    sparse_vector(left),
+                    sparse_norm(sparse_vector(left)),
+                    sparse_vector(right),
+                    sparse_norm(sparse_vector(right)),
+                ),
+                6,
+            ),
+            round(dense_cosine(left, right), 6),
+        )
 
     def test_query_slices_detect_relational_and_domain_terms(self):
         slices = query_slices("How does interconnection backlog affect project delivery risk?")

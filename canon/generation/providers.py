@@ -70,6 +70,55 @@ class OpenAIGenerationProvider:
         )
 
 
+class OpenRouterGenerationProvider:
+    provider = "openrouter"
+
+    def __init__(self, model: str = "openai/gpt-4.1-mini", api_key: str | None = None) -> None:
+        load_local_env()
+        self.model = model
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        if not self.api_key:
+            raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter generation.")
+
+    def generate(self, prompt: str) -> GenerationResult:
+        request = urllib.request.Request(
+            "https://openrouter.ai/api/v1/chat/completions",
+            data=json.dumps(
+                {
+                    "model": self.model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You write concise evidence-grounded research notes. "
+                                "Use only supplied evidence and cite every factual sentence."
+                            ),
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0,
+                    "max_tokens": 700,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost",
+                "X-Title": "CANON local workbench",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=120) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        text = extract_chat_completion_text(payload)
+        return GenerationResult(
+            provider=self.provider,
+            model=payload.get("model") or self.model,
+            text=text,
+            raw={"id": payload.get("id"), "model": payload.get("model")},
+        )
+
+
 def extract_response_text(payload: dict) -> str:
     parts = []
     for item in payload.get("output", []):
@@ -79,10 +128,25 @@ def extract_response_text(payload: dict) -> str:
     return "\n".join(part for part in parts if part).strip()
 
 
+def extract_chat_completion_text(payload: dict) -> str:
+    choices = payload.get("choices") or []
+    if not choices:
+        return ""
+    message = choices[0].get("message") or {}
+    content = message.get("content") or ""
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        return "\n".join(str(part.get("text") or part) for part in content).strip()
+    return str(content).strip()
+
+
 def get_generation_provider(name: str, model: str | None = None) -> GenerationProvider:
     normalized = name.lower()
     if normalized in {"template", "local"}:
         return TemplateGenerationProvider()
     if normalized == "openai":
         return OpenAIGenerationProvider(model=model or "gpt-4.1-mini")
+    if normalized == "openrouter":
+        return OpenRouterGenerationProvider(model=model or "openai/gpt-4.1-mini")
     raise ValueError(f"Unknown generation provider: {name}")

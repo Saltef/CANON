@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Any, Sequence
@@ -72,7 +73,9 @@ def diagnose_query(
     top_candidates = candidates[:top_k]
     query_terms = set(content_terms(query))
     matched_terms = sorted(
-        term for term in query_terms if any(term in set(tokenize(candidate.document.text)) for candidate in top_candidates)
+        term
+        for term in query_terms
+        if any(term_matches_tokens(term, candidate_terms(candidate)) for candidate in top_candidates)
     )
     weak_terms = sorted(term for term in query_terms if term not in set(matched_terms))
     phrases = result_neighborhood_phrases(
@@ -111,7 +114,31 @@ def diagnose_query(
 
 
 def content_terms(text: str) -> list[str]:
-    return sorted({token for token in tokenize(text) if len(token) >= 3 and token not in STOP_TERMS})
+    acronym_terms = {
+        token.casefold()
+        for token in re.findall(r"\b[A-Z]{2,6}\b", text or "")
+        if token.casefold() not in STOP_TERMS
+    }
+    return sorted(
+        {
+            token
+            for token in tokenize(text)
+            if (len(token) >= 3 or token in acronym_terms) and token not in STOP_TERMS
+        }
+    )
+
+
+def term_matches_tokens(term: str, tokens: set[str]) -> bool:
+    if term in tokens:
+        return True
+    if term.endswith("s") and len(term) > 3 and term[:-1] in tokens:
+        return True
+    return f"{term}s" in tokens
+
+
+def candidate_terms(candidate) -> set[str]:
+    document = candidate.document
+    return set(tokenize(" ".join([document.title or "", document.text or ""])))
 
 
 def semantic_similarity(left: str, right: str) -> float:

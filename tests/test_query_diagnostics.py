@@ -48,6 +48,22 @@ class QueryDiagnosticsTests(unittest.TestCase):
         self.assertEqual(by_phrase["fire code compliance"]["reviewer_history"], "accepted")
         self.assertNotIn("public comments", by_phrase)
 
+    def test_diagnostics_keep_domain_acronyms_and_plural_term_matches(self):
+        report = diagnose_query(
+            "AI risks",
+            [
+                doc("c1", "civil war grievances and mobilization"),
+                doc("c2", "AI infrastructure risk depends on grid capacity and water use"),
+            ],
+            top_k=2,
+            candidate_k=2,
+            freedom_level="balanced",
+        )
+
+        self.assertIn("ai", report["query_to_corpus"]["matched_terms"])
+        self.assertIn("risks", report["query_to_corpus"]["matched_terms"])
+        self.assertNotIn("ai", report["query_to_corpus"]["weak_terms"])
+
 
 def doc(chunk_id, text):
     return RetrievalDocument(

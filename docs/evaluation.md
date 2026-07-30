@@ -50,6 +50,12 @@ rather than silently treated as a loss.
 It is meant for automated regression testing before human review; it does not
 replace human qrels or brief-level acceptance labels.
 
+Long public benchmark runs are resumable. The suite caches completed benchmark
+reports under `reports/automated_benchmark_cache/` and per-query rerank work
+under `reports/automated_benchmark_query_cache/`. If a full run is interrupted,
+rerun the same command to continue from completed cache entries. Use
+`--no-resume` only when intentionally rebuilding every cached query.
+
 Run the Stage 1 candidate-pool sweep after the model matrix is configured:
 
 ```powershell
@@ -106,7 +112,124 @@ blocked:
 python -m canon.product.stage1_gate --no-fail
 ```
 
+## Disagreement Preservation Benchmark
+
+Stage 2 can be checked against a controlled disagreement fixture:
+
+```powershell
+python -m canon.eval.disagreement_fixture --output gold/disagreement_preservation_publishable.json
+python -m canon.eval.disagreement_preservation --benchmark gold/disagreement_preservation_publishable.json
+```
+
+The report scores whether synthesis links support, contradiction,
+qualification, and distractor evidence correctly. Metrics include link recall,
+link precision, stance accuracy, contradiction recall, citation integrity,
+unsupported-claim rate, and the aggregate disagreement-preservation score.
+
+This benchmark is useful for regression and artifact freezing, but it remains
+an automated pre-human signal. Human-reviewed synthesis labels are still
+required before publication-quality claims.
+
+## Publishable Human Review Scaffold
+
+Prepare the retrieval-qrels and synthesis-label handoff before assigning human
+review:
+
+```powershell
+python -m canon.product.human_review_scaffold --suite conf/benchmark_suites/stage1_public_full.json --disagreement-benchmark gold/disagreement_preservation_publishable.json
+```
+
+The scaffold writes:
+
+- `reports/publishable_human_review_scaffold_v1.json`
+- `reports/publishable_retrieval_review_scaffold.csv`
+- `reports/publishable_synthesis_review_scaffold.csv`
+
+It defines retrieval labels for relevance and evidence role, and synthesis
+labels for citation validity, stance correctness, claim support, missed key
+evidence, reviewer action, and rationale. This prepares the review work; it
+does not mark the human-review gate complete. The publishable package also
+checks that the scaffold meets its configured distinct retrieval-query and
+synthesis-case targets, so pilot-sized handoff CSVs remain blocked even before
+reviewer labels are considered. Completed label rows must include a stable
+`reviewer_id` for auditability.
+
+Validate completed labels and write the suite-specific publishable review
+status:
+
+```powershell
+python -m canon.product.publishable_review --retrieval-csv reports/publishable_retrieval_review_scaffold.csv --synthesis-csv reports/publishable_synthesis_review_scaffold.csv
+```
+
+The package gate requires `reports/publishable_human_review_status_v1.json`, not
+the older generic `reports/human_review_status_v1.json`, so a stale review
+artifact cannot accidentally satisfy publishable claims.
+
+Build the reviewer-facing benchmark card after the automated suite, optimizer,
+disagreement benchmark, and review-status artifacts exist:
+
+```powershell
+python -m canon.product.publishable_benchmark_card --automated-suite-report reports/automated_benchmark_suite_stage1_public_full_v1.json --optimizer-report reports/stage1_optimizer_v1.json
+```
+
+The card summarizes candidate-recall failures, ranking failures,
+score-observability signals, disagreement-preservation status, and blocked
+claims. Use it beside the package manifest; do not treat it as human-reviewed
+publication evidence.
+
 ## Public Corpus Acceptance Sets
+
+Full SciFact and NFCorpus imports:
+
+```powershell
+python -m canon.ingest.beir --dataset-dir data/raw/external/scifact --mode beir_scifact_full --benchmark-id beir_scifact_full_qrels --split test --include-qrels-documents --chunk-tokens 220 --overlap-tokens 0
+python -m canon.ingest.beir --dataset-dir data/raw/external/nfcorpus --mode beir_nfcorpus_full --benchmark-id beir_nfcorpus_full_qrels --split test --include-qrels-documents --chunk-tokens 220 --overlap-tokens 0
+```
+
+Use `conf/benchmark_suites/stage1_public_full.json` for the publishable package
+coverage gate. The 30-query commands below remain useful for quick iteration and
+debugging, but they are pilot slices.
+
+Freeze the publishable workflow from existing full-suite artifacts:
+
+```powershell
+python -m canon.product.publishable_workflow --suite conf/benchmark_suites/stage1_public_full.json
+```
+
+Use `--run-benchmarks` only when you intentionally want to rerun the resumable
+Stage 1 benchmark suite and optimizer as part of the workflow.
+
+The package manifest is expected to hash the suite file, configured public qrels
+files, the disagreement-preservation fixture, benchmark/optimizer/card/review
+reports, and the retrieval/synthesis review CSV handoffs. If any of those inputs
+are missing, the package remains blocked.
+
+The optimizer report must also contain completed trials for every fusion method
+declared in `conf/benchmark_suites/stage1_public_full.json`; configuration alone
+does not satisfy the fusion-diagnostics gate.
+
+The human-review scaffold must contain enough distinct retrieval queries and
+synthesis cases to meet its configured targets. The publishable disagreement
+fixture contains 30 controlled cases so the synthesis scaffold can meet the
+default target while still remaining an automated pre-human signal.
+
+After package generation, verify the frozen artifact manifest:
+
+```powershell
+python -m canon.product.publishable_verify --package reports/publishable_package_canon_publishable_evidence_workflow_v1.json
+```
+
+This checks artifact paths, byte counts, and SHA-256 hashes. It does not replace
+human review or prove model superiority.
+
+Create a reviewer handoff bundle from the verified manifest:
+
+```powershell
+python -m canon.product.publishable_export --package reports/publishable_package_canon_publishable_evidence_workflow_v1.json
+```
+
+The export writes a bundle directory and zip archive under `reports/`. It is
+useful for sharing the frozen evidence packet; it is not a new quality gate.
 
 SciFact 30-query import:
 

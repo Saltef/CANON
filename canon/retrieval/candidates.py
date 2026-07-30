@@ -122,6 +122,101 @@ def build_candidate_pool(
     return report
 
 
+def build_windowed_candidate_pool(
+    query: str,
+    mode: str,
+    lexical_window_k: int = 96,
+    lexical_k: int = 50,
+    vector_k: int = 50,
+    provider: str = "local",
+    model: str | None = None,
+    fusion: str = "weighted_bm25_dense",
+    batch_size: int = 32,
+) -> dict[str, Any]:
+    settings = load_settings()
+    documents = load_processed_corpus(
+        settings.data_dir,
+        mode,
+        cluster_assignments=load_cluster_assignments(settings.data_dir, mode),
+    )
+    lexical_window = ranked_lexical(query, documents, lexical_window_k)
+    document_by_id = {document.chunk_id: document for document in documents}
+    window_documents = [
+        document_by_id[chunk_id]
+        for chunk_id, _score in lexical_window
+        if chunk_id in document_by_id
+    ]
+    embedding_records = embed_window_documents(
+        window_documents,
+        provider_name=provider,
+        model=model,
+        batch_size=batch_size,
+    )
+    hits = candidate_pool_from_documents(
+        query=query,
+        documents=window_documents,
+        embeddings_path=Path(),
+        lexical_k=lexical_k,
+        vector_k=vector_k,
+        provider=provider,
+        model=model,
+        fusion=fusion,
+        embedding_records=embedding_records,
+    )
+    report = {
+        "report_id": "windowed_candidate_pool_v1",
+        "query": query,
+        "mode": mode,
+        "provider": provider,
+        "model": model,
+        "document_count": len(documents),
+        "window_document_count": len(window_documents),
+        "candidate_count": len(hits),
+        "lexical_window_k": lexical_window_k,
+        "lexical_k": lexical_k,
+        "vector_k": vector_k,
+        "fusion": fusion,
+        "source_counts": source_counts(hits),
+        "candidates": [hit.to_dict() for hit in hits],
+        "boundary": (
+            "Dense scores were computed over a bounded BM25 window from the full corpus; "
+            "this avoids requiring a full-corpus hosted embedding store for interactive use."
+        ),
+    }
+    report_io.write_json(
+        settings.reports_dir / f"candidate_pool_{mode}_{safe_slug(query)}_windowed.json",
+        report,
+    )
+    return report
+
+
+def embed_window_documents(
+    documents: Sequence[RetrievalDocument],
+    provider_name: str,
+    model: str | None,
+    batch_size: int,
+) -> list[dict[str, Any]]:
+    if not documents:
+        return []
+    provider = get_embedding_provider(provider_name, model)
+    records: list[dict[str, Any]] = []
+    for start in range(0, len(documents), max(1, batch_size)):
+        batch = list(documents[start : start + batch_size])
+        embeddings = provider.embed([document.text for document in batch])
+        records.extend(
+            {
+                "chunk_id": document.chunk_id,
+                "work_id": document.work_id,
+                "provider": embedding.provider,
+                "model": embedding.model,
+                "dimensions": embedding.dimensions,
+                "vector": embedding.vector,
+            }
+            for document, embedding in zip(batch, embeddings, strict=True)
+        )
+    return records
+
+
 def candidate_pool_from_documents(
     query: str,
     documents: Sequence[RetrievalDocument],

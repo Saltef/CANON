@@ -5,7 +5,9 @@ from canon.product.stage2_synthesis import (
     build_cited_claims,
     build_disagreement_map,
     build_model_cited_claims,
+    classify_stance,
     run_stage2_synthesis,
+    should_cluster_claims,
     stage2_quality_gate,
 )
 
@@ -76,6 +78,26 @@ class Stage2SynthesisTests(unittest.TestCase):
         }
         self.assertIn("qualifies", all_stances)
         self.assertIn("contradicts", all_stances)
+
+    def test_claim_clustering_handles_negated_same_proposition(self):
+        self.assertTrue(
+            should_cluster_claims(
+                "Data center load increased substation peak demand.",
+                "Data center load did not increase substation peak demand after curtailment.",
+            )
+        )
+
+    def test_qualification_marker_uses_words_not_substrings(self):
+        stance, _score = classify_stance(
+            "Forecast peak demand growth is attributed to data centers.",
+            evidence_row(
+                "C1",
+                "Utility queue filings attribute forecast peak demand growth to data centers.",
+                "Utility",
+            ),
+        )
+
+        self.assertEqual(stance, "supports")
 
     @patch("canon.product.stage2_synthesis.call_stage2_model")
     def test_model_backed_claim_builder_uses_model_links(self, model_call):

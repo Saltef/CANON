@@ -218,6 +218,23 @@ class SynthesisTests(unittest.TestCase):
         self.assertEqual(support["covered_focus_terms"], [])
         self.assertIn("quantum", support["missing_focus_terms"])
 
+    def test_support_assessment_keeps_acronyms_and_plural_matches(self):
+        support = support_assessment(
+            "AI risks",
+            [
+                {
+                    "title": "AI Infrastructure Risk",
+                    "preview": "Grid risk and AI infrastructure constraints.",
+                    "claim": {"text": "AI systems can create infrastructure risk."},
+                }
+            ],
+            [{"components": {"relevance": 0.8, "semantic_similarity": 0.8}}],
+        )
+
+        self.assertIn("ai", support["covered_focus_terms"])
+        self.assertIn("risks", support["covered_focus_terms"])
+        self.assertEqual(support["missing_focus_terms"], [])
+
     def test_grounded_answer_with_support_prepends_abstention(self):
         answer = grounded_answer_with_support("A normal answer.", {"support_level": "weak"})
         self.assertIn("abstention", answer)

@@ -16,6 +16,11 @@ class ProductReadinessTests(unittest.TestCase):
                 with patch("canon.product.readiness.load_json", return_value={"status": "pass"}):
                     report = build_readiness_report("social_science_ir_v1_harvest10")
         self.assertEqual(report["status"], "pass")
+        self.assertIn("GET /app", report["endpoints"])
+        self.assertIn("GET /v1/production/status", report["endpoints"])
+        self.assertIn("POST /v1/production/evidence-workbench", report["endpoints"])
+        self.assertIn("POST /v1/production/feedback", report["endpoints"])
+        self.assertIn("POST /v1/production/corpus-setup", report["endpoints"])
         self.assertIn("POST /v1/answer", report["endpoints"])
         self.assertIn("POST /v1/projects/start", report["endpoints"])
         self.assertIn("POST /v1/evidence-packets", report["endpoints"])
@@ -41,6 +46,11 @@ class ProductReadinessTests(unittest.TestCase):
         self.assertIn("intelligence_feedback_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("intelligence_handoff_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("routes_metadata_examples_present", [check["id"] for check in report["checks"]])
+        self.assertIn("browser_workbench_endpoint_documented", [check["id"] for check in report["checks"]])
+        self.assertIn("production_status_endpoint_documented", [check["id"] for check in report["checks"]])
+        self.assertIn("production_workbench_endpoint_documented", [check["id"] for check in report["checks"]])
+        self.assertIn("production_feedback_endpoint_documented", [check["id"] for check in report["checks"]])
+        self.assertIn("production_corpus_setup_endpoint_documented", [check["id"] for check in report["checks"]])
         self.assertIn("product_smoke_passed", [check["id"] for check in report["checks"]])
         self.assertEqual(report["package_metadata"]["name"], "canon-rag")
         self.assertEqual(report["package_metadata"]["readme"], "README.md")
@@ -63,6 +73,9 @@ class ProductReadinessTests(unittest.TestCase):
 
     def test_endpoints_are_derived_from_route_metadata(self):
         current = endpoints()
+        self.assertIn("GET /app", current)
+        self.assertIn("POST /v1/production/evidence-workbench", current)
+        self.assertIn("POST /v1/production/corpus-setup", current)
         self.assertIn("GET /v1/routes", current)
         self.assertIn("POST /v1/intelligence-brief/evaluate", current)
         self.assertIn("POST /v1/alert-digest/evaluate", current)
