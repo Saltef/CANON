@@ -387,7 +387,7 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
                 "provider": "local",
                 "model": "hashed-semantic-v1",
                 "hosted": False,
-                "status": "available",
+                "status": "available_deterministic_hashed_lexical_fallback",
             },
         ],
         "rerank_models": [

@@ -25,6 +25,7 @@ from canon.retrieval.tokenize import tokenize
 
 
 DEFAULT_RERANKERS = ["heuristic", "cohere"]
+PARENT_QRELS_PROTOCOL = "fixed_corpus_parent_map_v2"
 
 
 @dataclass(frozen=True)
@@ -172,6 +173,16 @@ def build_pooled_candidate_context(
     )
 
 
+def load_chunk_to_work_map(mode: str) -> dict[str, str]:
+    settings = load_settings()
+    documents = load_processed_corpus(
+        settings.data_dir,
+        mode,
+        cluster_assignments=load_cluster_assignments(settings.data_dir, mode),
+    )
+    return {document.chunk_id: document.work_id for document in documents}
+
+
 def evaluate_rerankers(
     mode: str,
     qrels_path: Path,
@@ -252,6 +263,7 @@ def evaluate_rerankers(
             "auto_query_expansion": auto_query_expansion,
             "benchmark_oracle_expansion": benchmark_oracle_expansion,
             "parent_qrels": parent_qrels,
+            "parent_qrels_protocol": PARENT_QRELS_PROTOCOL if parent_qrels else None,
             "parent_expansion_limit": parent_expansion_limit,
             "query_cache": {
                 "enabled": resume and query_cache_dir is not None,
@@ -332,6 +344,9 @@ def evaluate_reranker(
                 if pooled_candidates
                 else None
             )
+            chunk_to_work = pooled_context.chunk_to_work if pooled_context else (
+                load_chunk_to_work_map(mode) if parent_qrels else {}
+            )
             query_reports = []
             for query in queries:
                 query_reports.append(
@@ -378,6 +393,7 @@ def evaluate_reranker(
                             parent_qrels=parent_qrels,
                             parent_expansion_limit=parent_expansion_limit,
                             pooled_context=pooled_context,
+                            chunk_to_work=chunk_to_work,
                         ),
                     )
                 )
@@ -562,6 +578,7 @@ def query_cache_path(
         "auto_query_expansion": auto_query_expansion,
         "benchmark_oracle_expansion": benchmark_oracle_expansion,
         "parent_qrels": parent_qrels,
+        "parent_qrels_protocol": PARENT_QRELS_PROTOCOL if parent_qrels else None,
         "parent_expansion_limit": parent_expansion_limit,
     }
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
@@ -610,6 +627,7 @@ def evaluate_query(
     parent_qrels: bool = False,
     parent_expansion_limit: int = 0,
     pooled_context: PooledCandidateContext | None = None,
+    chunk_to_work: dict[str, str] | None = None,
 ) -> dict:
     candidate_report = candidate_report_for_query(
         query=query["query"],
@@ -639,12 +657,17 @@ def evaluate_query(
     ranked_pairs = diversify_by_parent(ranked_pairs, max_chunks_per_parent)
     ranked_results = [result for result, _score in ranked_pairs]
     ranked_ids = [result["chunk_id"] for result in ranked_results]
+    original_qrels = query["relevant"]
     qrels = effective_qrels(
-        candidates=candidates,
-        qrels=query["relevant"],
-        chunk_to_work=pooled_context.chunk_to_work if pooled_context else {},
+        qrels=original_qrels,
+        chunk_to_work=chunk_to_work or (pooled_context.chunk_to_work if pooled_context else {}),
         parent_qrels=parent_qrels,
     )
+    relevant_hit_ids = {
+        chunk_id
+        for chunk_id, relevance in qrels.items()
+        if float(relevance) > 0
+    }
     metrics = evaluate_ranking(ranked_ids, qrels, k)
     candidate_scores = scored_candidates(candidates, reranked, qrels)
     return {
@@ -655,15 +678,17 @@ def evaluate_query(
         "candidate_recall": candidate_recall(candidates, qrels),
         "qrels_semantics": {
             "parent_qrels_enabled": parent_qrels,
-            "effective_relevant_count": len(qrels),
-            "original_relevant_count": len(query["relevant"]),
+            "parent_qrels_protocol": PARENT_QRELS_PROTOCOL if parent_qrels else None,
+            "qrels_expansion_scope": "full_corpus_parent_map" if parent_qrels else "original_chunk_qrels",
+            "effective_relevant_count": positive_relevance_count(qrels),
+            "original_relevant_count": positive_relevance_count(original_qrels),
         },
         "metrics": metrics,
         "score_observability": score_observability(candidate_scores, k),
         "diversification": diversification_summary(ranked_results[:k], max_chunks_per_parent),
         "scored_candidates": candidate_scores,
         "ranked_chunk_ids": ranked_ids[:k],
-        "relevant_hit_ids": [chunk_id for chunk_id in ranked_ids[:k] if chunk_id in query["relevant"]],
+        "relevant_hit_ids": [chunk_id for chunk_id in ranked_ids[:k] if chunk_id in relevant_hit_ids],
         "top_results": [
             {
                 "rank": index,
@@ -820,25 +845,26 @@ def scored_candidates(
 
 
 def effective_qrels(
-    candidates: list[dict],
     qrels: dict[str, float],
     chunk_to_work: dict[str, str],
     parent_qrels: bool,
 ) -> dict[str, float]:
     if not parent_qrels:
-        return qrels
+        return dict(qrels)
     relevant_works = {
         chunk_to_work.get(str(chunk_id), str(chunk_id))
         for chunk_id, relevance in qrels.items()
         if float(relevance) > 0
     }
     effective = dict(qrels)
-    for candidate in candidates:
-        chunk_id = str(candidate.get("chunk_id"))
-        work_id = str(candidate.get("work_id") or chunk_to_work.get(chunk_id, chunk_id))
+    for chunk_id, work_id in chunk_to_work.items():
         if work_id in relevant_works and chunk_id not in effective:
             effective[chunk_id] = 1.0
     return effective
+
+
+def positive_relevance_count(qrels: dict[str, float]) -> int:
+    return sum(1 for relevance in qrels.values() if float(relevance) > 0)
 
 
 def candidate_recall(candidates: list[dict], qrels: dict[str, float]) -> dict:

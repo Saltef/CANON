@@ -47,7 +47,26 @@ The project should be compared against established evaluation practice:
 
 ## Current Evidence Bundle
 
-The current portfolio bundle should include:
+The committed evidence bundle is intentionally compact. It includes:
+
+- Public qrels fixtures: `gold/beir_scifact_full_qrels.json`,
+  `gold/beir_nfcorpus_full_qrels.json`, and
+  `gold/beir_nfcorpus_stage1_title_preserve_qrels.json`
+- Disagreement-preservation fixture:
+  `gold/disagreement_preservation_publishable.json`
+- Stage 1 fixed-qrels summary:
+  `reports/stage1_fixed_qrels_v2_summary.json`
+- Public benchmark suite definition:
+  `conf/benchmark_suites/stage1_public_full.json`
+- Publishable evaluation package guide:
+  `docs/publishable_evaluation_package.md`
+
+The broader generated portfolio bundle is local by default because many reports
+are large, cache-like, or project-specific. Before citing a report publicly,
+regenerate it from the committed commands, check its claim boundary, and commit
+a compact summary artifact rather than raw caches.
+
+Generated local artifacts may include:
 
 - Method definitions: `conf/methods/baseline_methods.json`
 - Retrieval policy weights: `conf/settings.toml`

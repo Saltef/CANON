@@ -29,14 +29,16 @@ styles, latency budget, privacy requirements, and human relevance labels.
 Use this default stack until corpus-specific evidence says otherwise:
 
 - **Retrieval baseline:** hybrid retrieval with lexical plus semantic signals.
-- **Local baseline:** `local` / `hashed-semantic-v1`.
+- **Local deterministic fallback:** `local` / `hashed-semantic-v1`, a hashed
+  lexical n-gram control rather than a neural semantic model.
 - **Remote candidates:** OpenAI and Cohere embedding providers when API keys are
   configured.
 - **Future open-weight candidates:** multilingual retrieval models such as BGE-M3
   or multilingual E5, added behind the same provider interface.
 
 The local baseline is useful for reproducibility and offline testing. It is not
-expected to be the best production semantic model.
+expected to be the best production semantic model, and it should be described as
+a hashed lexical fallback in public materials.
 
 ## Why There Is No Universal Best Model
 
@@ -225,7 +227,8 @@ model comparison report instead of declaring a winner.
 
 Current smoke evidence:
 
-- `local` / `hashed-semantic-v1` runs successfully.
+- `local` / `hashed-semantic-v1` runs successfully as a deterministic hashed
+  lexical fallback.
 - OpenAI and Cohere providers are marked `unavailable` when API keys are absent.
 - The smoke qrels file proves the evaluation path works.
 

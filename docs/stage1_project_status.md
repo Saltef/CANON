@@ -7,11 +7,12 @@ and synthesis claims are trusted.
 
 ## Current Stage 1 Result
 
-The strongest focused pilot so far uses:
+The current focused pilot uses:
 
 - Corpus: `beir_nfcorpus_stage1_title_preserve`
 - Acceptance set: 30 NFCorpus public BEIR queries
-- Qrels: document-level BEIR labels transferred to chunks
+- Qrels: document-level BEIR labels transferred to chunks with fixed corpus-map
+  expansion only when `parent_qrels=true`
 - Sparse retrieval: BM25
 - Dense retrieval: `openrouter:qwen/qwen3-embedding-8b`
 - Fusion: `rrf`
@@ -25,58 +26,45 @@ It is useful for product debugging and regression testing, but it should not be
 reported as a full public benchmark result or compared directly to published
 full-corpus BEIR leaderboards.
 
-The strongest raw retrieval/ranking score now uses the same Qwen+Cohere stack
-with `auto_query_expansion=true`, corpus topic-profile expansion, and
-`parent_qrels=true`. The strongest coverage run also uses
-`parent_expansion_limit=2`, which adds up to two sibling chunks from each
-retrieved parent work into the candidate pool. This is the right diagnostic
-setting for public document-level qrels and alternate chunking, because
-relevance can transfer across chunks that share the same parent work.
+### Fixed Parent-Qrels Protocol
 
-Benchmark integrity note: hand-written biomedical alias expansion is now
+Earlier status notes used a candidate-dependent `parent_qrels` implementation:
+the evaluator promoted sibling chunks only when a system retrieved them. That
+made the effective qrels a function of each run's candidate set, so different
+retrieval configurations were scored against different labels. Those old
+`parent_qrels` numbers are retired and must not be cited.
+
+The fixed protocol is `fixed_corpus_parent_map_v2`. When `parent_qrels=true`,
+CANON expands relevant chunks from the original qrels across the full
+corpus-level chunk-to-parent map before reading any candidate output. Every
+configuration is therefore scored against a fixed qrels set.
+
+Fresh runs were executed on 2026-07-30 with a clean fixed-qrels cache at
+`reports/rerank_query_cache_fixed_qrels_v2/`. The compact report is
+`reports/stage1_fixed_qrels_v2_summary.json`.
+
+| Configuration | Qrels scope | Candidate recall mean | Work-level hit rate mean | nDCG@10 | Recall@10 | MAP@10 | MRR@10 | Zero-hit queries |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| Base Qwen+Cohere | original chunk qrels | 0.365927 | 0.395415 | 0.393658 | 0.142102 | 0.294536 | 0.647222 | 4/30 |
+| Auto query expansion + fixed parent qrels | full corpus parent map v2 | 0.382565 | 0.418675 | 0.395759 | 0.142102 | 0.296783 | 0.650000 | 4/30 |
+| Auto query expansion + fixed parent qrels + parent-neighborhood candidates | full corpus parent map v2 | 0.416257 | 0.418675 | 0.393091 | 0.142102 | 0.293396 | 0.650000 | 4/30 |
+
+The corrected result is much less dramatic than the retired status note. Auto
+query expansion gives a small top-k gain under fixed qrels. Parent-neighborhood
+expansion improves candidate coverage but does not improve top-10 ranking in
+this run.
+
+Benchmark integrity note: hand-written biomedical alias expansion is
 quarantined behind `--benchmark-oracle-expansion`. Normal runs with
 `--auto-query-expansion` use explicit query variants and corpus-derived topic
 profiles only. Any run using `--benchmark-oracle-expansion` is diagnostic and
 must be excluded from headline metrics.
 
-This run produces:
-
-- candidate recall mean: `0.365927`
-- work-level hit rate mean: `0.395415`
-- nDCG@10: `0.343299`
-- Recall@10: `0.112004`
-- MAP@10: `0.23596`
-- MRR@10: `0.651111`
-- queries with any relevant work in pool: `26/30`
-- queries with top-10 relevant hits: `23/30`
-- zero candidate-recall queries: `4/30`
-
-With auto query expansion and parent-qrels enabled:
-
-- candidate recall mean: `0.422138`
-- work-level hit rate mean: `0.470343`
-- nDCG@10: `0.397614`
-- Recall@10: `0.142432`
-- MAP@10: `0.298061`
-- MRR@10: `0.65`
-- queries with any relevant work in pool: `29/30`
-- zero candidate-recall queries: `1/30`
-
-With parent-neighborhood expansion enabled:
-
-- candidate recall mean: `0.469410`
-- work-level hit rate mean: `0.470343`
-- nDCG@10: `0.396759`
-- Recall@10: `0.142432`
-- MAP@10: `0.297184`
-- MRR@10: `0.65`
-- queries with any relevant work in pool: `29/30`
-- zero candidate-recall queries: `1/30`
-
 The automated gate still reports `automated_fail` because broad public qrels
 make full candidate recall unrealistic at this candidate budget. That is useful
-signal, not a plumbing failure: one query still has no relevant evidence in the
-candidate pool, and no reranker can recover evidence that was never retrieved.
+signal, not a plumbing failure: four of the 30 pilot queries still have no
+relevant evidence in the candidate pool, and no reranker can recover evidence
+that was never retrieved.
 
 ## What Was Fixed
 
@@ -109,9 +97,9 @@ swamping dense cosine similarities and makes fusion sweeps more interpretable.
 
 The candidate generator now supports parent-neighborhood expansion. When a
 chunk from a parent work is retrieved, Stage 1 can add a bounded number of
-sibling chunks from that work as candidate evidence. In the NFCorpus pilot this
-raised candidate recall from `0.422138` to `0.469410`, which is a much larger
-coverage gain than the topic-profile expansion alone.
+sibling chunks from that work as candidate evidence. Under the fixed qrels
+protocol this raised candidate recall from `0.382565` to `0.416257`, but it
+did not improve top-10 ranking.
 
 The production research workflow can optionally enrich the deterministic
 research frame through OpenRouter. That gives Stage 1 a non-deterministic frame
@@ -128,7 +116,7 @@ The previous heuristic reranker had weak discrimination:
 - overlap rate: `0.886035`
 - interpretation: `heavy_overlap_or_weak_discrimination`
 
-Cohere Rerank with the parent cap gives much stronger observability:
+Cohere Rerank gave much stronger observability in the earlier diagnostic run:
 
 - relevant score mean: `0.346928`
 - non-relevant score mean: `0.245519`
@@ -136,24 +124,25 @@ Cohere Rerank with the parent cap gives much stronger observability:
 - overlap rate: `0.287985`
 - interpretation: `strong_discrimination`
 
-This supports the hypothesis that the value of a learned reranker is not only
-top-k movement. Its score distribution is now a real observability instrument:
-low score gaps, score overlap, and low-confidence top-k results can drive review
-and retrieval tuning.
+This remains a useful diagnostic hypothesis, but these score-distribution
+figures should be treated as observability evidence rather than final benchmark
+claims until regenerated under the same fixed-qrels protocol used above.
 
 ## Qrels Semantics
 
 For the NFCorpus pilot, qrels are document-level labels transferred to chunks.
-The evaluation therefore reports both:
+The fixed protocol expands those labels from the full corpus chunk-to-parent map
+before scoring any retrieval output. The evaluation therefore reports both:
 
 - chunk-level recall: whether relevant chunks were retrieved
 - work-level recall: whether any chunk from a relevant parent document was
   retrieved
 
-The rule is explicit: a retrieved chunk is relevant whenever its parent BEIR
-document is relevant. This is appropriate for public BEIR comparison, but it is
-not a substitute for human-reviewed passage-level labels on the mounted project
-corpus.
+The rule is explicit: every chunk whose parent BEIR document is relevant is
+treated as relevant before candidates are inspected. This is a document-level
+diagnostic for public BEIR labels. It is not a substitute for human-reviewed
+passage-level labels on the mounted project corpus, and it is not directly
+leaderboard-comparable to published BEIR passage/chunk protocols.
 
 Diagnostics now include a qrels-quality guard that checks query-to-label text
 overlap. The latest NFCorpus run flags `9/30` suspicious low-overlap queries:
@@ -165,25 +154,21 @@ retrieval/model failure.
 
 ## Remaining Stage 1 Work
 
-The next improvement is first-stage retrieval, not reranking alone. The
-remaining zero-hit query is `fava beans`. Its transferred gold chunk is
-`chunk:81588b7b16810a61` from parent `MED-4281`, titled "Beneficial effects of
-L-arginine on reducing obesity: potential mechanisms and important implications
-for human health." The visible chunk text is about L-arginine, obesity, and
-metabolic disorders rather than fava beans. Treat this as a qrels/content
-semantics risk to inspect before forcing retrieval behavior around it.
+The next improvement is first-stage retrieval, not reranking alone. The fixed
+runs still have four zero-hit pilot queries at this candidate budget. Treat
+those as qrels/content semantics risks to inspect before forcing retrieval
+behavior around them.
 
 Recommended retrieval fixes:
 
 - Continue query expansion based on title terms and corpus-specific topic
-  profiles. Use biomedical aliases only in explicit oracle diagnostics. The
-  previous deterministic diagnostic expansion reduced zero-hit queries from
-  `4/30` to `1/30` and improved mean candidate recall from `0.406249` to
-  `0.422138`, but that gain should be remeasured under non-oracle expansion.
+  profiles. Use biomedical aliases only in explicit oracle diagnostics. Under
+  fixed qrels, the non-oracle auto-expansion run improved candidate recall only
+  from `0.365927` to `0.382565` and did not reduce zero-hit queries.
 - Keep parent-neighborhood expansion in the Stage 1 matrix for document-level
-  qrels. It improved mean candidate recall to `0.469410`, but it did not improve
-  top-10 ranking, so it should be paired with a later ordering/diversification
-  pass rather than treated as a complete fix.
+  qrels. Under fixed qrels it improved mean candidate recall to `0.416257`, but
+  it did not improve top-10 ranking, so it should be paired with a later
+  ordering/diversification pass rather than treated as a complete fix.
 - Compare original NFCorpus chunking and title-preserve chunking as a dual-index
   candidate source instead of choosing only one.
 - Report chunk recall and parent-document recall for every benchmark.

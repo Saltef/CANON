@@ -325,7 +325,7 @@ def render_app() -> str:
                 <option value="openai/text-embedding-3-small">OpenAI text-embedding-3-small</option>
                 <option value="BAAI/bge-small-en-v1.5">BGE small local</option>
                 <option value="embed-v4.0">Cohere embed v4</option>
-                <option value="hashed-semantic-v1">Hashed semantic</option>
+                <option value="hashed-semantic-v1">Hashed lexical fallback</option>
               </select>
             </label>
             <label>

@@ -186,17 +186,30 @@ class RerankEvaluationTests(unittest.TestCase):
 
         self.assertEqual([row[0]["chunk_id"] for row in diversified], ["chunk:a1", "chunk:b1", "chunk:a2"])
 
-    def test_effective_qrels_transfers_document_labels_to_candidate_chunks(self):
+    def test_effective_qrels_expands_document_labels_from_full_corpus_map(self):
         qrels = {"chunk:gold": 1.0}
-        candidates = [{"chunk_id": "chunk:candidate", "work_id": "work:a"}]
         effective = effective_qrels(
-            candidates=candidates,
+            qrels=qrels,
+            chunk_to_work={
+                "chunk:gold": "work:a",
+                "chunk:sibling": "work:a",
+                "chunk:other": "work:b",
+            },
+            parent_qrels=True,
+        )
+
+        self.assertEqual(effective["chunk:sibling"], 1.0)
+        self.assertNotIn("chunk:other", effective)
+
+    def test_effective_qrels_is_not_candidate_dependent(self):
+        qrels = {"chunk:gold": 1.0}
+        effective = effective_qrels(
             qrels=qrels,
             chunk_to_work={"chunk:gold": "work:a"},
             parent_qrels=True,
         )
 
-        self.assertEqual(effective["chunk:candidate"], 1.0)
+        self.assertNotIn("chunk:candidate_only", effective)
 
     @patch("canon.eval.rerank_evaluation.run_retrieval")
     def test_reranker_reuses_query_cache(self, run_retrieval):

@@ -9,7 +9,7 @@ from typing import Any
 from canon.config import load_settings
 from canon.eval.external_ir import load_qrels
 from canon.eval.model_evaluation import parse_provider_spec, provider_identifier
-from canon.eval.rerank_evaluation import evaluate_rerankers
+from canon.eval.rerank_evaluation import PARENT_QRELS_PROTOCOL, evaluate_rerankers
 from canon.product import report_io
 from canon.product.automated_benchmark_suite import DEFAULT_SUITE_PATH, load_suite, resolve_path
 
@@ -367,6 +367,7 @@ def trial_cache_path(
         "auto_query_expansion": auto_query_expansion,
         "benchmark_oracle_expansion": benchmark_oracle_expansion,
         "parent_qrels": parent_qrels,
+        "parent_qrels_protocol": PARENT_QRELS_PROTOCOL if parent_qrels else None,
         "parent_expansion_limit": parent_expansion_limit,
     }
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]

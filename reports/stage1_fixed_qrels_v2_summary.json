@@ -1,0 +1,83 @@
+{
+  "report_id": "stage1_fixed_qrels_v2_summary",
+  "created_at": "2026-07-30",
+  "status": "pilot_result_not_leaderboard_comparable",
+  "mode": "beir_nfcorpus_stage1_title_preserve",
+  "qrels_path": "gold/beir_nfcorpus_stage1_title_preserve_qrels.json",
+  "query_count": 30,
+  "label_count": 1724,
+  "protocol": {
+    "parent_qrels_protocol": "fixed_corpus_parent_map_v2",
+    "integrity_boundary": "When parent_qrels is enabled, labels are expanded once from the full corpus chunk-to-parent map before candidate output is inspected.",
+    "retired_protocol": "candidate_dependent_parent_qrels",
+    "retired_protocol_boundary": "Older parent_qrels numbers promoted labels from the retrieved candidates and must not be cited as comparable benchmark results."
+  },
+  "retrieval_stack": {
+    "sparse": "bm25",
+    "dense_provider": "openrouter",
+    "dense_model": "qwen/qwen3-embedding-8b",
+    "fusion": "rrf",
+    "reranker_provider": "cohere",
+    "reranker_model": "rerank-v4.0-fast",
+    "candidate_pool": "250 lexical plus 250 vector candidates",
+    "document_format": "structured"
+  },
+  "results": [
+    {
+      "configuration": "base_qwen_cohere",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "candidate_recall_mean": 0.365927,
+      "work_level_hit_rate_mean": 0.395415,
+      "nDCG@10": 0.393658,
+      "Recall@10": 0.142102,
+      "MAP@10": 0.294536,
+      "MRR@10": 0.647222,
+      "queries_with_any_relevant_work_in_pool": "26/30",
+      "zero_candidate_recall_queries": "4/30"
+    },
+    {
+      "configuration": "auto_query_expansion_fixed_parent_qrels",
+      "auto_query_expansion": true,
+      "parent_qrels": true,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "full_corpus_parent_map_v2",
+      "candidate_recall_mean": 0.382565,
+      "work_level_hit_rate_mean": 0.418675,
+      "nDCG@10": 0.395759,
+      "Recall@10": 0.142102,
+      "MAP@10": 0.296783,
+      "MRR@10": 0.65,
+      "queries_with_any_relevant_work_in_pool": "26/30",
+      "zero_candidate_recall_queries": "4/30"
+    },
+    {
+      "configuration": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "auto_query_expansion": true,
+      "parent_qrels": true,
+      "parent_expansion_limit": 2,
+      "qrels_scope": "full_corpus_parent_map_v2",
+      "candidate_recall_mean": 0.416257,
+      "work_level_hit_rate_mean": 0.418675,
+      "nDCG@10": 0.393091,
+      "Recall@10": 0.142102,
+      "MAP@10": 0.293396,
+      "MRR@10": 0.65,
+      "queries_with_any_relevant_work_in_pool": "26/30",
+      "zero_candidate_recall_queries": "4/30"
+    }
+  ],
+  "interpretation": [
+    "The corrected auto-expansion gain is small, not a major breakthrough.",
+    "Parent-neighborhood expansion improves candidate coverage but does not improve top-10 ranking in this pilot.",
+    "The 30-query NFCorpus slice is useful for regression and product debugging, not for claims against published BEIR leaderboards.",
+    "Human-reviewed passage-level qrels are still required for publication-quality claims."
+  ],
+  "commands": [
+    "python -m canon.eval.rerank_evaluation --mode beir_nfcorpus_stage1_title_preserve --qrels gold\\beir_nfcorpus_stage1_title_preserve_qrels.json --rerankers cohere:rerank-v4.0-fast --candidate-k 250 --k 10 --pooled-candidates --lexical-k 250 --vector-k 250 --vector-provider openrouter --vector-model qwen/qwen3-embedding-8b --fusion rrf --document-format structured --query-cache-dir reports\\rerank_query_cache_fixed_qrels_v2\\base",
+    "python -m canon.eval.rerank_evaluation --mode beir_nfcorpus_stage1_title_preserve --qrels gold\\beir_nfcorpus_stage1_title_preserve_qrels.json --rerankers cohere:rerank-v4.0-fast --candidate-k 250 --k 10 --pooled-candidates --lexical-k 250 --vector-k 250 --vector-provider openrouter --vector-model qwen/qwen3-embedding-8b --fusion rrf --document-format structured --auto-query-expansion --parent-qrels --query-cache-dir reports\\rerank_query_cache_fixed_qrels_v2\\auto_parent",
+    "python -m canon.eval.rerank_evaluation --mode beir_nfcorpus_stage1_title_preserve --qrels gold\\beir_nfcorpus_stage1_title_preserve_qrels.json --rerankers cohere:rerank-v4.0-fast --candidate-k 250 --k 10 --pooled-candidates --lexical-k 250 --vector-k 250 --vector-provider openrouter --vector-model qwen/qwen3-embedding-8b --fusion rrf --document-format structured --auto-query-expansion --parent-qrels --parent-expansion-limit 2 --query-cache-dir reports\\rerank_query_cache_fixed_qrels_v2\\auto_parent_neighborhood"
+  ]
+}

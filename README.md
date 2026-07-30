@@ -38,6 +38,16 @@ make ci
 
 `make ci` runs install, unit tests, dry-run ingestion, report generation, and the product smoke/readiness gates with the same command path used in CI.
 
+CANON's core package is intentionally stdlib-first. Hosted OpenRouter/Cohere
+calls are made through HTTP APIs when keys are configured. Optional SDK/model
+dependencies live under `pyproject.toml` extras; they are not required for the
+local deterministic CI path.
+
+The default `local` / `hashed-semantic-v1` encoder is an offline deterministic
+fallback for tests and reproducible controls. It hashes lexical unigrams and
+bigrams into a sparse vector. Treat it as a lexical/hash baseline, not as a
+production neural embedding model.
+
 Human review is required for final conclusions, citation validity, domain
 interpretation, corpus representativeness, and any high-stakes use.
 
@@ -118,9 +128,11 @@ http://127.0.0.1:8000/app
 
 The workbench runs local corpus retrieval, evidence cards, query diagnostics,
 coverage gaps, a cited draft preview, and product feedback capture. By default
-it does not call hosted models or external web search; external expansion is
-shown as reviewable suggestions only. Feedback is stored as local user
-experience telemetry, not as formal human-review labels.
+it does not call hosted models or external web search. When the OpenAlex online
+search option is enabled, CANON sends only the query string to OpenAlex and
+marks returned evidence as `ONLINE` / `external_source` so it cannot be confused
+with corpus evidence. Feedback is stored as local user experience telemetry, not
+as formal human-review labels.
 
 Use the Corpus Setup panel in the app to profile, ingest, and build a corpus
 from a local folder or file path. After setup, select the new mode in the Corpus
@@ -199,6 +211,16 @@ Installed packages expose these as `canon-readiness` and
 See [docs/evaluation.md](docs/evaluation.md) and
 [docs/human_review_rubric.md](docs/human_review_rubric.md).
 
+Current committed benchmark artifacts are deliberately compact:
+
+- `gold/beir_scifact_full_qrels.json`
+- `gold/beir_nfcorpus_full_qrels.json`
+- `reports/stage1_fixed_qrels_v2_summary.json`
+- `reports/stage1_fixed_qrels_v2_summary.md`
+
+The Stage 1 summary is a 30-query NFCorpus pilot under a fixed parent-qrels
+protocol. It is not leaderboard-comparable to published BEIR results.
+
 ## Public Docs
 
 - [Quickstart](docs/quickstart.md)
@@ -227,7 +249,7 @@ docs/        public documentation
 docs/internal/
              internal planning and testing notes
 gold/        checked-in benchmark/qrels fixtures
-reports/     generated reports, gitignored
+reports/     generated reports, gitignored except curated public summaries
 tests/       regression and product tests
 ```
 
