@@ -15,7 +15,10 @@ The effective qrels are no longer a function of the retrieval configuration.
 
 Interpretation:
 
-- The corrected auto-expansion gain is small, not a major breakthrough.
+- The corrected single-run auto-expansion gain is tiny and should not be
+  claimed without the repeat-spread report.
+- The 3x repeat-spread check found direction-unstable paired nDCG@10 deltas
+  versus base, so the current pilot does not support a top-k ranking gain claim.
 - Parent-neighborhood expansion improves candidate coverage but does not
   improve top-10 ranking in this pilot.
 - This 30-query NFCorpus slice is useful for regression and product debugging,
@@ -25,3 +28,5 @@ Interpretation:
 
 Commands and full metadata are in
 `reports/stage1_fixed_qrels_v2_summary.json`.
+The repeat-spread report is in
+`reports/stage1_fixed_qrels_v2_repeat_spread.json`.

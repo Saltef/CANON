@@ -49,10 +49,23 @@ Fresh runs were executed on 2026-07-30 with a clean fixed-qrels cache at
 | Auto query expansion + fixed parent qrels | full corpus parent map v2 | 0.382565 | 0.418675 | 0.395759 | 0.142102 | 0.296783 | 0.650000 | 4/30 |
 | Auto query expansion + fixed parent qrels + parent-neighborhood candidates | full corpus parent map v2 | 0.416257 | 0.418675 | 0.393091 | 0.142102 | 0.293396 | 0.650000 | 4/30 |
 
-The corrected result is much less dramatic than the retired status note. Auto
-query expansion gives a small top-k gain under fixed qrels. Parent-neighborhood
-expansion improves candidate coverage but does not improve top-10 ranking in
-this run.
+The corrected single-run result is much less dramatic than the retired status
+note. A follow-up repeat-spread check now runs each fixed-qrels configuration
+three times with separate query-cache roots. The report is
+`reports/stage1_fixed_qrels_v2_repeat_spread.json`.
+
+| Configuration | Runs | nDCG@10 mean | nDCG spread pp | MAP@10 mean | Candidate recall mean |
+|---|---:|---:|---:|---:|---:|
+| Base Qwen+Cohere | 3 | 0.394511 | 0.141 | 0.295470 | 0.365927 |
+| Auto query expansion + fixed parent qrels | 3 | 0.394649 | 0.022 | 0.295595 | 0.382565 |
+| Auto query expansion + fixed parent qrels + parent-neighborhood candidates | 3 | 0.394767 | 0.282 | 0.295955 | 0.416257 |
+
+Paired nDCG@10 deltas versus base change sign across repeats:
+`-0.057pp` to `+0.105pp` for auto expansion, and `-0.101pp` to
+`+0.136pp` for parent-neighborhood candidates. The current conclusion is
+therefore: do not claim an auto-expansion top-10 ranking gain from this pilot.
+Parent-neighborhood expansion still improves candidate coverage, but it should
+not be presented as a top-k ranking improvement.
 
 Benchmark integrity note: hand-written biomedical alias expansion is
 quarantined behind `--benchmark-oracle-expansion`. Normal runs with
@@ -163,12 +176,14 @@ Recommended retrieval fixes:
 
 - Continue query expansion based on title terms and corpus-specific topic
   profiles. Use biomedical aliases only in explicit oracle diagnostics. Under
-  fixed qrels, the non-oracle auto-expansion run improved candidate recall only
-  from `0.365927` to `0.382565` and did not reduce zero-hit queries.
+  fixed qrels, the non-oracle auto-expansion run improved candidate recall from
+  `0.365927` to `0.382565`, but the repeat-spread check did not support a
+  stable top-k ranking gain and did not reduce zero-hit queries.
 - Keep parent-neighborhood expansion in the Stage 1 matrix for document-level
   qrels. Under fixed qrels it improved mean candidate recall to `0.416257`, but
-  it did not improve top-10 ranking, so it should be paired with a later
-  ordering/diversification pass rather than treated as a complete fix.
+  the repeat-spread check did not support a stable top-10 ranking gain, so it
+  should be paired with a later ordering/diversification pass rather than
+  treated as a complete fix.
 - Compare original NFCorpus chunking and title-preserve chunking as a dual-index
   candidate source instead of choosing only one.
 - Report chunk recall and parent-document recall for every benchmark.

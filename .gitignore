@@ -14,4 +14,6 @@ build/
 /reports/*
 !/reports/stage1_fixed_qrels_v2_summary.json
 !/reports/stage1_fixed_qrels_v2_summary.md
+!/reports/stage1_fixed_qrels_v2_repeat_spread.json
+!/reports/stage1_fixed_qrels_v2_repeat_spread.md
 *.log

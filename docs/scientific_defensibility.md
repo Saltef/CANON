@@ -56,6 +56,8 @@ The committed evidence bundle is intentionally compact. It includes:
   `gold/disagreement_preservation_publishable.json`
 - Stage 1 fixed-qrels summary:
   `reports/stage1_fixed_qrels_v2_summary.json`
+- Stage 1 fixed-qrels repeat-spread check:
+  `reports/stage1_fixed_qrels_v2_repeat_spread.json`
 - Public benchmark suite definition:
   `conf/benchmark_suites/stage1_public_full.json`
 - Publishable evaluation package guide:

@@ -1,0 +1,777 @@
+{
+  "report_id": "stage1_fixed_qrels_v2_repeat_spread",
+  "created_at": "2026-07-30",
+  "status": "repeat_spread_complete",
+  "mode": "beir_nfcorpus_stage1_title_preserve",
+  "qrels_path": "gold/beir_nfcorpus_stage1_title_preserve_qrels.json",
+  "query_count": 30,
+  "label_count": 1724,
+  "repeat_count_requested": 3,
+  "completed_run_count": 9,
+  "expected_run_count": 9,
+  "protocol": {
+    "parent_qrels_protocol": "fixed_corpus_parent_map_v2",
+    "integrity_boundary": "When parent_qrels is enabled, labels are expanded once from the full corpus chunk-to-parent map before candidate output is inspected.",
+    "repeat_boundary": "Each completed repeat uses a separate query cache path and runs with resume disabled inside evaluate_rerankers."
+  },
+  "retrieval_stack": {
+    "sparse": "bm25",
+    "dense_provider": "openrouter",
+    "dense_model": "qwen/qwen3-embedding-8b",
+    "fusion": "rrf",
+    "reranker": "cohere:rerank-v4.0-fast",
+    "candidate_pool": "250 lexical plus 250 vector candidates",
+    "document_format": "structured",
+    "query_cache_root": "reports/rerank_query_cache_fixed_qrels_v2_repeats"
+  },
+  "configuration_summaries": [
+    {
+      "id": "base_qwen_cohere",
+      "label": "Base Qwen+Cohere",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "completed_runs": 3,
+      "metrics": {
+        "nDCG@10": {
+          "n": 3,
+          "mean": 0.394511,
+          "min": 0.39372,
+          "max": 0.395128,
+          "spread": 0.001408,
+          "sample_std": 0.00072,
+          "spread_pp": 0.141,
+          "sample_std_pp": 0.072,
+          "values": [
+            0.395128,
+            0.39372,
+            0.394685
+          ]
+        },
+        "Recall@10": {
+          "n": 3,
+          "mean": 0.142102,
+          "min": 0.142102,
+          "max": 0.142102,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.142102,
+            0.142102,
+            0.142102
+          ]
+        },
+        "MAP@10": {
+          "n": 3,
+          "mean": 0.29547,
+          "min": 0.294622,
+          "max": 0.295911,
+          "spread": 0.001289,
+          "sample_std": 0.000735,
+          "spread_pp": 0.129,
+          "sample_std_pp": 0.073,
+          "values": [
+            0.295878,
+            0.294622,
+            0.295911
+          ]
+        },
+        "MRR@10": {
+          "n": 3,
+          "mean": 0.649074,
+          "min": 0.647222,
+          "max": 0.65,
+          "spread": 0.002778,
+          "sample_std": 0.001604,
+          "spread_pp": 0.278,
+          "sample_std_pp": 0.16,
+          "values": [
+            0.65,
+            0.647222,
+            0.65
+          ]
+        },
+        "candidate_recall_mean": {
+          "n": 3,
+          "mean": 0.365927,
+          "min": 0.365927,
+          "max": 0.365927,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.365927,
+            0.365927,
+            0.365927
+          ]
+        },
+        "work_level_hit_rate_mean": {
+          "n": 3,
+          "mean": 0.395415,
+          "min": 0.395415,
+          "max": 0.395415,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.395415,
+            0.395415,
+            0.395415
+          ]
+        }
+      },
+      "zero_candidate_recall_queries_values": [
+        "4/30",
+        "4/30",
+        "4/30"
+      ],
+      "queries_with_any_relevant_work_in_pool_values": [
+        "26/30",
+        "26/30",
+        "26/30"
+      ]
+    },
+    {
+      "id": "auto_query_expansion_fixed_parent_qrels",
+      "label": "Auto query expansion + fixed parent qrels",
+      "auto_query_expansion": true,
+      "parent_qrels": true,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "full_corpus_parent_map_v2",
+      "completed_runs": 3,
+      "metrics": {
+        "nDCG@10": {
+          "n": 3,
+          "mean": 0.394649,
+          "min": 0.394554,
+          "max": 0.394775,
+          "spread": 0.000221,
+          "sample_std": 0.000114,
+          "spread_pp": 0.022,
+          "sample_std_pp": 0.011,
+          "values": [
+            0.394554,
+            0.394775,
+            0.394619
+          ]
+        },
+        "Recall@10": {
+          "n": 3,
+          "mean": 0.142102,
+          "min": 0.142102,
+          "max": 0.142102,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.142102,
+            0.142102,
+            0.142102
+          ]
+        },
+        "MAP@10": {
+          "n": 3,
+          "mean": 0.295595,
+          "min": 0.295431,
+          "max": 0.295693,
+          "spread": 0.000262,
+          "sample_std": 0.000143,
+          "spread_pp": 0.026,
+          "sample_std_pp": 0.014,
+          "values": [
+            0.29566,
+            0.295431,
+            0.295693
+          ]
+        },
+        "MRR@10": {
+          "n": 3,
+          "mean": 0.649074,
+          "min": 0.647222,
+          "max": 0.65,
+          "spread": 0.002778,
+          "sample_std": 0.001604,
+          "spread_pp": 0.278,
+          "sample_std_pp": 0.16,
+          "values": [
+            0.65,
+            0.65,
+            0.647222
+          ]
+        },
+        "candidate_recall_mean": {
+          "n": 3,
+          "mean": 0.382565,
+          "min": 0.382565,
+          "max": 0.382565,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.382565,
+            0.382565,
+            0.382565
+          ]
+        },
+        "work_level_hit_rate_mean": {
+          "n": 3,
+          "mean": 0.418675,
+          "min": 0.418675,
+          "max": 0.418675,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.418675,
+            0.418675,
+            0.418675
+          ]
+        }
+      },
+      "zero_candidate_recall_queries_values": [
+        "4/30",
+        "4/30",
+        "4/30"
+      ],
+      "queries_with_any_relevant_work_in_pool_values": [
+        "26/30",
+        "26/30",
+        "26/30"
+      ]
+    },
+    {
+      "id": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "label": "Auto query expansion + fixed parent qrels + parent-neighborhood candidates",
+      "auto_query_expansion": true,
+      "parent_qrels": true,
+      "parent_expansion_limit": 2,
+      "qrels_scope": "full_corpus_parent_map_v2",
+      "completed_runs": 3,
+      "metrics": {
+        "nDCG@10": {
+          "n": 3,
+          "mean": 0.394767,
+          "min": 0.393671,
+          "max": 0.39649,
+          "spread": 0.002819,
+          "sample_std": 0.00151,
+          "spread_pp": 0.282,
+          "sample_std_pp": 0.151,
+          "values": [
+            0.39649,
+            0.39414,
+            0.393671
+          ]
+        },
+        "Recall@10": {
+          "n": 3,
+          "mean": 0.142102,
+          "min": 0.142102,
+          "max": 0.142102,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.142102,
+            0.142102,
+            0.142102
+          ]
+        },
+        "MAP@10": {
+          "n": 3,
+          "mean": 0.295955,
+          "min": 0.294902,
+          "max": 0.297963,
+          "spread": 0.003061,
+          "sample_std": 0.001739,
+          "spread_pp": 0.306,
+          "sample_std_pp": 0.174,
+          "values": [
+            0.297963,
+            0.294902,
+            0.295001
+          ]
+        },
+        "MRR@10": {
+          "n": 3,
+          "mean": 0.649074,
+          "min": 0.647222,
+          "max": 0.65,
+          "spread": 0.002778,
+          "sample_std": 0.001604,
+          "spread_pp": 0.278,
+          "sample_std_pp": 0.16,
+          "values": [
+            0.65,
+            0.65,
+            0.647222
+          ]
+        },
+        "candidate_recall_mean": {
+          "n": 3,
+          "mean": 0.416257,
+          "min": 0.416257,
+          "max": 0.416257,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.416257,
+            0.416257,
+            0.416257
+          ]
+        },
+        "work_level_hit_rate_mean": {
+          "n": 3,
+          "mean": 0.418675,
+          "min": 0.418675,
+          "max": 0.418675,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.418675,
+            0.418675,
+            0.418675
+          ]
+        }
+      },
+      "zero_candidate_recall_queries_values": [
+        "4/30",
+        "4/30",
+        "4/30"
+      ],
+      "queries_with_any_relevant_work_in_pool_values": [
+        "26/30",
+        "26/30",
+        "26/30"
+      ]
+    }
+  ],
+  "paired_deltas": [
+    {
+      "comparison": "auto_query_expansion_fixed_parent_qrels - base_qwen_cohere",
+      "treatment_config": "auto_query_expansion_fixed_parent_qrels",
+      "baseline_config": "base_qwen_cohere",
+      "metric": "nDCG@10",
+      "n": 3,
+      "mean_delta": 0.000138,
+      "mean_delta_pp": 0.014,
+      "min_delta": -0.000574,
+      "max_delta": 0.001055,
+      "spread_delta": 0.001629,
+      "spread_delta_pp": 0.163,
+      "rows": [
+        {
+          "repeat": 1,
+          "delta": -0.000574,
+          "delta_pp": -0.057,
+          "treatment": 0.394554,
+          "baseline": 0.395128
+        },
+        {
+          "repeat": 2,
+          "delta": 0.001055,
+          "delta_pp": 0.105,
+          "treatment": 0.394775,
+          "baseline": 0.39372
+        },
+        {
+          "repeat": 3,
+          "delta": -6.6e-05,
+          "delta_pp": -0.007,
+          "treatment": 0.394619,
+          "baseline": 0.394685
+        }
+      ]
+    },
+    {
+      "comparison": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood - base_qwen_cohere",
+      "treatment_config": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "baseline_config": "base_qwen_cohere",
+      "metric": "nDCG@10",
+      "n": 3,
+      "mean_delta": 0.000256,
+      "mean_delta_pp": 0.026,
+      "min_delta": -0.001014,
+      "max_delta": 0.001362,
+      "spread_delta": 0.002376,
+      "spread_delta_pp": 0.238,
+      "rows": [
+        {
+          "repeat": 1,
+          "delta": 0.001362,
+          "delta_pp": 0.136,
+          "treatment": 0.39649,
+          "baseline": 0.395128
+        },
+        {
+          "repeat": 2,
+          "delta": 0.00042,
+          "delta_pp": 0.042,
+          "treatment": 0.39414,
+          "baseline": 0.39372
+        },
+        {
+          "repeat": 3,
+          "delta": -0.001014,
+          "delta_pp": -0.101,
+          "treatment": 0.393671,
+          "baseline": 0.394685
+        }
+      ]
+    }
+  ],
+  "claim_checks": [
+    {
+      "comparison": "auto_query_expansion_fixed_parent_qrels - base_qwen_cohere",
+      "metric": "nDCG@10",
+      "standing": "does_not_stand_direction_unstable",
+      "reason": "The paired delta changes sign across repeats.",
+      "mean_delta": 0.000138,
+      "mean_delta_pp": 0.014,
+      "max_within_config_spread": 0.001408,
+      "max_within_config_spread_pp": 0.141,
+      "min_delta": -0.000574,
+      "max_delta": 0.001055,
+      "materiality_threshold_pp": 0.5
+    },
+    {
+      "comparison": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood - base_qwen_cohere",
+      "metric": "nDCG@10",
+      "standing": "does_not_stand_direction_unstable",
+      "reason": "The paired delta changes sign across repeats.",
+      "mean_delta": 0.000256,
+      "mean_delta_pp": 0.026,
+      "max_within_config_spread": 0.002819,
+      "max_within_config_spread_pp": 0.282,
+      "min_delta": -0.001014,
+      "max_delta": 0.001362,
+      "materiality_threshold_pp": 0.5
+    }
+  ],
+  "runs": [
+    {
+      "id": "auto_query_expansion_fixed_parent_qrels",
+      "label": "Auto query expansion + fixed parent qrels",
+      "auto_query_expansion": true,
+      "parent_qrels": true,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "full_corpus_parent_map_v2",
+      "configuration": "auto_query_expansion_fixed_parent_qrels",
+      "repeat": 1,
+      "status": "ok",
+      "reason": null,
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 814939.872,
+      "wall_elapsed_ms": 815387.74,
+      "query_cache_dir": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_1/auto_query_expansion_fixed_parent_qrels",
+      "cache": {
+        "enabled": true,
+        "path": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_1/auto_query_expansion_fixed_parent_qrels/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 0,
+        "miss_count": 30
+      },
+      "metrics": {
+        "nDCG@10": 0.394554,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.29566,
+        "MRR@10": 0.65,
+        "candidate_recall_mean": 0.382565,
+        "work_level_hit_rate_mean": 0.418675,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      }
+    },
+    {
+      "id": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "label": "Auto query expansion + fixed parent qrels + parent-neighborhood candidates",
+      "auto_query_expansion": true,
+      "parent_qrels": true,
+      "parent_expansion_limit": 2,
+      "qrels_scope": "full_corpus_parent_map_v2",
+      "configuration": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "repeat": 1,
+      "status": "ok",
+      "reason": null,
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 686839.799,
+      "wall_elapsed_ms": 687510.351,
+      "query_cache_dir": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_1/auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "cache": {
+        "enabled": true,
+        "path": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_1/auto_query_expansion_fixed_parent_qrels_parent_neighborhood/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 0,
+        "miss_count": 30
+      },
+      "metrics": {
+        "nDCG@10": 0.39649,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.297963,
+        "MRR@10": 0.65,
+        "candidate_recall_mean": 0.416257,
+        "work_level_hit_rate_mean": 0.418675,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      }
+    },
+    {
+      "id": "base_qwen_cohere",
+      "label": "Base Qwen+Cohere",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "configuration": "base_qwen_cohere",
+      "repeat": 1,
+      "status": "ok",
+      "reason": null,
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 369351.225,
+      "wall_elapsed_ms": 369803.665,
+      "query_cache_dir": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_1/base_qwen_cohere",
+      "cache": {
+        "enabled": true,
+        "path": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_1/base_qwen_cohere/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 0,
+        "miss_count": 30
+      },
+      "metrics": {
+        "nDCG@10": 0.395128,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.295878,
+        "MRR@10": 0.65,
+        "candidate_recall_mean": 0.365927,
+        "work_level_hit_rate_mean": 0.395415,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      }
+    },
+    {
+      "id": "auto_query_expansion_fixed_parent_qrels",
+      "label": "Auto query expansion + fixed parent qrels",
+      "auto_query_expansion": true,
+      "parent_qrels": true,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "full_corpus_parent_map_v2",
+      "configuration": "auto_query_expansion_fixed_parent_qrels",
+      "repeat": 2,
+      "status": "ok",
+      "reason": null,
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 765946.332,
+      "wall_elapsed_ms": 766459.356,
+      "query_cache_dir": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_2/auto_query_expansion_fixed_parent_qrels",
+      "cache": {
+        "enabled": true,
+        "path": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_2/auto_query_expansion_fixed_parent_qrels/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 0,
+        "miss_count": 30
+      },
+      "metrics": {
+        "nDCG@10": 0.394775,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.295431,
+        "MRR@10": 0.65,
+        "candidate_recall_mean": 0.382565,
+        "work_level_hit_rate_mean": 0.418675,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      }
+    },
+    {
+      "id": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "label": "Auto query expansion + fixed parent qrels + parent-neighborhood candidates",
+      "auto_query_expansion": true,
+      "parent_qrels": true,
+      "parent_expansion_limit": 2,
+      "qrels_scope": "full_corpus_parent_map_v2",
+      "configuration": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "repeat": 2,
+      "status": "ok",
+      "reason": null,
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 742668.515,
+      "wall_elapsed_ms": 743179.818,
+      "query_cache_dir": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_2/auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "cache": {
+        "enabled": true,
+        "path": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_2/auto_query_expansion_fixed_parent_qrels_parent_neighborhood/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 0,
+        "miss_count": 30
+      },
+      "metrics": {
+        "nDCG@10": 0.39414,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.294902,
+        "MRR@10": 0.65,
+        "candidate_recall_mean": 0.416257,
+        "work_level_hit_rate_mean": 0.418675,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      }
+    },
+    {
+      "id": "base_qwen_cohere",
+      "label": "Base Qwen+Cohere",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "configuration": "base_qwen_cohere",
+      "repeat": 2,
+      "status": "ok",
+      "reason": null,
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 416143.695,
+      "wall_elapsed_ms": 416623.877,
+      "query_cache_dir": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_2/base_qwen_cohere",
+      "cache": {
+        "enabled": true,
+        "path": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_2/base_qwen_cohere/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 0,
+        "miss_count": 30
+      },
+      "metrics": {
+        "nDCG@10": 0.39372,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.294622,
+        "MRR@10": 0.647222,
+        "candidate_recall_mean": 0.365927,
+        "work_level_hit_rate_mean": 0.395415,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      }
+    },
+    {
+      "id": "auto_query_expansion_fixed_parent_qrels",
+      "label": "Auto query expansion + fixed parent qrels",
+      "auto_query_expansion": true,
+      "parent_qrels": true,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "full_corpus_parent_map_v2",
+      "configuration": "auto_query_expansion_fixed_parent_qrels",
+      "repeat": 3,
+      "status": "ok",
+      "reason": null,
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 718557.781,
+      "wall_elapsed_ms": 719049.405,
+      "query_cache_dir": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_3/auto_query_expansion_fixed_parent_qrels",
+      "cache": {
+        "enabled": true,
+        "path": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_3/auto_query_expansion_fixed_parent_qrels/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 0,
+        "miss_count": 30
+      },
+      "metrics": {
+        "nDCG@10": 0.394619,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.295693,
+        "MRR@10": 0.647222,
+        "candidate_recall_mean": 0.382565,
+        "work_level_hit_rate_mean": 0.418675,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      }
+    },
+    {
+      "id": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "label": "Auto query expansion + fixed parent qrels + parent-neighborhood candidates",
+      "auto_query_expansion": true,
+      "parent_qrels": true,
+      "parent_expansion_limit": 2,
+      "qrels_scope": "full_corpus_parent_map_v2",
+      "configuration": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "repeat": 3,
+      "status": "ok",
+      "reason": null,
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 891262.105,
+      "wall_elapsed_ms": 891804.155,
+      "query_cache_dir": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_3/auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "cache": {
+        "enabled": true,
+        "path": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_3/auto_query_expansion_fixed_parent_qrels_parent_neighborhood/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 0,
+        "miss_count": 30
+      },
+      "metrics": {
+        "nDCG@10": 0.393671,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.295001,
+        "MRR@10": 0.647222,
+        "candidate_recall_mean": 0.416257,
+        "work_level_hit_rate_mean": 0.418675,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      }
+    },
+    {
+      "id": "base_qwen_cohere",
+      "label": "Base Qwen+Cohere",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "configuration": "base_qwen_cohere",
+      "repeat": 3,
+      "status": "ok",
+      "reason": null,
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 406900.636,
+      "wall_elapsed_ms": 407406.617,
+      "query_cache_dir": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_3/base_qwen_cohere",
+      "cache": {
+        "enabled": true,
+        "path": "reports/rerank_query_cache_fixed_qrels_v2_repeats/repeat_3/base_qwen_cohere/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 0,
+        "miss_count": 30
+      },
+      "metrics": {
+        "nDCG@10": 0.394685,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.295911,
+        "MRR@10": 0.65,
+        "candidate_recall_mean": 0.365927,
+        "work_level_hit_rate_mean": 0.395415,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      }
+    }
+  ],
+  "interpretation": [
+    "The fixed-qrels auto-expansion gain should not be claimed from this repeat check.",
+    "Treat this as a pilot reproducibility check, not a public BEIR leaderboard result.",
+    "Human-reviewed passage-level labels are still required for publication-quality claims."
+  ]
+}

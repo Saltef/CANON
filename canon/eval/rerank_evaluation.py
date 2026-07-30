@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -77,24 +78,24 @@ class CohereRerankProvider:
             raise RuntimeError("COHERE_API_KEY is required for Cohere rerank.")
 
     def rerank(self, query: str, documents: list[str], top_n: int) -> list[RerankResult]:
-        request = urllib.request.Request(
-            "https://api.cohere.com/v2/rerank",
-            data=json.dumps(
-                {
-                    "model": self.model,
-                    "query": query,
-                    "documents": documents,
-                    "top_n": top_n,
-                }
-            ).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
+        payload = read_json_with_retries(
+            lambda: urllib.request.Request(
+                "https://api.cohere.com/v2/rerank",
+                data=json.dumps(
+                    {
+                        "model": self.model,
+                        "query": query,
+                        "documents": documents,
+                        "top_n": top_n,
+                    }
+                ).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
         )
-        with urllib.request.urlopen(request, timeout=120) as response:
-            payload = json.loads(response.read().decode("utf-8"))
         return [
             RerankResult(index=int(row["index"]), score=float(row["relevance_score"]))
             for row in payload.get("results", [])
@@ -112,28 +113,53 @@ class OpenRouterRerankProvider:
             raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter rerank.")
 
     def rerank(self, query: str, documents: list[str], top_n: int) -> list[RerankResult]:
-        request = urllib.request.Request(
-            "https://openrouter.ai/api/v1/rerank",
-            data=json.dumps(
-                {
-                    "model": self.model,
-                    "query": query,
-                    "documents": documents,
-                    "top_n": top_n,
-                }
-            ).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
+        payload = read_json_with_retries(
+            lambda: urllib.request.Request(
+                "https://openrouter.ai/api/v1/rerank",
+                data=json.dumps(
+                    {
+                        "model": self.model,
+                        "query": query,
+                        "documents": documents,
+                        "top_n": top_n,
+                    }
+                ).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
         )
-        with urllib.request.urlopen(request, timeout=120) as response:
-            payload = json.loads(response.read().decode("utf-8"))
         return [
             RerankResult(index=int(row["index"]), score=float(row["relevance_score"]))
             for row in payload.get("results", [])
         ]
+
+
+def read_json_with_retries(
+    request_factory,
+    *,
+    attempts: int = 3,
+    timeout_seconds: int = 120,
+    retry_wait_seconds: float = 2.0,
+) -> dict:
+    last_error: BaseException | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(request_factory(), timeout=timeout_seconds) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code not in {408, 409, 425, 429} and exc.code < 500:
+                raise
+            last_error = exc
+        except (TimeoutError, urllib.error.URLError) as exc:
+            last_error = exc
+        if attempt < attempts:
+            time.sleep(retry_wait_seconds * attempt)
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Hosted rerank request failed without an exception.")
 
 
 def get_rerank_provider(name: str, model: str | None = None) -> RerankProvider:

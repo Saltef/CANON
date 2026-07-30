@@ -70,11 +70,13 @@
     }
   ],
   "interpretation": [
-    "The corrected auto-expansion gain is small, not a major breakthrough.",
-    "Parent-neighborhood expansion improves candidate coverage but does not improve top-10 ranking in this pilot.",
+    "The corrected single-run auto-expansion gain is tiny and should not be claimed without the repeat-spread report.",
+    "The 3x repeat-spread check found direction-unstable paired nDCG@10 deltas versus base, so the current pilot does not support a top-k ranking gain claim.",
+    "Parent-neighborhood expansion improves candidate coverage but does not support a stable top-10 ranking improvement in this pilot.",
     "The 30-query NFCorpus slice is useful for regression and product debugging, not for claims against published BEIR leaderboards.",
     "Human-reviewed passage-level qrels are still required for publication-quality claims."
   ],
+  "repeat_spread_report": "reports/stage1_fixed_qrels_v2_repeat_spread.json",
   "commands": [
     "python -m canon.eval.rerank_evaluation --mode beir_nfcorpus_stage1_title_preserve --qrels gold\\beir_nfcorpus_stage1_title_preserve_qrels.json --rerankers cohere:rerank-v4.0-fast --candidate-k 250 --k 10 --pooled-candidates --lexical-k 250 --vector-k 250 --vector-provider openrouter --vector-model qwen/qwen3-embedding-8b --fusion rrf --document-format structured --query-cache-dir reports\\rerank_query_cache_fixed_qrels_v2\\base",
     "python -m canon.eval.rerank_evaluation --mode beir_nfcorpus_stage1_title_preserve --qrels gold\\beir_nfcorpus_stage1_title_preserve_qrels.json --rerankers cohere:rerank-v4.0-fast --candidate-k 250 --k 10 --pooled-candidates --lexical-k 250 --vector-k 250 --vector-provider openrouter --vector-model qwen/qwen3-embedding-8b --fusion rrf --document-format structured --auto-query-expansion --parent-qrels --query-cache-dir reports\\rerank_query_cache_fixed_qrels_v2\\auto_parent",

@@ -217,6 +217,8 @@ Current committed benchmark artifacts are deliberately compact:
 - `gold/beir_nfcorpus_full_qrels.json`
 - `reports/stage1_fixed_qrels_v2_summary.json`
 - `reports/stage1_fixed_qrels_v2_summary.md`
+- `reports/stage1_fixed_qrels_v2_repeat_spread.json`
+- `reports/stage1_fixed_qrels_v2_repeat_spread.md`
 
 The Stage 1 summary is a 30-query NFCorpus pilot under a fixed parent-qrels
 protocol. It is not leaderboard-comparable to published BEIR results.

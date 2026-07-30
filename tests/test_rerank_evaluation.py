@@ -11,6 +11,7 @@ from canon.eval.rerank_evaluation import (
     effective_qrels,
     evaluate_rerankers,
     get_rerank_provider,
+    read_json_with_retries,
 )
 
 
@@ -94,6 +95,28 @@ class RerankEvaluationTests(unittest.TestCase):
                 provider = get_rerank_provider("openrouter")
         self.assertEqual(provider.provider, "openrouter")
         self.assertEqual(provider.model, "cohere/rerank-v3.5")
+
+    def test_read_json_with_retries_recovers_from_timeout(self):
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, _exc_type, _exc, _traceback):
+                return False
+
+            def read(self):
+                return b'{"ok": true}'
+
+        with patch(
+            "canon.eval.rerank_evaluation.urllib.request.urlopen",
+            side_effect=[TimeoutError("slow hosted call"), Response()],
+        ) as urlopen:
+            with patch("canon.eval.rerank_evaluation.time.sleep") as sleep:
+                payload = read_json_with_retries(lambda: object(), attempts=2)
+
+        self.assertEqual(payload, {"ok": True})
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once()
 
     @patch("canon.eval.rerank_evaluation.build_pooled_candidate_context", return_value=None)
     @patch("canon.eval.rerank_evaluation.build_candidate_pool")
