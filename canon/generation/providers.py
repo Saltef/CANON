@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.request
 from dataclasses import dataclass
 from typing import Protocol
 
+from canon.http_client import post_json
 from canon.secrets import load_local_env
 
 
@@ -44,23 +44,19 @@ class OpenAIGenerationProvider:
             raise RuntimeError("OPENAI_API_KEY is required for OpenAI generation.")
 
     def generate(self, prompt: str) -> GenerationResult:
-        request = urllib.request.Request(
+        payload = post_json(
             "https://api.openai.com/v1/responses",
-            data=json.dumps(
-                {
-                    "model": self.model,
-                    "input": prompt,
-                    "temperature": 0,
-                }
-            ).encode("utf-8"),
+            {
+                "model": self.model,
+                "input": prompt,
+                "temperature": 0,
+            },
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             },
-            method="POST",
+            timeout=120,
         )
-        with urllib.request.urlopen(request, timeout=120) as response:
-            payload = json.loads(response.read().decode("utf-8"))
         text = payload.get("output_text") or extract_response_text(payload)
         return GenerationResult(
             provider=self.provider,
@@ -81,35 +77,31 @@ class OpenRouterGenerationProvider:
             raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter generation.")
 
     def generate(self, prompt: str) -> GenerationResult:
-        request = urllib.request.Request(
+        payload = post_json(
             "https://openrouter.ai/api/v1/chat/completions",
-            data=json.dumps(
-                {
-                    "model": self.model,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "You write concise evidence-grounded research notes. "
-                                "Use only supplied evidence and cite every factual sentence."
-                            ),
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": 0,
-                    "max_tokens": 700,
-                }
-            ).encode("utf-8"),
+            {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You write concise evidence-grounded research notes. "
+                            "Use only supplied evidence and cite every factual sentence."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0,
+                "max_tokens": 700,
+            },
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "http://localhost",
                 "X-Title": "CANON local workbench",
             },
-            method="POST",
+            timeout=120,
         )
-        with urllib.request.urlopen(request, timeout=120) as response:
-            payload = json.loads(response.read().decode("utf-8"))
         text = extract_chat_completion_text(payload)
         return GenerationResult(
             provider=self.provider,

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.request
 from dataclasses import dataclass
 from typing import Protocol
 
+from canon.http_client import post_json
 from canon.secrets import load_local_env
 from canon.retrieval.semantic import HashedSemanticEncoder
 
@@ -92,17 +92,15 @@ class OpenAIEmbeddingProvider:
             raise RuntimeError("OPENAI_API_KEY is required for OpenAI embeddings.")
 
     def embed(self, texts: list[str]) -> list[EmbeddingResult]:
-        request = urllib.request.Request(
+        payload = post_json(
             "https://api.openai.com/v1/embeddings",
-            data=json.dumps({"model": self.model, "input": texts}).encode("utf-8"),
+            {"model": self.model, "input": texts},
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             },
-            method="POST",
+            timeout=60,
         )
-        with urllib.request.urlopen(request, timeout=60) as response:
-            payload = json.loads(response.read().decode("utf-8"))
         return [
             EmbeddingResult(
                 provider=self.provider,
@@ -125,17 +123,15 @@ class OpenRouterEmbeddingProvider:
             raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter embeddings.")
 
     def embed(self, texts: list[str]) -> list[EmbeddingResult]:
-        request = urllib.request.Request(
+        payload = post_json(
             "https://openrouter.ai/api/v1/embeddings",
-            data=json.dumps({"model": self.model, "input": texts, "encoding_format": "float"}).encode("utf-8"),
+            {"model": self.model, "input": texts, "encoding_format": "float"},
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             },
-            method="POST",
+            timeout=60,
         )
-        with urllib.request.urlopen(request, timeout=60) as response:
-            payload = json.loads(response.read().decode("utf-8"))
         return [
             EmbeddingResult(
                 provider=self.provider,
@@ -170,24 +166,20 @@ class CohereEmbeddingProvider:
         return self.embed_with_input_type(texts, self.input_type)
 
     def embed_with_input_type(self, texts: list[str], input_type: str) -> list[EmbeddingResult]:
-        request = urllib.request.Request(
+        payload = post_json(
             "https://api.cohere.com/v2/embed",
-            data=json.dumps(
-                {
-                    "model": self.model,
-                    "texts": texts,
-                    "input_type": input_type,
-                    "embedding_types": ["float"],
-                }
-            ).encode("utf-8"),
+            {
+                "model": self.model,
+                "texts": texts,
+                "input_type": input_type,
+                "embedding_types": ["float"],
+            },
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             },
-            method="POST",
+            timeout=60,
         )
-        with urllib.request.urlopen(request, timeout=60) as response:
-            payload = json.loads(response.read().decode("utf-8"))
         vectors = payload["embeddings"]["float"]
         return [
             EmbeddingResult(

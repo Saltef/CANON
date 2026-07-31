@@ -10,6 +10,7 @@ from typing import Any, Sequence
 from canon.config import load_settings
 from canon.embeddings.providers import EmbeddingResult, embed_queries, get_embedding_provider
 from canon.embeddings.store import build_embedding_store, embedding_store_path, load_embedding_records
+from canon.observability import estimate_tokens, stage_span
 from canon.product import report_io
 from canon.retrieval.bm25 import BM25Index
 from canon.retrieval.clusters import load_cluster_assignments
@@ -139,30 +140,58 @@ def build_windowed_candidate_pool(
         mode,
         cluster_assignments=load_cluster_assignments(settings.data_dir, mode),
     )
-    lexical_window = ranked_lexical(query, documents, lexical_window_k)
+    with stage_span(
+        "bm25",
+        mode=mode,
+        lexical_window_k=lexical_window_k,
+        document_count=len(documents),
+        input_tokens=estimate_tokens(query),
+    ) as span:
+        lexical_window = ranked_lexical(query, documents, lexical_window_k)
+        span.set_attribute("candidate_count", len(lexical_window))
     document_by_id = {document.chunk_id: document for document in documents}
     window_documents = [
         document_by_id[chunk_id]
         for chunk_id, _score in lexical_window
         if chunk_id in document_by_id
     ]
-    embedding_records = embed_window_documents(
-        window_documents,
-        provider_name=provider,
+    with stage_span(
+        "embed",
+        mode=mode,
+        provider=provider,
         model=model,
-        batch_size=batch_size,
-    )
-    hits = candidate_pool_from_documents(
-        query=query,
-        documents=window_documents,
-        embeddings_path=Path(),
-        lexical_k=lexical_k,
-        vector_k=vector_k,
+        document_count=len(window_documents),
+        input_tokens=estimate_tokens([document.text for document in window_documents]),
+    ) as span:
+        embedding_records = embed_window_documents(
+            window_documents,
+            provider_name=provider,
+            model=model,
+            batch_size=batch_size,
+        )
+        span.set_attribute("embedding_count", len(embedding_records))
+    with stage_span(
+        "fuse",
+        mode=mode,
         provider=provider,
         model=model,
         fusion=fusion,
-        embedding_records=embedding_records,
-    )
+        lexical_k=lexical_k,
+        vector_k=vector_k,
+        input_tokens=estimate_tokens(query),
+    ) as span:
+        hits = candidate_pool_from_documents(
+            query=query,
+            documents=window_documents,
+            embeddings_path=Path(),
+            lexical_k=lexical_k,
+            vector_k=vector_k,
+            provider=provider,
+            model=model,
+            fusion=fusion,
+            embedding_records=embedding_records,
+        )
+        span.set_attribute("candidate_count", len(hits))
     report = {
         "report_id": "windowed_candidate_pool_v1",
         "query": query,
@@ -185,6 +214,67 @@ def build_windowed_candidate_pool(
     }
     report_io.write_json(
         settings.reports_dir / f"candidate_pool_{mode}_{safe_slug(query)}_windowed.json",
+        report,
+    )
+    return report
+
+
+def build_bm25_candidate_pool(
+    query: str,
+    mode: str,
+    lexical_k: int = 50,
+) -> dict[str, Any]:
+    settings = load_settings()
+    documents = load_processed_corpus(
+        settings.data_dir,
+        mode,
+        cluster_assignments=load_cluster_assignments(settings.data_dir, mode),
+    )
+    document_by_id = {document.chunk_id: document for document in documents}
+    with stage_span(
+        "bm25",
+        mode=mode,
+        lexical_k=lexical_k,
+        document_count=len(documents),
+        input_tokens=estimate_tokens(query),
+        degraded_fallback=True,
+    ) as span:
+        ranked = ranked_lexical(query, documents, lexical_k)
+        span.set_attribute("candidate_count", len(ranked))
+    hits = [
+        CandidateHit(
+            document=document_by_id[chunk_id],
+            retrieval_sources=("lexical",),
+            best_rank=rank,
+            best_score=float(score),
+            scores={"lexical": float(score)},
+            ranks={"lexical": rank},
+        )
+        for rank, (chunk_id, score) in enumerate(ranked, start=1)
+        if chunk_id in document_by_id
+    ]
+    with stage_span("fuse", mode=mode, fusion="bm25_only", degraded_fallback=True) as span:
+        hits = sort_hits(hits, "bm25_only")
+        span.set_attribute("candidate_count", len(hits))
+    report = {
+        "report_id": "bm25_candidate_pool_v1",
+        "query": query,
+        "mode": mode,
+        "provider": "bm25",
+        "model": "bm25_only",
+        "document_count": len(documents),
+        "candidate_count": len(hits),
+        "lexical_k": lexical_k,
+        "vector_k": 0,
+        "fusion": "bm25_only",
+        "source_counts": source_counts(hits),
+        "candidates": [hit.to_dict() for hit in hits],
+        "degraded": True,
+        "degradation_flags": ["embed_failed_bm25_only"],
+        "boundary": "Hosted or dense embedding retrieval failed; candidates were degraded to BM25-only ordering.",
+    }
+    report_io.write_json(
+        settings.reports_dir / f"candidate_pool_{mode}_{safe_slug(query)}_bm25_only.json",
         report,
     )
     return report

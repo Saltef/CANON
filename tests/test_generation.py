@@ -1,4 +1,3 @@
-import json
 import unittest
 from unittest.mock import patch
 
@@ -37,7 +36,7 @@ class GenerationTests(unittest.TestCase):
             "choices": [{"message": {"content": "Grid risk should be cited [C1]."}}],
         }
 
-        with patch("canon.generation.providers.urllib.request.urlopen", return_value=fake_response(payload)):
+        with patch("canon.generation.providers.post_json", return_value=payload):
             result = provider.generate("Use C1.")
 
         self.assertEqual(result.provider, "openrouter")
@@ -50,21 +49,6 @@ class GenerationTests(unittest.TestCase):
     def test_unknown_generation_provider_fails(self):
         with self.assertRaises(ValueError):
             get_generation_provider("missing")
-
-
-class fake_response:
-    def __init__(self, payload):
-        self.payload = payload
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        return False
-
-    def read(self):
-        return json.dumps(self.payload).encode("utf-8")
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "grid_ai_datacenter",
+    "query": "What are the grid risks around AI data center expansion?",
+    "mode": "ai_infra_geo_risk_demo",
+    "top_k": 5,
+    "candidate_k": 8,
+    "retrieval_engine": "model_candidate_pool",
+    "retrieval_provider": "local",
+    "retrieval_model": "hashed-semantic-v1",
+    "reranker_provider": "heuristic",
+    "reranker_model": "lexical-overlap-rerank-v1",
+    "generator_provider": "deterministic",
+    "write_telemetry": false
+  },
+  {
+    "id": "water_cooling",
+    "query": "How could data center water and cooling needs affect local opposition?",
+    "mode": "ai_infra_geo_risk_demo",
+    "top_k": 5,
+    "candidate_k": 8,
+    "retrieval_engine": "model_candidate_pool",
+    "retrieval_provider": "local",
+    "retrieval_model": "hashed-semantic-v1",
+    "reranker_provider": "heuristic",
+    "reranker_model": "lexical-overlap-rerank-v1",
+    "generator_provider": "deterministic",
+    "write_telemetry": false
+  },
+  {
+    "id": "sovereign_cloud",
+    "query": "What evidence links sovereign AI policy to cloud dependency?",
+    "mode": "ai_infra_geo_risk_demo",
+    "top_k": 5,
+    "candidate_k": 8,
+    "retrieval_engine": "model_candidate_pool",
+    "retrieval_provider": "local",
+    "retrieval_model": "hashed-semantic-v1",
+    "reranker_provider": "heuristic",
+    "reranker_model": "lexical-overlap-rerank-v1",
+    "generator_provider": "deterministic",
+    "write_telemetry": false
+  }
+]

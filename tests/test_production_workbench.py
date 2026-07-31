@@ -1,4 +1,5 @@
 import json
+import time
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
@@ -617,6 +618,131 @@ class ProductionWorkbenchTests(unittest.TestCase):
         self.assertIn("Grid Interconnection Note", fake_generator.prompt)
         self.assertNotIn("Sepsis Guidelines", fake_generator.prompt)
 
+    def test_model_candidate_pool_degrades_to_bm25_when_embeddings_fail(self):
+        candidate_report = {
+            "report_id": "bm25_candidate_pool_v1",
+            "degraded": True,
+            "degradation_flags": ["embed_failed_bm25_only"],
+            "source_counts": {"lexical": 1},
+            "candidates": [
+                {
+                    "chunk_id": "grid_1",
+                    "work_id": "official-grid",
+                    "title": "Grid Interconnection Note",
+                    "source_name": "Regulator",
+                    "year": 2026,
+                    "section": "grid planning",
+                    "retrieval_sources": ["lexical"],
+                    "best_rank": 1,
+                    "best_score": 1.0,
+                    "scores": {"lexical": 1.0},
+                    "ranks": {"lexical": 1},
+                    "preview": "AI data center expansion increases grid interconnection pressure.",
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            settings = SimpleNamespace(reports_dir=Path(temp_dir))
+            with patch("canon.product.service.load_settings", return_value=settings):
+                with patch(
+                    "canon.product.service.production_candidate_report",
+                    side_effect=RuntimeError("embedding provider unavailable"),
+                ):
+                    with patch("canon.product.service.build_bm25_candidate_pool", return_value=candidate_report):
+                        report = service.production_evidence_workbench(
+                            {
+                                "session_id": "prod_embed_fallback",
+                                "query": "grid risks around AI data center expansion",
+                                "mode": "m",
+                                "retrieval_engine": "model_candidate_pool",
+                                "reranker_provider": "heuristic",
+                                "generator_provider": "deterministic",
+                                "write_telemetry": False,
+                            }
+                        )
+
+        self.assertEqual(report["retrieval"]["degradation_flags"], ["embed_failed_bm25_only"])
+        self.assertTrue(report["retrieval"]["degraded"])
+        self.assertEqual(report["draft_brief"]["status"], "evidence_note_ready")
+        self.assertEqual(report["evidence_cards"][0]["chunk_id"], "grid_1")
+
+    def test_model_candidate_pool_degrades_to_rrf_when_rerank_times_out(self):
+        candidate_report = {
+            "report_id": "windowed_candidate_pool_v1",
+            "source_counts": {"lexical": 2},
+            "candidates": [
+                {
+                    "chunk_id": "grid_1",
+                    "work_id": "official-grid",
+                    "title": "Grid Interconnection Note",
+                    "source_name": "Regulator",
+                    "year": 2026,
+                    "section": "grid planning",
+                    "retrieval_sources": ["lexical"],
+                    "best_rank": 1,
+                    "best_score": 1.0,
+                    "scores": {"lexical": 1.0},
+                    "ranks": {"lexical": 1},
+                    "preview": "AI data center expansion increases grid interconnection pressure.",
+                },
+                {
+                    "chunk_id": "grid_2",
+                    "work_id": "cloud-grid",
+                    "title": "Cloud Region Expansion",
+                    "source_name": "Newsroom",
+                    "year": 2026,
+                    "section": "body",
+                    "retrieval_sources": ["lexical"],
+                    "best_rank": 2,
+                    "best_score": 0.8,
+                    "scores": {"lexical": 0.8},
+                    "ranks": {"lexical": 2},
+                    "preview": "AI cloud expansion requires grid upgrades.",
+                },
+            ],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            settings = SimpleNamespace(reports_dir=Path(temp_dir))
+            with patch("canon.product.service.load_settings", return_value=settings):
+                with patch("canon.product.service.production_candidate_report", return_value=candidate_report):
+                    with patch("canon.product.service.get_rerank_provider", return_value=SlowRerankProvider()):
+                        report = service.production_evidence_workbench(
+                            {
+                                "session_id": "prod_rerank_timeout",
+                                "query": "grid risks around AI data center expansion",
+                                "mode": "m",
+                                "retrieval_engine": "model_candidate_pool",
+                                "reranker_provider": "cohere",
+                                "reranker_model": "rerank-v4.0-pro",
+                                "rerank_timeout_s": 0.001,
+                                "generator_provider": "deterministic",
+                                "write_telemetry": False,
+                            }
+                        )
+
+        self.assertEqual(report["retrieval"]["degradation_flags"], ["rerank_timeout_rrf_fallback"])
+        self.assertTrue(report["retrieval"]["degraded"])
+        self.assertEqual(report["raw_contract_validation"]["status"], "pass")
+        self.assertEqual(report["evidence_cards"][0]["chunk_id"], "grid_1")
+
+    def test_model_candidate_pool_rejects_invalid_candidate_scope(self):
+        with self.assertRaises(service.ProductError) as context:
+            service.production_evidence_workbench(
+                {
+                    "session_id": "prod_bad_scope",
+                    "query": "grid risks around AI data center expansion",
+                    "mode": "m",
+                    "retrieval_engine": "model_candidate_pool",
+                    "candidate_scope": "typo",
+                    "generator_provider": "deterministic",
+                    "write_telemetry": False,
+                }
+            )
+
+        self.assertIn("candidate_scope", str(context.exception))
+
     def test_production_corpus_setup_profiles_only_or_builds_user_corpus(self):
         with patch("canon.product.service.source_profile", return_value={"source_shape": "folder"}) as profile:
             with patch("canon.product.service.source_ingest", return_value={"status": "ingested"}) as ingest:
@@ -734,6 +860,17 @@ class FakeRerankProvider:
             RerankResult(index=2, score=0.9),
             RerankResult(index=1, score=0.1),
         ][:top_n]
+
+
+class SlowRerankProvider:
+    provider = "cohere"
+    model = "rerank-v4.0-pro"
+
+    def rerank(self, query, documents, top_n):
+        from canon.rerank.providers import RerankResult
+
+        time.sleep(0.05)
+        return [RerankResult(index=index, score=1.0 / (index + 1)) for index in range(len(documents))][:top_n]
 
 
 if __name__ == "__main__":

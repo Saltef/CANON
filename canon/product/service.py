@@ -5,6 +5,7 @@ import re
 import time
 import urllib.parse
 import uuid
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ from canon.corpus.build import run_phase16
 from canon.eval.contracts import CONTRACT_VERSION, validate_report
 from canon.eval.model_evaluation import evaluate_semantic_models, parse_providers
 from canon.eval.diversity import run_diversity_audit
+from canon.observability import estimate_tokens, stage_span
 from canon.product import report_io
 from canon.eval.source_diversity import (
     DEFAULT_MAX_DOMINANT_SOURCE_SHARE,
@@ -27,7 +29,7 @@ from canon.ingest.flexible import ingest_flexible_source, profile_source
 from canon.reports.claim_decision import build_claim_decision
 from canon.product.run_diagnosis import build_run_diagnosis
 from canon.retrieval.compare import compare
-from canon.retrieval.candidates import build_candidate_pool, build_windowed_candidate_pool
+from canon.retrieval.candidates import build_bm25_candidate_pool, build_candidate_pool, build_windowed_candidate_pool
 from canon.retrieval.experiment import cached_documents
 from canon.retrieval.query_diagnostics import FREEDOM_THRESHOLDS, content_terms, diagnose_query, term_matches_tokens
 from canon.rerank.providers import get_rerank_provider
@@ -42,6 +44,7 @@ DEFAULT_PRODUCTION_TOP_K = 12
 DEFAULT_PRODUCTION_CANDIDATE_K = 12
 DEFAULT_PRODUCTION_CANDIDATE_SCOPE = "lexical_window"
 DEFAULT_PRODUCTION_LEXICAL_WINDOW_K = 96
+DEFAULT_PRODUCTION_RERANK_TIMEOUT_S = 15.0
 DEFAULT_EXTERNAL_SEARCH_PROVIDER = "openalex"
 DEFAULT_EXTERNAL_RESULT_COUNT = 5
 DEFAULT_POLICIES = ["lexical", "balanced", "semantic", "rag", "diverse", "conflict_aware"]
@@ -690,16 +693,28 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
         "reranker_provider": packet_response.get("reranker_provider"),
         "reranker_model": packet_response.get("reranker_model"),
         "candidate_count": packet_response.get("candidate_count"),
+        "degraded": bool(packet_response.get("degraded")),
+        "degradation_flags": packet_response.get("degradation_flags") or [],
+        "degradation_details": packet_response.get("degradation_details") or [],
         "boundary": packet_response.get("retrieval_boundary")
         or "Uses the selected CANON retrieval engine to produce inspection candidates.",
     }
-    draft_brief = production_draft_brief(
-        packet_response,
-        relevance_gate,
-        evidence,
-        generator_provider=generator_provider,
-        generator_model=generator_model,
-    )
+    with stage_span(
+        "synthesise",
+        provider=generator_provider,
+        model=generator_model or "evidence-note-v1",
+        evidence_count=len(evidence),
+        input_tokens=estimate_tokens(evidence) + estimate_tokens(query),
+    ) as span:
+        draft_brief = production_draft_brief(
+            packet_response,
+            relevance_gate,
+            evidence,
+            generator_provider=generator_provider,
+            generator_model=generator_model,
+        )
+        span.set_attribute("draft_status", draft_brief.get("status"))
+        span.set_attribute("output_tokens", estimate_tokens(draft_brief.get("text") or draft_brief.get("abstention")))
     run_diagnosis = build_run_diagnosis(
         query=query,
         packet_response=packet_response,
@@ -744,6 +759,8 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
             "evidence_count": len(evidence),
             "usable_evidence_count": relevance_gate.get("usable_evidence_count", len(evidence)),
             "external_evidence_count": len(external_cards),
+            "degraded": bool(packet_response.get("degraded")),
+            "degradation_flags": packet_response.get("degradation_flags") or [],
             "source_diversity": packet.get("source_diversity") or {},
             "frame_coverage": packet.get("frame_coverage") or {},
             "evidence_scope_summary": production_scope_summary(evidence, external_cards),
@@ -825,77 +842,120 @@ def production_model_candidate_packet(
         candidate_k * 6,
     )
     fusion = optional_text(payload, "fusion") or "weighted_bm25_dense"
+    rerank_timeout_s = optional_positive_float(payload.get("rerank_timeout_s"), "rerank_timeout_s")
+    rerank_timeout_s = rerank_timeout_s or DEFAULT_PRODUCTION_RERANK_TIMEOUT_S
+    degradation_flags: list[str] = []
+    degradation_details: list[dict[str, Any]] = []
     try:
-        if candidate_scope in {"lexical_window", "windowed", "bounded_lexical_window"}:
-            candidate_report = build_windowed_candidate_pool(
+        candidate_report = production_candidate_report(
+            query=query,
+            mode=mode,
+            candidate_scope=candidate_scope,
+            lexical_window_k=lexical_window_k,
+            lexical_k=lexical_k,
+            vector_k=vector_k,
+            retrieval_provider=retrieval_provider,
+            retrieval_model=retrieval_model,
+            fusion=fusion,
+        )
+    except ProductError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - model availability belongs in the product response.
+        degradation_flags.append("embed_failed_bm25_only")
+        degradation_details.append({"stage": "embed", "error": str(exc)})
+        try:
+            candidate_report = build_bm25_candidate_pool(
                 query=query,
                 mode=mode,
-                lexical_window_k=lexical_window_k,
-                lexical_k=lexical_k,
-                vector_k=vector_k,
-                provider=retrieval_provider,
-                model=retrieval_model,
-                fusion=fusion,
+                lexical_k=max(lexical_k, lexical_window_k, candidate_k),
             )
-        elif candidate_scope in {"full_embedding_store", "full_dense"}:
-            candidate_report = build_candidate_pool(
-                query=query,
-                mode=mode,
-                lexical_k=lexical_k,
-                vector_k=vector_k,
-                provider=retrieval_provider,
-                model=retrieval_model,
-                fusion=fusion,
-            )
-        else:
-            raise ProductError("candidate_scope must be lexical_window or full_embedding_store.")
-        candidates = candidate_report.get("candidates") or []
+        except Exception as fallback_exc:  # noqa: BLE001 - report both failures to the caller.
+            return {
+                "status": "model_retrieval_failed",
+                "request_id": request_id,
+                "project_id": str(payload.get("project_id") or "production_workbench"),
+                "query": query,
+                "mode": mode,
+                "policy": policy,
+                "retrieval_provider": retrieval_provider,
+                "retrieval_model": retrieval_model,
+                "candidate_scope": candidate_scope,
+                "lexical_window_k": lexical_window_k
+                if candidate_scope in {"lexical_window", "windowed", "bounded_lexical_window"}
+                else None,
+                "reranker_provider": reranker_provider,
+                "reranker_model": reranker_model,
+                "candidate_count": 0,
+                "retrieval_error": str(exc),
+                "fallback_error": str(fallback_exc),
+                "degraded": True,
+                "degradation_flags": degradation_flags,
+                "degradation_details": degradation_details,
+                "retrieval_boundary": "Model-backed retrieval and BM25 fallback both failed.",
+                "evidence_packets": [],
+                "query_diagnostics": {
+                    "matched_terms": [],
+                    "weak_terms": content_terms(query),
+                    "query_variants": [],
+                    "semantic_similarity_summary": {},
+                },
+                "coverage_gaps": [{"gap": "Model-backed retrieval failed.", "details": str(exc)}],
+                "external_expansion": production_external_expansion(requirements),
+                "answer_report": {
+                    "answer": "",
+                    "citations": [],
+                    "support_assessment": {
+                        "support_level": "failed",
+                        "query_term_coverage": 0.0,
+                        "covered_focus_terms": [],
+                        "missing_focus_terms": content_terms(query),
+                    },
+                },
+                "contract_validation": {"status": "failed", "error": str(exc)},
+            }
+    candidates = candidate_report.get("candidates") or []
+    if candidate_report.get("degraded"):
+        degradation_flags.extend(candidate_report.get("degradation_flags") or [])
+    try:
         ranked_candidates, rerank_summary = production_rerank_candidates(
             query=query,
             candidates=candidates,
             provider_name=reranker_provider,
             model=reranker_model,
+            timeout_s=rerank_timeout_s,
         )
-    except Exception as exc:  # noqa: BLE001 - model availability belongs in the product response.
-        return {
-            "status": "model_retrieval_failed",
-            "request_id": request_id,
-            "project_id": str(payload.get("project_id") or "production_workbench"),
-            "query": query,
-            "mode": mode,
-            "policy": policy,
-            "retrieval_provider": retrieval_provider,
-            "retrieval_model": retrieval_model,
-            "candidate_scope": candidate_scope,
-            "lexical_window_k": lexical_window_k if candidate_scope in {"lexical_window", "windowed", "bounded_lexical_window"} else None,
-            "reranker_provider": reranker_provider,
-            "reranker_model": reranker_model,
-            "candidate_count": 0,
-            "retrieval_error": str(exc),
-            "retrieval_boundary": "Model-backed retrieval failed; no fallback candidates were substituted.",
-            "evidence_packets": [],
-            "query_diagnostics": {
-                "matched_terms": [],
-                "weak_terms": content_terms(query),
-                "query_variants": [],
-                "semantic_similarity_summary": {},
-            },
-            "coverage_gaps": [{"gap": "Model-backed retrieval failed.", "details": str(exc)}],
-            "external_expansion": production_external_expansion(requirements),
-            "answer_report": {
-                "answer": "",
-                "citations": [],
-                "support_assessment": {
-                    "support_level": "failed",
-                    "query_term_coverage": 0.0,
-                    "covered_focus_terms": [],
-                    "missing_focus_terms": content_terms(query),
-                },
-            },
-            "contract_validation": {"status": "failed", "error": str(exc)},
-        }
+    except RerankTimeoutError as exc:
+        degradation_flags.append("rerank_timeout_rrf_fallback")
+        degradation_details.append({"stage": "rerank", "error": str(exc), "timeout_s": rerank_timeout_s})
+        ranked_candidates, rerank_summary = production_rrf_fallback_candidates(
+            candidates,
+            provider_name=reranker_provider,
+            model=reranker_model,
+            status="timeout_rrf_fallback",
+            error=str(exc),
+        )
+    except Exception as exc:  # noqa: BLE001 - preserve retrieval candidates when rerank fails.
+        degradation_flags.append("rerank_failed_rrf_fallback")
+        degradation_details.append({"stage": "rerank", "error": str(exc)})
+        ranked_candidates, rerank_summary = production_rrf_fallback_candidates(
+            candidates,
+            provider_name=reranker_provider,
+            model=reranker_model,
+            status="failed_rrf_fallback",
+            error=str(exc),
+        )
     evidence = production_candidate_evidence(ranked_candidates[:top_k])
     support = production_candidate_support(query, evidence)
+    degradation_flags = dedupe_strings(degradation_flags)
+    degraded = bool(degradation_flags)
+    retrieval_boundary = (
+        "Evidence candidates were generated with BM25 plus the selected embedding provider, "
+        "then ordered with the selected reranker for user inspection."
+    )
+    if degraded:
+        retrieval_boundary = (
+            "The request completed with degraded retrieval. Inspect degradation_flags before using the result."
+        )
     return {
         "status": "complete",
         "request_id": request_id,
@@ -911,10 +971,10 @@ def production_model_candidate_packet(
         "reranker_provider": rerank_summary.get("provider"),
         "reranker_model": rerank_summary.get("model"),
         "candidate_count": len(candidates),
-        "retrieval_boundary": (
-            "Evidence candidates were generated with BM25 plus the selected embedding provider, "
-            "then ordered with the selected reranker for user inspection."
-        ),
+        "degraded": degraded,
+        "degradation_flags": degradation_flags,
+        "degradation_details": degradation_details,
+        "retrieval_boundary": retrieval_boundary,
         "candidate_generation": {
             "engine": "model_candidate_pool",
             "candidate_scope": candidate_scope,
@@ -927,6 +987,8 @@ def production_model_candidate_packet(
             "retrieval_provider": retrieval_provider,
             "retrieval_model": retrieval_model,
             "source_counts": candidate_report.get("source_counts") or {},
+            "degraded": degraded,
+            "degradation_flags": degradation_flags,
         },
         "rerank_summary": rerank_summary,
         "evidence_packets": [
@@ -985,17 +1047,67 @@ def default_reranker_model(provider: str) -> str | None:
     return None
 
 
+def production_candidate_report(
+    *,
+    query: str,
+    mode: str,
+    candidate_scope: str,
+    lexical_window_k: int,
+    lexical_k: int,
+    vector_k: int,
+    retrieval_provider: str,
+    retrieval_model: str | None,
+    fusion: str,
+) -> dict[str, Any]:
+    if candidate_scope in {"lexical_window", "windowed", "bounded_lexical_window"}:
+        return build_windowed_candidate_pool(
+            query=query,
+            mode=mode,
+            lexical_window_k=lexical_window_k,
+            lexical_k=lexical_k,
+            vector_k=vector_k,
+            provider=retrieval_provider,
+            model=retrieval_model,
+            fusion=fusion,
+        )
+    if candidate_scope in {"full_embedding_store", "full_dense"}:
+        return build_candidate_pool(
+            query=query,
+            mode=mode,
+            lexical_k=lexical_k,
+            vector_k=vector_k,
+            provider=retrieval_provider,
+            model=retrieval_model,
+            fusion=fusion,
+        )
+    raise ProductError("candidate_scope must be lexical_window or full_embedding_store.")
+
+
+class RerankTimeoutError(TimeoutError):
+    pass
+
+
 def production_rerank_candidates(
     query: str,
     candidates: list[dict[str, Any]],
     provider_name: str,
     model: str | None,
+    timeout_s: float | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not candidates:
         return [], {"provider": provider_name, "model": model, "status": "no_candidates"}
     provider = get_rerank_provider(provider_name, model)
     documents = [production_candidate_document_text(candidate) for candidate in candidates]
-    reranked = provider.rerank(query, documents, top_n=len(documents))
+    with stage_span(
+        "rerank",
+        provider=provider.provider,
+        model=provider.model,
+        candidate_count=len(candidates),
+        input_tokens=estimate_tokens(documents) + estimate_tokens(query),
+        timeout_s=timeout_s,
+    ) as span:
+        reranked = call_rerank_with_timeout(provider, query, documents, len(documents), timeout_s)
+        span.set_attribute("scored_candidate_count", len(reranked))
     by_index = {row.index: row.score for row in reranked if 0 <= row.index < len(candidates)}
     ranked = []
     used_indexes = set()
@@ -1016,6 +1128,62 @@ def production_rerank_candidates(
         "status": "ok",
         "scored_candidate_count": len(by_index),
     }
+
+
+def call_rerank_with_timeout(provider, query: str, documents: list[str], top_n: int, timeout_s: float | None):
+    if timeout_s is None or timeout_s <= 0:
+        return provider.rerank(query, documents, top_n=top_n)
+    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="canon-rerank")
+    future = executor.submit(provider.rerank, query, documents, top_n)
+    try:
+        return future.result(timeout=timeout_s)
+    except FutureTimeout as exc:
+        future.cancel()
+        raise RerankTimeoutError(f"Rerank exceeded {timeout_s:.3f}s timeout.") from exc
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+
+def production_rrf_fallback_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    provider_name: str,
+    model: str | None,
+    status: str,
+    error: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    ranked = []
+    for candidate in candidates:
+        row = dict(candidate)
+        row["rerank_score"] = rrf_candidate_score(candidate)
+        ranked.append(row)
+    ranked = sorted(
+        ranked,
+        key=lambda row: (float(row.get("rerank_score") or 0.0), -int(row.get("best_rank") or 999999), row.get("chunk_id") or ""),
+        reverse=True,
+    )
+    return ranked, {
+        "provider": provider_name,
+        "model": model,
+        "status": status,
+        "scored_candidate_count": 0,
+        "fallback": "rrf",
+        "error": error,
+    }
+
+
+def rrf_candidate_score(candidate: dict[str, Any], k: int = 60) -> float:
+    ranks = candidate.get("ranks") or {}
+    if not isinstance(ranks, dict) or not ranks:
+        best_rank = int(candidate.get("best_rank") or 999999)
+        return 1.0 / (k + best_rank)
+    total = 0.0
+    for rank in ranks.values():
+        try:
+            total += 1.0 / (k + int(rank))
+        except (TypeError, ValueError):
+            continue
+    return total
 
 
 def production_candidate_document_text(candidate: dict[str, Any]) -> str:
@@ -1778,6 +1946,8 @@ def write_production_telemetry(report: dict[str, Any]) -> None:
         "relevance_gate_status": relevance.get("status"),
         "query_term_coverage": relevance.get("query_term_coverage"),
         "coverage_gap_count": len(report.get("coverage_gaps") or []),
+        "retrieval_degraded": bool((report.get("retrieval") or {}).get("degraded")),
+        "retrieval_degradation_flags": (report.get("retrieval") or {}).get("degradation_flags") or [],
         "run_diagnosis_status": diagnosis.get("overall_status"),
         "run_diagnosis_failure_class": diagnosis.get("failure_class"),
         "run_diagnosis_issue_categories": diagnosis.get("issue_categories") or [],
@@ -1838,6 +2008,15 @@ def optional_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def optional_positive_float(value: Any, name: str) -> float | None:
+    parsed = optional_float(value)
+    if parsed is None:
+        return None
+    if parsed <= 0:
+        raise ProductError(f"{name} must be greater than 0.")
+    return parsed
 
 
 def append_jsonl(path: Path, payload: dict[str, Any]) -> None:

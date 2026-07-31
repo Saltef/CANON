@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.request
 from dataclasses import dataclass
 from typing import Protocol
 
+from canon.http_client import post_json
 from canon.retrieval.query_diagnostics import content_terms
 from canon.secrets import load_local_env
 
@@ -49,24 +49,20 @@ class CohereRerankProvider:
             raise RuntimeError("COHERE_API_KEY is required for Cohere rerank.")
 
     def rerank(self, query: str, documents: list[str], top_n: int) -> list[RerankResult]:
-        request = urllib.request.Request(
+        payload = post_json(
             "https://api.cohere.com/v2/rerank",
-            data=json.dumps(
-                {
-                    "model": self.model,
-                    "query": query,
-                    "documents": documents,
-                    "top_n": top_n,
-                }
-            ).encode("utf-8"),
+            {
+                "model": self.model,
+                "query": query,
+                "documents": documents,
+                "top_n": top_n,
+            },
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             },
-            method="POST",
+            timeout=120,
         )
-        with urllib.request.urlopen(request, timeout=120) as response:
-            payload = json.loads(response.read().decode("utf-8"))
         return [
             RerankResult(index=int(row["index"]), score=float(row["relevance_score"]))
             for row in payload.get("results", [])
@@ -84,24 +80,20 @@ class OpenRouterRerankProvider:
             raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter rerank.")
 
     def rerank(self, query: str, documents: list[str], top_n: int) -> list[RerankResult]:
-        request = urllib.request.Request(
+        payload = post_json(
             "https://openrouter.ai/api/v1/rerank",
-            data=json.dumps(
-                {
-                    "model": self.model,
-                    "query": query,
-                    "documents": documents,
-                    "top_n": top_n,
-                }
-            ).encode("utf-8"),
+            {
+                "model": self.model,
+                "query": query,
+                "documents": documents,
+                "top_n": top_n,
+            },
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             },
-            method="POST",
+            timeout=120,
         )
-        with urllib.request.urlopen(request, timeout=120) as response:
-            payload = json.loads(response.read().decode("utf-8"))
         return [
             RerankResult(index=int(row["index"]), score=float(row["relevance_score"]))
             for row in payload.get("results", [])

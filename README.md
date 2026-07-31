@@ -120,6 +120,29 @@ Start the product API:
 python -m canon.product.server --host 127.0.0.1 --port 8000
 ```
 
+For the production serving path, install the optional ASGI stack and run the
+FastAPI server with bounded concurrency:
+
+```powershell
+python -m pip install -e ".[serve]"
+python -m canon.product.asgi --host 127.0.0.1 --port 8000 --max-concurrency 8 --max-queue-depth 16
+```
+
+`serve` keeps the core CANON package dependency-free while adding FastAPI,
+uvicorn, pooled `httpx` provider calls, and Prometheus metrics. `otel` is a
+separate optional extra for OpenTelemetry instrumentation:
+
+```powershell
+python -m pip install -e ".[serve,otel]"
+```
+
+The ASGI server writes structured JSONL operational logs to
+`reports/asgi_operational_v1.jsonl`, carries a `request_id` through every log
+line, emits stage spans/logs for `bm25`, `embed`, `fuse`, `rerank`, and
+`synthesise`, exposes `/metrics`, rejects excess queue depth with HTTP 503 plus
+`Retry-After`, and degrades embed/rerank failures to marked BM25/RRF fallbacks
+instead of silently failing the whole request.
+
 Open the local Evidence Discovery Workbench:
 
 ```text
@@ -160,6 +183,17 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/acceptance-scenario -Con
 Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/handoff -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json"}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/feedback -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
 ```
+
+Run the local ASGI load ramp against a frozen query set:
+
+```powershell
+python -m scripts.load_test_asgi --base-url http://127.0.0.1:8000 --duration-per-level 200
+```
+
+The default ramp is 1, 5, 10, 20, 35, and 50 concurrent workers, for 20 minutes
+total. It writes raw samples plus JSON/Markdown reports under `reports/load/`.
+The first published local ASGI run is summarized in
+[docs/asgi_load_test_report.md](docs/asgi_load_test_report.md).
 
 More examples are in [docs/quickstart.md](docs/quickstart.md).
 
