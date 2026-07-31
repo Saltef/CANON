@@ -67,6 +67,28 @@ therefore: do not claim an auto-expansion top-10 ranking gain from this pilot.
 Parent-neighborhood expansion still improves candidate coverage, but it should
 not be presented as a top-k ranking improvement.
 
+### LlamaIndex Head-to-Head
+
+CANON now includes a framework baseline under
+`canon.baselines.llamaindex_baseline`. It evaluates LlamaIndex's
+`VectorStoreIndex` retriever on the same 30 NFCorpus queries and 1,724 labels,
+then pairs its three repeats against the existing CANON repeat-spread report.
+
+The compact machine-readable artifact is
+`reports/llamaindex_stage1_head_to_head.json`; the reviewer-facing summary is
+`docs/llamaindex_head_to_head.md`.
+
+| Comparison | Paired runs | Mean nDCG@10 delta | Standing |
+|---|---:|---:|---|
+| LlamaIndex original qrels - CANON base Qwen+Cohere | 3 | -26.627 pp | `stands_under_repeat_spread_check` |
+| LlamaIndex fixed parent qrels - CANON auto expansion | 3 | -26.640 pp | `stands_under_repeat_spread_check` |
+| LlamaIndex fixed parent qrels - CANON parent-neighborhood | 3 | -26.652 pp | `stands_under_repeat_spread_check` |
+
+Standing verdict: `canon`. The result should be described narrowly: CANON beats
+this LlamaIndex in-memory vector-index baseline on the current 30-query
+NFCorpus pilot. It is not a claim that CANON beats tuned LlamaIndex pipelines,
+OpenAI-backed LlamaIndex defaults, or full BEIR leaderboards.
+
 ### Historical Base-Shift Audit
 
 The July 30 base row should not be described as a documented improvement over

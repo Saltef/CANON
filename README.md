@@ -195,6 +195,19 @@ total. It writes raw samples plus JSON/Markdown reports under `reports/load/`.
 The first published local ASGI run is summarized in
 [docs/asgi_load_test_report.md](docs/asgi_load_test_report.md).
 
+Run the LlamaIndex framework baseline against the same Stage 1 fixed-qrels
+protocol:
+
+```powershell
+python -m pip install -e ".[baselines]"
+python -m canon.baselines.llamaindex_baseline --repeats 3 --no-resume
+```
+
+The current head-to-head is summarized in
+[docs/llamaindex_head_to_head.md](docs/llamaindex_head_to_head.md), with the
+compact machine-readable artifact in
+`reports/llamaindex_stage1_head_to_head.json`.
+
 More examples are in [docs/quickstart.md](docs/quickstart.md).
 
 ## Source Safety

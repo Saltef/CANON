@@ -18,4 +18,6 @@ build/
 !/reports/stage1_fixed_qrels_v2_repeat_spread.json
 !/reports/stage1_fixed_qrels_v2_repeat_spread.md
 !/reports/stage1_payload_shift_probe.json
+!/reports/llamaindex_stage1_head_to_head.json
+!/reports/llamaindex_stage1_head_to_head.md
 *.log
