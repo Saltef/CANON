@@ -59,6 +59,10 @@ class ProductionWorkbenchTests(unittest.TestCase):
         self.assertIn("ai_infra_geo_risk_demo", report["available_modes"])
         self.assertNotIn("unit_tmp", report["available_modes"])
         self.assertIn("corpus-backed evidence packets", report["shippable_without_human_review"])
+        self.assertIn(
+            "run diagnosis explaining corpus fit, retrieval, reranking, generation, and review needs",
+            report["shippable_without_human_review"],
+        )
         self.assertIn("autonomous factual conclusions", report["blocked_without_human_review"])
         self.assertEqual(report["endpoints"]["run"], "POST /v1/production/evidence-workbench")
         self.assertEqual(report["endpoints"]["corpus_setup"], "POST /v1/production/corpus-setup")
@@ -150,6 +154,8 @@ class ProductionWorkbenchTests(unittest.TestCase):
         self.assertEqual(report["relevance_gate"]["status"], "pass")
         self.assertEqual(report["draft_brief"]["status"], "evidence_note_ready")
         self.assertEqual(report["draft_brief"]["method"], "deterministic_evidence_note")
+        self.assertEqual(report["run_diagnosis"]["overall_status"], "ready_with_caveats")
+        self.assertEqual(report["run_diagnosis"]["failure_class"], "coverage_gap")
         self.assertEqual(report["evidence_packet"]["evidence_count"], 1)
         self.assertEqual(report["evidence_packet"]["usable_evidence_count"], 1)
         self.assertEqual(report["evidence_cards"][0]["evidence_id"], "C1")
@@ -158,6 +164,7 @@ class ProductionWorkbenchTests(unittest.TestCase):
         self.assertEqual(report["feedback"]["endpoint"], "POST /v1/production/feedback")
         self.assertEqual(telemetry[0]["session_id"], "prod_fixed")
         self.assertEqual(telemetry[0]["relevance_gate_status"], "pass")
+        self.assertEqual(telemetry[0]["run_diagnosis_failure_class"], "coverage_gap")
         self.assertEqual(telemetry[0]["boundary"], "Local product telemetry only; this is not a human-review label.")
 
     def test_production_evidence_workbench_keeps_external_results_marked(self):
@@ -371,6 +378,8 @@ class ProductionWorkbenchTests(unittest.TestCase):
 
         self.assertEqual(report["status"], "corpus_mismatch_no_grounded_answer")
         self.assertEqual(report["relevance_gate"]["status"], "corpus_mismatch")
+        self.assertEqual(report["run_diagnosis"]["failure_class"], "corpus_mismatch")
+        self.assertEqual(report["run_diagnosis"]["overall_status"], "failed_no_grounded_answer")
         self.assertFalse(report["relevance_gate"]["draft_allowed"])
         self.assertEqual(report["evidence_packet"]["usable_evidence_count"], 0)
         self.assertEqual(report["draft_brief"]["status"], "blocked_by_relevance_gate")
@@ -440,6 +449,7 @@ class ProductionWorkbenchTests(unittest.TestCase):
 
         self.assertEqual(report["status"], "corpus_mismatch_no_grounded_answer")
         self.assertEqual(report["relevance_gate"]["usable_evidence_count"], 0)
+        self.assertEqual(report["run_diagnosis"]["failure_class"], "corpus_mismatch")
         self.assertEqual(report["draft_brief"]["status"], "blocked_by_relevance_gate")
         self.assertEqual(
             [row["relevance"]["usage_status"] for row in report["evidence_cards"]],
@@ -520,6 +530,7 @@ class ProductionWorkbenchTests(unittest.TestCase):
 
         self.assertEqual(report["draft_brief"]["status"], "model_draft_ready")
         self.assertEqual(report["draft_brief"]["method"], "hosted_model_generation")
+        self.assertEqual(report["run_diagnosis"]["scorecard"]["generation_grounding"], "pass")
         self.assertEqual(report["draft_brief"]["generator"]["provider"], "openrouter")
         self.assertEqual(report["draft_brief"]["citations"], [{"citation_id": "C1"}, {"citation_id": "C3"}])
         self.assertIn("[C1]", report["draft_brief"]["text"])
@@ -597,6 +608,7 @@ class ProductionWorkbenchTests(unittest.TestCase):
         self.assertEqual(report["retrieval"]["provider"], "openrouter")
         self.assertEqual(report["retrieval"]["candidate_scope"], "lexical_window")
         self.assertEqual(report["retrieval"]["reranker_provider"], "cohere")
+        self.assertEqual(report["run_diagnosis"]["scorecard"]["reranking"], "pass")
         self.assertEqual(report["draft_brief"]["status"], "model_draft_ready")
         self.assertEqual(report["draft_brief"]["citations"], [{"citation_id": "C1"}, {"citation_id": "C2"}])
         self.assertEqual(report["evidence_cards"][0]["chunk_id"], "grid_1")

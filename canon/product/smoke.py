@@ -119,6 +119,7 @@ def smoke_checks(results: dict[str, Any]) -> list[dict[str, Any]]:
         check("query_diagnostics_has_terms", "query_to_corpus" in results["query_diagnostics"]),
         check("query_diagnostics_has_variants", "query_variants" in results["query_diagnostics"]),
         check("evidence_packets_have_packets", bool(results["evidence_packets"].get("evidence_packets"))),
+        check("evidence_packets_have_run_diagnosis", bool(results["evidence_packets"].get("run_diagnosis"))),
         check(
             "evidence_packets_contract_passed",
             (results["evidence_packets"].get("contract_validation") or {}).get("status") == "pass",
@@ -134,6 +135,10 @@ def smoke_checks(results: dict[str, Any]) -> list[dict[str, Any]]:
         check(
             "production_workbench_has_claim_boundary",
             bool(results["production_workbench"].get("claim_boundary")),
+        ),
+        check(
+            "production_workbench_has_run_diagnosis",
+            bool(results["production_workbench"].get("run_diagnosis")),
         ),
     ]
 
@@ -160,9 +165,11 @@ def compact_results(results: dict[str, Any]) -> dict[str, Any]:
         "query_diagnostics_variant_count": len(diagnostics.get("query_variants") or []),
         "evidence_packet_count": len(packets.get("evidence_packets") or []),
         "evidence_packet_contract_status": (packets.get("contract_validation") or {}).get("status"),
+        "evidence_packet_run_diagnosis_status": (packets.get("run_diagnosis") or {}).get("overall_status"),
         "external_expansion_status": (packets.get("external_expansion") or {}).get("status"),
         "production_workbench_status": production.get("status"),
         "production_workbench_evidence_count": len(production.get("evidence_cards") or []),
+        "production_workbench_run_diagnosis_status": (production.get("run_diagnosis") or {}).get("overall_status"),
     }
 
 

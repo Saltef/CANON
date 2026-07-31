@@ -25,6 +25,7 @@ from canon.generation.providers import get_generation_provider
 from canon.ingest.openalex import abstract_from_inverted_index, fetch_json
 from canon.ingest.flexible import ingest_flexible_source, profile_source
 from canon.reports.claim_decision import build_claim_decision
+from canon.product.run_diagnosis import build_run_diagnosis
 from canon.retrieval.compare import compare
 from canon.retrieval.candidates import build_candidate_pool, build_windowed_candidate_pool
 from canon.retrieval.experiment import cached_documents
@@ -291,6 +292,14 @@ def evidence_packets(payload: dict[str, Any]) -> dict:
             "support_assessment": support,
         },
     }
+    response["run_diagnosis"] = build_run_diagnosis(
+        query=query,
+        packet_response=response,
+        evidence=packet["supporting_evidence"],
+        coverage_gaps=gaps,
+        query_diagnostics=response["query_diagnostics"],
+        frame_coverage=frame_coverage,
+    )
     response["contract_validation"] = validate_report(response, "evidence_packet_response")
     return response
 
@@ -464,6 +473,7 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
         "shippable_without_human_review": [
             "corpus-backed evidence packets",
             "query diagnostics and query refinement",
+            "run diagnosis explaining corpus fit, retrieval, reranking, generation, and review needs",
             "citation-bearing draft brief for user inspection",
             "coverage and source-diversity warnings",
             "local telemetry and explicit user feedback capture",
@@ -671,6 +681,37 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
     external_search = production_external_search(query, payload)
     external_cards = external_search.get("evidence_cards") or []
     external_expansion = merge_external_expansion(packet_response.get("external_expansion") or {}, external_search)
+    retrieval = {
+        "engine": retrieval_engine,
+        "provider": packet_response.get("retrieval_provider"),
+        "model": packet_response.get("retrieval_model"),
+        "candidate_scope": packet_response.get("candidate_scope"),
+        "lexical_window_k": packet_response.get("lexical_window_k"),
+        "reranker_provider": packet_response.get("reranker_provider"),
+        "reranker_model": packet_response.get("reranker_model"),
+        "candidate_count": packet_response.get("candidate_count"),
+        "boundary": packet_response.get("retrieval_boundary")
+        or "Uses the selected CANON retrieval engine to produce inspection candidates.",
+    }
+    draft_brief = production_draft_brief(
+        packet_response,
+        relevance_gate,
+        evidence,
+        generator_provider=generator_provider,
+        generator_model=generator_model,
+    )
+    run_diagnosis = build_run_diagnosis(
+        query=query,
+        packet_response=packet_response,
+        evidence=evidence,
+        relevance_gate=relevance_gate,
+        draft_brief=draft_brief,
+        retrieval=retrieval,
+        coverage_gaps=gaps,
+        query_diagnostics=packet_response.get("query_diagnostics") or {},
+        external_cards=external_cards,
+        frame_coverage=packet.get("frame_coverage") or {},
+    )
     elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
     report = {
         "report_id": "production_evidence_workbench_session_v1",
@@ -682,18 +723,7 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
         "policy": policy,
         "top_k": top_k,
         "elapsed_ms": elapsed_ms,
-        "retrieval": {
-            "engine": retrieval_engine,
-            "provider": packet_response.get("retrieval_provider"),
-            "model": packet_response.get("retrieval_model"),
-            "candidate_scope": packet_response.get("candidate_scope"),
-            "lexical_window_k": packet_response.get("lexical_window_k"),
-            "reranker_provider": packet_response.get("reranker_provider"),
-            "reranker_model": packet_response.get("reranker_model"),
-            "candidate_count": packet_response.get("candidate_count"),
-            "boundary": packet_response.get("retrieval_boundary")
-            or "Uses the selected CANON retrieval engine to produce inspection candidates.",
-        },
+        "retrieval": retrieval,
         "claim_boundary": production_claim_boundary(),
         "generation": {
             "requested_provider": generator_provider,
@@ -705,13 +735,8 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
             ),
         },
         "relevance_gate": relevance_gate,
-        "draft_brief": production_draft_brief(
-            packet_response,
-            relevance_gate,
-            evidence,
-            generator_provider=generator_provider,
-            generator_model=generator_model,
-        ),
+        "draft_brief": draft_brief,
+        "run_diagnosis": run_diagnosis,
         "evidence_packet": {
             "packet_id": packet.get("packet_id"),
             "support_level": packet.get("support_level"),
@@ -1735,6 +1760,7 @@ def write_production_telemetry(report: dict[str, Any]) -> None:
     settings = load_settings()
     packet = report.get("evidence_packet") or {}
     relevance = report.get("relevance_gate") or {}
+    diagnosis = report.get("run_diagnosis") or {}
     record = {
         "report_id": "production_workbench_telemetry_event_v1",
         "created_at": report.get("created_at"),
@@ -1752,6 +1778,9 @@ def write_production_telemetry(report: dict[str, Any]) -> None:
         "relevance_gate_status": relevance.get("status"),
         "query_term_coverage": relevance.get("query_term_coverage"),
         "coverage_gap_count": len(report.get("coverage_gaps") or []),
+        "run_diagnosis_status": diagnosis.get("overall_status"),
+        "run_diagnosis_failure_class": diagnosis.get("failure_class"),
+        "run_diagnosis_issue_categories": diagnosis.get("issue_categories") or [],
         "boundary": "Local product telemetry only; this is not a human-review label.",
     }
     append_jsonl(settings.reports_dir / "production_workbench_telemetry_v1.jsonl", record)

@@ -127,12 +127,14 @@ http://127.0.0.1:8000/app
 ```
 
 The workbench runs local corpus retrieval, evidence cards, query diagnostics,
-coverage gaps, a cited draft preview, and product feedback capture. By default
-it does not call hosted models or external web search. When the OpenAlex online
-search option is enabled, CANON sends only the query string to OpenAlex and
-marks returned evidence as `ONLINE` / `external_source` so it cannot be confused
-with corpus evidence. Feedback is stored as local user experience telemetry, not
-as formal human-review labels.
+coverage gaps, a cited draft preview, run diagnosis, and product feedback
+capture. The run diagnosis explains corpus fit, candidate retrieval, reranking,
+generation grounding, coverage gaps, and the remaining human-review boundary. By
+default it does not call hosted models or external web search. When the OpenAlex
+online search option is enabled, CANON sends only the query string to OpenAlex
+and marks returned evidence as `ONLINE` / `external_source` so it cannot be
+confused with corpus evidence. Feedback is stored as local user experience
+telemetry, not as formal human-review labels.
 
 Use the Corpus Setup panel in the app to profile, ingest, and build a corpus
 from a local folder or file path. After setup, select the new mode in the Corpus

@@ -30,7 +30,12 @@ class ProductSmokeTests(unittest.TestCase):
         self.assertEqual(report["status"], "pass")
         self.assertEqual(report["result_summary"]["answer_citation_count"], 1)
         self.assertEqual(report["result_summary"]["evidence_packet_contract_status"], "pass")
+        self.assertEqual(report["result_summary"]["evidence_packet_run_diagnosis_status"], "ready_for_user_inspection")
         self.assertEqual(report["result_summary"]["production_workbench_evidence_count"], 1)
+        self.assertEqual(
+            report["result_summary"]["production_workbench_run_diagnosis_status"],
+            "ready_for_user_inspection",
+        )
         self.assertIn("GET /v1/production/status", report["endpoints"])
         self.assertIn("POST /v1/production/evidence-workbench", report["endpoints"])
         self.assertIn("POST /v1/query-diagnostics", report["endpoints"])
@@ -106,6 +111,11 @@ def evidence_packets_payload():
             }
         ],
         "external_expansion": {"status": "planned", "executed": False},
+        "run_diagnosis": {
+            "report_id": "run_diagnosis_v1",
+            "overall_status": "ready_for_user_inspection",
+            "failure_class": "human_review_required",
+        },
         "contract_validation": {"status": "pass"},
     }
 
@@ -123,6 +133,11 @@ def production_workbench_payload():
         "status": "ready_for_user_inspection",
         "claim_boundary": {"safe_to_use_for": ["finding evidence"]},
         "evidence_cards": [{"evidence_id": "C1"}],
+        "run_diagnosis": {
+            "report_id": "run_diagnosis_v1",
+            "overall_status": "ready_for_user_inspection",
+            "failure_class": "human_review_required",
+        },
     }
 
 

@@ -187,6 +187,49 @@ def render_app() -> str:
     }
     .banner.warn { border-left-color: var(--amber); background: var(--amber-soft); }
     .banner.danger { border-left-color: var(--red); background: var(--red-soft); }
+    .diagnosis {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .diagnosis-stage {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fbfcfa;
+    }
+    .stage-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    .stage-name { font-weight: 800; }
+    .stage-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid #bdddd6;
+      color: #10483f;
+      background: var(--accent-soft);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .stage-status.warn,
+    .stage-status.review_required { color: var(--amber); background: var(--amber-soft); border-color: #f0d79d; }
+    .stage-status.fail { color: var(--red); background: var(--red-soft); border-color: #f3beb5; }
+    .signals {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px 12px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .signals span { min-width: 0; overflow-wrap: anywhere; }
     .corpus-result {
       max-height: 190px;
       font-size: 12px;
@@ -499,6 +542,10 @@ def render_app() -> str:
           </div>
         </div>
         <div id="tab-diagnostics" class="tabpane hidden">
+          <h2>Why This Run</h2>
+          <div id="runDiagnosis" class="diagnosis">
+            <div class="empty">No run diagnosis yet.</div>
+          </div>
           <div class="split">
             <div>
               <h2>Query Lingo</h2>
@@ -607,6 +654,7 @@ def render_app() -> str:
 
       const cards = session.evidence_cards || [];
       $("evidence").innerHTML = cards.length ? cards.map(renderEvidenceCard).join("") : `<div class="empty">No evidence was retrieved.</div>`;
+      $("runDiagnosis").innerHTML = renderRunDiagnosis(session.run_diagnosis || {});
       $("queryLingo").innerHTML = renderQueryLingo(session.query_lingo || {});
       $("gaps").innerHTML = (session.coverage_gaps || []).map((gap) => `<li>${esc(gap.gap || gap)}</li>`).join("");
       $("rawJson").textContent = JSON.stringify(session, null, 2);
@@ -661,6 +709,49 @@ def render_app() -> str:
       ).join("") + `<h3>Variants</h3><ul class="list">${(lingo.query_variants || []).slice(0, 5).map((row) =>
         `<li>${esc(row.query || row)}</li>`
       ).join("")}</ul>`;
+    }
+
+    function renderRunDiagnosis(diagnosis) {
+      if (!diagnosis.report_id) return `<div class="empty">No run diagnosis yet.</div>`;
+      const tone = diagnosis.overall_status === "failed_no_grounded_answer"
+        ? "danger"
+        : diagnosis.overall_status === "ready_for_user_inspection"
+          ? ""
+          : "warn";
+      const metrics = diagnosis.metrics || {};
+      const issues = (diagnosis.issue_categories || []).map((issue) =>
+        `<span class="pill ${issue === "human_review_required" ? "warn" : ""}">${esc(issue)}</span>`
+      ).join("");
+      const stages = (diagnosis.stages || []).map((stage) => {
+        const signals = Object.entries(stage.signals || {}).slice(0, 6).map(([key, value]) =>
+          `<span><strong>${esc(key)}:</strong> ${esc(renderSignalValue(value))}</span>`
+        ).join("");
+        return `<div class="diagnosis-stage">
+          <div class="stage-head">
+            <span class="stage-name">${esc(stage.stage || "")}</span>
+            <span class="stage-status ${esc(stage.status || "")}">${esc(stage.status || "")}</span>
+          </div>
+          <div>${esc(stage.message || "")}</div>
+          ${signals ? `<div class="signals">${signals}</div>` : ""}
+        </div>`;
+      }).join("");
+      return `<div class="banner ${tone}">
+        <strong>${esc(diagnosis.overall_status || "")}</strong>: ${esc(diagnosis.summary || "")}
+      </div>
+      <div class="signals">
+        <span><strong>failure_class:</strong> ${esc(diagnosis.failure_class || "-")}</span>
+        <span><strong>usable_evidence:</strong> ${esc(metrics.usable_evidence_count ?? "-")}</span>
+        <span><strong>term_coverage:</strong> ${esc(metrics.query_term_coverage ?? "-")}</span>
+        <span><strong>coverage_gaps:</strong> ${esc(metrics.coverage_gap_count ?? 0)}</span>
+      </div>
+      <div class="buttonrow">${issues}</div>
+      <div>${stages}</div>`;
+    }
+
+    function renderSignalValue(value) {
+      if (Array.isArray(value)) return value.join(", ") || "-";
+      if (value && typeof value === "object") return JSON.stringify(value);
+      return value ?? "-";
     }
 
     async function runSearch(event) {

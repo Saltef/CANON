@@ -170,6 +170,9 @@ class ProductServiceTests(unittest.TestCase):
         self.assertEqual(report["query_diagnostics"]["weak_terms"], ["permitting"])
         self.assertEqual(report["retrieval_metrics"]["source_diversity_status"], "pass")
         self.assertTrue(report["frame_coverage"]["human_review_required"])
+        self.assertEqual(report["run_diagnosis"]["report_id"], "run_diagnosis_v1")
+        self.assertTrue(report["run_diagnosis"]["human_review_required"])
+        self.assertIn("coverage_gap", report["run_diagnosis"]["issue_categories"])
         self.assertEqual(report["external_expansion"]["status"], "planned")
         self.assertFalse(report["external_expansion"]["executed"])
         self.assertEqual(report["external_expansion"]["allowed_source_types"], ["official", "filing"])
@@ -201,6 +204,7 @@ class ProductServiceTests(unittest.TestCase):
         self.assertEqual(report["external_expansion"]["status"], "disabled")
         self.assertFalse(report["external_expansion"]["enabled"])
         self.assertEqual(report["external_expansion"]["suggested_queries"], [])
+        self.assertEqual(report["run_diagnosis"]["failure_class"], "no_candidate_evidence")
 
     def test_frame_coverage_reports_requested_missing_dimensions(self):
         report = service.analyze_frame_coverage(
