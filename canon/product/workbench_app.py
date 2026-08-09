@@ -113,9 +113,13 @@ def render_app() -> str:
       place-items: center;
       font-weight: 800;
     }
-    .brand h1 { font-size: 18px; margin: 0; letter-spacing: 0; }
-    .brand p { margin: 0; color: var(--muted); font-size: 13px; }
-    .statusline { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .brand h1 { font-size: 21px; margin: 0; letter-spacing: 0; }
+    .brand p {
+      margin: 1px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 760px;
+    }
     .pill {
       display: inline-flex;
       align-items: center;
@@ -334,7 +338,6 @@ def render_app() -> str:
       .split { grid-template-columns: 1fr; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .topbar { align-items: flex-start; flex-direction: column; }
-      .statusline { justify-content: flex-start; }
     }
     @media (max-width: 560px) {
       .row2, .row3, .metrics { grid-template-columns: 1fr; }
@@ -349,12 +352,9 @@ def render_app() -> str:
       <div class="brand">
         <div class="mark">C</div>
         <div>
-          <h1>CANON Evidence Discovery</h1>
-          <p>Inspection-first research workbench</p>
+          <h1>CANON</h1>
+          <p>Search your documents, compare AI drafts, and inspect the evidence before trusting an answer.</p>
         </div>
-      </div>
-      <div class="statusline" id="statusline">
-        <span class="pill warn">Loading status</span>
       </div>
     </div>
   </header>
@@ -849,13 +849,6 @@ def render_app() -> str:
 
     function renderStatus(status) {
       state.status = status;
-      const quality = status.quality_state || {};
-      const blocked = quality.blocked_checks || [];
-      $("statusline").innerHTML = [
-        `<span class="pill">${esc(status.status)}</span>`,
-        `<span class="pill warn">Gate: ${esc(quality.stage1_gate_status || "unknown")}</span>`,
-        `<span class="pill ${blocked.length ? "danger" : ""}">${blocked.length} blocked checks</span>`
-      ].join("");
       const select = $("mode");
       select.innerHTML = (status.available_modes || []).map((mode) =>
         `<option value="${esc(mode)}" ${mode === status.mode ? "selected" : ""}>${esc(mode)}</option>`
