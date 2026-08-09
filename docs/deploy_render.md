@@ -57,6 +57,13 @@ Use the free service to test login, routing, model-provider wiring, Qdrant
 connectivity, and the interactive workflow. Do not treat free Render storage as
 a place to keep private corpora.
 
+Each workbench run attempts two hosted OpenRouter generation calls by default:
+the primary `openai/gpt-4.1-mini` draft model and the comparison
+`moonshotai/kimi-k3` model. The response includes `model_comparison`, and local
+analysis rows are appended to `reports/production_model_runs_v1.jsonl`. On the
+free preview service, those telemetry rows are ephemeral for the same reason as
+uploaded corpora.
+
 ## Durable Alpha Storage
 
 For durable hosted user corpora, upgrade the web service to a paid instance and
@@ -70,7 +77,8 @@ Recommended disk:
 - App reports env: `CANON_REPORTS_DIR=/app/storage/reports`
 
 This preserves processed corpora, source manifests, vector-index manifests, and
-run reports. Qdrant remains the hosted vector index, not the source of truth.
+run reports, including `production_model_runs_v1.jsonl`. Qdrant remains the
+hosted vector index, not the source of truth.
 
 ## Access Control
 

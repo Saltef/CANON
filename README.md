@@ -180,6 +180,14 @@ Invoke-RestMethod -Method Post http://localhost:8000/v1/production/corpus-refres
 Invoke-RestMethod http://localhost:8000/v1/routes
 ```
 
+Production workbench runs default to hosted model behavior rather than a
+deterministic evidence note: CANON attempts two OpenRouter generation calls
+over the same relevance-gated evidence, currently `openai/gpt-4.1-mini` and
+`moonshotai/kimi-k3`. The selected draft, both model outputs, latency, token
+counts, citation counts, and failures are returned in `model_comparison` and
+logged to `reports/production_model_runs_v1.jsonl` for later analysis. This is
+product telemetry, not a model-winner claim.
+
 Run the local ASGI load ramp against a frozen query set:
 
 ```powershell

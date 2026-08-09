@@ -140,6 +140,10 @@ def smoke_checks(results: dict[str, Any]) -> list[dict[str, Any]]:
             "production_workbench_has_run_diagnosis",
             bool(results["production_workbench"].get("run_diagnosis")),
         ),
+        check(
+            "production_workbench_attempts_two_model_calls",
+            (results["production_workbench"].get("model_comparison") or {}).get("call_count") == 2,
+        ),
     ]
 
 
@@ -170,6 +174,8 @@ def compact_results(results: dict[str, Any]) -> dict[str, Any]:
         "production_workbench_status": production.get("status"),
         "production_workbench_evidence_count": len(production.get("evidence_cards") or []),
         "production_workbench_run_diagnosis_status": (production.get("run_diagnosis") or {}).get("overall_status"),
+        "production_workbench_model_call_count": (production.get("model_comparison") or {}).get("call_count", 0),
+        "production_workbench_model_success_count": (production.get("model_comparison") or {}).get("success_count", 0),
     }
 
 

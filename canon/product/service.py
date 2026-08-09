@@ -60,6 +60,9 @@ DEFAULT_PRODUCTION_CANDIDATE_SCOPE = "vector_store"
 DEFAULT_PRODUCTION_LEXICAL_WINDOW_K = 96
 DEFAULT_PRODUCTION_RERANK_TIMEOUT_S = 15.0
 DEFAULT_VECTOR_BACKEND = "qdrant"
+DEFAULT_GENERATOR_PROVIDER = "openrouter"
+DEFAULT_GENERATOR_MODEL = "openai/gpt-4.1-mini"
+DEFAULT_COMPARISON_GENERATOR_MODEL = "moonshotai/kimi-k3"
 DEFAULT_EXTERNAL_SEARCH_PROVIDER = "openalex"
 DEFAULT_EXTERNAL_RESULT_COUNT = 5
 DEFAULT_POLICIES = ["lexical", "balanced", "semantic", "rag", "diverse", "conflict_aware"]
@@ -352,8 +355,10 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
             "retrieval_model": "qwen/qwen3-embedding-8b",
             "reranker_provider": "cohere",
             "reranker_model": "rerank-v4.0-pro",
-            "generator_provider": "openrouter",
-            "generator_model": "openai/gpt-4.1-mini",
+            "generator_provider": DEFAULT_GENERATOR_PROVIDER,
+            "generator_model": DEFAULT_GENERATOR_MODEL,
+            "comparison_generator_model": DEFAULT_COMPARISON_GENERATOR_MODEL,
+            "model_pair_enabled": True,
             "model_review_provider": "openrouter",
             "model_review_model": DEFAULT_MODEL_TASK_MODEL,
         },
@@ -517,6 +522,17 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
             ],
             "boundary": "Typed model review is triage over retrieved evidence and remains human-review-bound.",
         },
+        "model_comparison": {
+            "status": "enabled_by_default",
+            "provider": DEFAULT_GENERATOR_PROVIDER,
+            "primary_model": DEFAULT_GENERATOR_MODEL,
+            "comparison_model": DEFAULT_COMPARISON_GENERATOR_MODEL,
+            "stored_at": "reports/production_model_runs_v1.jsonl",
+            "boundary": (
+                "Each hosted workbench run attempts two generation-model calls over the same gated evidence. "
+                "Outputs are comparison data for analysis, not model-winner proof."
+            ),
+        },
         "try_queries": production_try_queries(mode),
         "shippable_without_human_review": [
             "corpus-backed evidence packets",
@@ -545,7 +561,10 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
         },
         "operational_boundary": {
             "default_data_flow": "local corpus retrieval and local report generation",
-            "hosted_models": "called only when generator_provider selects a hosted model; query and relevance-gated snippets are sent",
+            "hosted_models": (
+                "default workbench runs call two OpenRouter generation models over the same gated evidence; "
+                "query and snippets are sent and model-run telemetry is stored locally"
+            ),
             "hosted_retrieval": "called only when retrieval_engine selects model_candidate_pool; query and corpus chunks are sent for embedding/reranking",
             "vector_index": (
                 "Qdrant is an optional ANN index over local chunk IDs and previews. "
@@ -818,9 +837,17 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
     top_k = optional_positive_int(payload.get("top_k"), "top_k") or DEFAULT_PRODUCTION_TOP_K
     freedom_level = optional_freedom_level(payload.get("freedom_level"))
     retrieval_engine = optional_text(payload, "retrieval_engine") or "canon_synthesis"
-    generator_provider = optional_text(payload, "generator_provider") or optional_text(payload, "generator") or "deterministic"
+    generator_provider = optional_text(payload, "generator_provider") or optional_text(payload, "generator") or DEFAULT_GENERATOR_PROVIDER
     generator_model = optional_text(payload, "generator_model") or (
-        "openai/gpt-4.1-mini" if generator_provider == "openrouter" else None
+        DEFAULT_GENERATOR_MODEL if generator_provider == DEFAULT_GENERATOR_PROVIDER else None
+    )
+    comparison_generator_model = optional_text(payload, "comparison_generator_model") or optional_text(
+        payload,
+        "secondary_generator_model",
+    )
+    model_pair_enabled = optional_bool(
+        payload.get("model_pair_enabled"),
+        default=generator_provider not in {"deterministic", "template", "local"},
     )
     session_id = optional_text(payload, "session_id") or f"prod_{uuid.uuid4().hex[:12]}"
     requirements = production_evidence_requirements(payload, top_k)
@@ -881,14 +908,17 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
         evidence_count=len(evidence),
         input_tokens=estimate_tokens(evidence) + estimate_tokens(query),
     ) as span:
-        draft_brief = production_draft_brief(
+        draft_brief, model_comparison = production_draft_and_model_comparison(
             packet_response,
             relevance_gate,
             evidence,
             generator_provider=generator_provider,
             generator_model=generator_model,
+            comparison_generator_model=comparison_generator_model,
+            model_pair_enabled=model_pair_enabled,
         )
         span.set_attribute("draft_status", draft_brief.get("status"))
+        span.set_attribute("model_call_count", model_comparison.get("call_count", 0))
         span.set_attribute("output_tokens", estimate_tokens(draft_brief.get("text") or draft_brief.get("abstention")))
     model_review = production_model_review(payload, query, evidence)
     run_diagnosis = build_run_diagnosis(
@@ -919,14 +949,17 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
         "generation": {
             "requested_provider": generator_provider,
             "requested_model": generator_model,
+            "comparison_model": model_comparison.get("comparison_model"),
+            "model_pair_enabled": model_pair_enabled,
             "hosted_model_boundary": (
-                "Hosted generation sends the selected query and gated evidence snippets to the provider."
+                "Hosted generation sends the selected query and gated evidence snippets to two model calls for comparison."
                 if generator_provider not in {"deterministic", "template", "local"}
                 else "No hosted generation requested."
             ),
         },
         "relevance_gate": relevance_gate,
         "draft_brief": draft_brief,
+        "model_comparison": model_comparison,
         "model_review": model_review,
         "run_diagnosis": run_diagnosis,
         "evidence_packet": {
@@ -1889,6 +1922,172 @@ def production_claim_boundary() -> dict[str, Any]:
     }
 
 
+def production_draft_and_model_comparison(
+    packet_response: dict[str, Any],
+    relevance_gate: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    generator_provider: str = DEFAULT_GENERATOR_PROVIDER,
+    generator_model: str | None = DEFAULT_GENERATOR_MODEL,
+    comparison_generator_model: str | None = None,
+    model_pair_enabled: bool = True,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if generator_provider in {"deterministic", "template", "local"} or not model_pair_enabled:
+        draft = production_draft_brief(
+            packet_response,
+            relevance_gate,
+            evidence,
+            generator_provider=generator_provider,
+            generator_model=generator_model,
+        )
+        return draft, {
+            "report_id": "production_model_comparison_v1",
+            "status": "disabled",
+            "call_count": 0,
+            "success_count": 0,
+            "provider": generator_provider,
+            "primary_model": generator_model,
+            "comparison_model": None,
+            "selected_model": (draft.get("generator") or {}).get("model"),
+            "runs": [],
+            "boundary": "Model-pair comparison was disabled for this run.",
+        }
+
+    answer_report = packet_response.get("answer_report") or {}
+    support = answer_report.get("support_assessment") or {}
+    citations = answer_report.get("citations") or []
+    draft_allowed = bool(relevance_gate.get("draft_allowed"))
+    usable_evidence = usable_evidence_for_note(evidence, relevance_gate)
+    model_evidence = usable_evidence if draft_allowed and usable_evidence else evidence[:8]
+    usable_citations = citations_for_usable_evidence(citations, usable_evidence) if draft_allowed else []
+    diagnostic_count = max(0, len(evidence) - len(usable_evidence))
+    models = resolve_generation_model_pair(generator_model, comparison_generator_model)
+    runs = []
+    for index, model in enumerate(models, start=1):
+        role = "primary" if index == 1 else "comparison"
+        run = model_generated_draft_brief(
+            query=packet_response.get("query") or "",
+            evidence=model_evidence,
+            diagnostic_count=diagnostic_count,
+            support=support,
+            citations=usable_citations,
+            generator_provider=generator_provider,
+            generator_model=model,
+            draft_allowed=draft_allowed,
+            relevance_gate=relevance_gate,
+        )
+        run["model_role"] = role
+        run["call_index"] = index
+        runs.append(run)
+
+    selected = select_model_run(runs, draft_allowed=draft_allowed)
+    comparison = build_model_comparison(
+        provider=generator_provider,
+        primary_model=models[0],
+        comparison_model=models[1],
+        selected=selected,
+        runs=runs,
+        draft_allowed=draft_allowed,
+    )
+    if not draft_allowed:
+        return {
+            "status": "blocked_by_relevance_gate",
+            "method": "model_pair_relevance_abstention",
+            "generator": {"provider": generator_provider, "model": selected.get("generator", {}).get("model")},
+            "text": "",
+            "abstention": relevance_gate.get("message") or "The retrieved evidence is not strong enough for a draft.",
+            "citation_count": 0,
+            "citations": [],
+            "support_assessment": support,
+            "model_call_count": comparison["call_count"],
+            "selected_model_status": selected.get("status"),
+            "boundary": "Two models were called for analysis, but no final draft was exposed because the relevance gate blocked drafting.",
+        }, comparison
+    return selected_model_draft(selected, support=support, comparison=comparison), comparison
+
+
+def resolve_generation_model_pair(primary_model: str | None, comparison_model: str | None) -> list[str]:
+    primary = primary_model or DEFAULT_GENERATOR_MODEL
+    comparison = comparison_model or DEFAULT_COMPARISON_GENERATOR_MODEL
+    if comparison == primary:
+        comparison = DEFAULT_COMPARISON_GENERATOR_MODEL
+    if comparison == primary:
+        comparison = "openai/gpt-4o-mini"
+    return [primary, comparison]
+
+
+def select_model_run(runs: list[dict[str, Any]], draft_allowed: bool) -> dict[str, Any]:
+    preferred_status = "model_draft_ready" if draft_allowed else "model_abstention_ready"
+    for run in runs:
+        if run.get("status") == preferred_status and str(run.get("text") or "").strip():
+            return run
+    for run in runs:
+        if str(run.get("text") or "").strip():
+            return run
+    return runs[0] if runs else {}
+
+
+def selected_model_draft(selected: dict[str, Any], support: dict[str, Any], comparison: dict[str, Any]) -> dict[str, Any]:
+    if selected.get("status") == "model_draft_ready":
+        return {
+            **selected,
+            "model_call_count": comparison["call_count"],
+            "comparison_model": comparison.get("comparison_model"),
+            "boundary": "Selected from a two-model run over the same relevance-gated evidence; verify citations before use.",
+        }
+    return {
+        "status": selected.get("status") or "model_generation_failed",
+        "method": selected.get("method") or "hosted_model_generation",
+        "generator": selected.get("generator") or {},
+        "text": selected.get("text") or "",
+        "error": selected.get("error"),
+        "citation_count": selected.get("citation_count", 0),
+        "citations": selected.get("citations") or [],
+        "support_assessment": selected.get("support_assessment") or support,
+        "model_call_count": comparison["call_count"],
+        "comparison_model": comparison.get("comparison_model"),
+        "boundary": "No deterministic fallback was substituted after model generation failed or returned empty output.",
+    }
+
+
+def build_model_comparison(
+    *,
+    provider: str,
+    primary_model: str,
+    comparison_model: str,
+    selected: dict[str, Any],
+    runs: list[dict[str, Any]],
+    draft_allowed: bool,
+) -> dict[str, Any]:
+    success_statuses = {"model_draft_ready", "model_abstention_ready"}
+    success_count = sum(1 for run in runs if run.get("status") in success_statuses)
+    status = "model_pair_complete" if success_count == len(runs) else "model_pair_partial" if success_count else "model_pair_failed"
+    return {
+        "report_id": "production_model_comparison_v1",
+        "status": status,
+        "provider": provider,
+        "primary_model": primary_model,
+        "comparison_model": comparison_model,
+        "selected_model": (selected.get("generator") or {}).get("model"),
+        "draft_allowed_by_relevance_gate": draft_allowed,
+        "call_count": len(runs),
+        "success_count": success_count,
+        "stored_at": "reports/production_model_runs_v1.jsonl",
+        "runs": runs,
+        "summary": {
+            "statuses": [run.get("status") for run in runs],
+            "models": [(run.get("generator") or {}).get("model") for run in runs],
+            "latency_ms": [run.get("elapsed_ms") for run in runs],
+            "citation_counts": [run.get("citation_count") for run in runs],
+            "text_lengths": [len(str(run.get("text") or "")) for run in runs],
+            "errors": [run.get("error") for run in runs if run.get("error")],
+        },
+        "boundary": (
+            "Two hosted model calls were attempted over the same CANON evidence context. "
+            "These rows support product analysis and comparison, not durable model-winner claims."
+        ),
+    }
+
+
 def production_draft_brief(
     packet_response: dict[str, Any],
     relevance_gate: dict[str, Any],
@@ -1974,22 +2173,20 @@ def model_generated_draft_brief(
     citations: list[dict[str, Any]],
     generator_provider: str,
     generator_model: str | None,
+    draft_allowed: bool = True,
+    relevance_gate: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    if not evidence:
-        return {
-            "status": "insufficient_cited_evidence",
-            "method": "model_generation_skipped",
-            "generator": {"provider": generator_provider, "model": generator_model},
-            "text": "",
-            "abstention": "No usable evidence rows passed the relevance gate.",
-            "citation_count": 0,
-            "citations": [],
-            "support_assessment": support,
-            "boundary": "Model generation was skipped because no gated evidence was available.",
-        }
+    started = time.perf_counter()
+    prompt = model_generation_prompt(
+        query,
+        evidence,
+        diagnostic_count,
+        support,
+        draft_allowed=draft_allowed,
+        relevance_gate=relevance_gate,
+    )
     try:
         provider = get_generation_provider(generator_provider, generator_model)
-        prompt = model_generation_prompt(query, evidence, diagnostic_count, support)
         result = provider.generate(prompt)
         if not str(result.text or "").strip():
             result = provider.generate(prompt + "\nReturn a non-empty cited answer or an explicit evidence limitation.")
@@ -2003,6 +2200,9 @@ def model_generated_draft_brief(
             "citation_count": 0,
             "citations": [],
             "support_assessment": support,
+            "input_tokens": estimate_tokens(prompt),
+            "output_tokens": 0,
+            "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
             "boundary": "Hosted model generation failed; no fallback answer was substituted.",
         }
     if not str(result.text or "").strip():
@@ -2016,10 +2216,13 @@ def model_generated_draft_brief(
             "citations": [],
             "support_assessment": support,
             "diagnostic_candidate_count": diagnostic_count,
+            "input_tokens": estimate_tokens(prompt),
+            "output_tokens": 0,
+            "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
             "boundary": "Hosted model generation returned no draft; no fallback answer was substituted.",
         }
     return {
-        "status": "model_draft_ready",
+        "status": "model_draft_ready" if draft_allowed else "model_abstention_ready",
         "method": "hosted_model_generation",
         "generator": {"provider": result.provider, "model": result.model},
         "text": result.text,
@@ -2027,7 +2230,14 @@ def model_generated_draft_brief(
         "citations": citations,
         "support_assessment": support,
         "diagnostic_candidate_count": diagnostic_count,
-        "boundary": "Model draft is based only on relevance-gated evidence snippets and still requires verification.",
+        "input_tokens": estimate_tokens(prompt),
+        "output_tokens": estimate_tokens(result.text),
+        "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+        "boundary": (
+            "Model draft is based only on relevance-gated evidence snippets and still requires verification."
+            if draft_allowed
+            else "Model was called for abstention/comparison analysis because the relevance gate blocked final drafting."
+        ),
     }
 
 
@@ -2036,6 +2246,8 @@ def model_generation_prompt(
     evidence: list[dict[str, Any]],
     diagnostic_count: int,
     support: dict[str, Any],
+    draft_allowed: bool = True,
+    relevance_gate: dict[str, Any] | None = None,
 ) -> str:
     return json.dumps(
         {
@@ -2047,8 +2259,20 @@ def model_generation_prompt(
                 "Do not mention evidence not listed here.",
                 "If evidence is partial, say what is missing.",
                 "Do not claim final correctness or completeness.",
+                (
+                    "The relevance gate allowed drafting; produce a concise cited draft."
+                    if draft_allowed
+                    else "The relevance gate blocked drafting; return an explicit abstention and explain what evidence is missing."
+                ),
             ],
             "support_assessment": support,
+            "relevance_gate": {
+                "draft_allowed": draft_allowed,
+                "status": (relevance_gate or {}).get("status"),
+                "message": (relevance_gate or {}).get("message"),
+                "weak_terms": (relevance_gate or {}).get("weak_terms") or [],
+                "usable_evidence_count": (relevance_gate or {}).get("usable_evidence_count"),
+            },
             "diagnostic_candidate_count_excluded": diagnostic_count,
             "evidence_items": [
                 {
@@ -2161,6 +2385,7 @@ def write_production_telemetry(report: dict[str, Any]) -> None:
     packet = report.get("evidence_packet") or {}
     relevance = report.get("relevance_gate") or {}
     diagnosis = report.get("run_diagnosis") or {}
+    comparison = report.get("model_comparison") or {}
     record = {
         "report_id": "production_workbench_telemetry_event_v1",
         "created_at": report.get("created_at"),
@@ -2180,12 +2405,43 @@ def write_production_telemetry(report: dict[str, Any]) -> None:
         "coverage_gap_count": len(report.get("coverage_gaps") or []),
         "retrieval_degraded": bool((report.get("retrieval") or {}).get("degraded")),
         "retrieval_degradation_flags": (report.get("retrieval") or {}).get("degradation_flags") or [],
+        "model_comparison_status": comparison.get("status"),
+        "model_call_count": comparison.get("call_count", 0),
+        "model_success_count": comparison.get("success_count", 0),
+        "model_primary": comparison.get("primary_model"),
+        "model_comparison": comparison.get("comparison_model"),
+        "model_selected": comparison.get("selected_model"),
         "run_diagnosis_status": diagnosis.get("overall_status"),
         "run_diagnosis_failure_class": diagnosis.get("failure_class"),
         "run_diagnosis_issue_categories": diagnosis.get("issue_categories") or [],
         "boundary": "Local product telemetry only; this is not a human-review label.",
     }
     append_jsonl(settings.reports_dir / "production_workbench_telemetry_v1.jsonl", record)
+    for run in comparison.get("runs") or []:
+        append_jsonl(
+            settings.reports_dir / "production_model_runs_v1.jsonl",
+            {
+                "report_id": "production_model_run_event_v1",
+                "created_at": report.get("created_at"),
+                "session_id": report.get("session_id"),
+                "query": report.get("query"),
+                "mode": report.get("mode"),
+                "status": run.get("status"),
+                "model_role": run.get("model_role"),
+                "call_index": run.get("call_index"),
+                "provider": (run.get("generator") or {}).get("provider"),
+                "model": (run.get("generator") or {}).get("model"),
+                "selected_for_draft": (run.get("generator") or {}).get("model") == comparison.get("selected_model"),
+                "draft_allowed_by_relevance_gate": comparison.get("draft_allowed_by_relevance_gate"),
+                "elapsed_ms": run.get("elapsed_ms"),
+                "input_tokens": run.get("input_tokens"),
+                "output_tokens": run.get("output_tokens"),
+                "citation_count": run.get("citation_count"),
+                "text": run.get("text"),
+                "error": run.get("error"),
+                "boundary": "Model-run telemetry is product analysis data, not a human-review label or model-winner claim.",
+            },
+        )
 
 
 def production_feedback(payload: dict[str, Any]) -> dict[str, Any]:

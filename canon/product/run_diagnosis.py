@@ -367,7 +367,7 @@ def recommended_actions(
         suggested = str(gap.get("suggested_next_query") or "").strip()
         actions.append(f"Run follow-up query: {suggested}" if suggested else str(gap.get("gap") or "Inspect coverage gap."))
     if "generation_failed" in issue_categories:
-        actions.append("Retry generation with the same gated evidence or use the deterministic evidence note.")
+        actions.append("Retry the two-model generation run with the same gated evidence and inspect model_comparison.")
     if not actions:
         actions.append("Inspect cited evidence and source diversity before using the draft.")
     actions.append("Record user feedback separately from authoritative human-review labels.")

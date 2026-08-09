@@ -148,15 +148,21 @@ Ask for evidence:
 Invoke-RestMethod -Method Post http://localhost:8000/v1/evidence-packets -ContentType "application/json" -Body '{"request_id":"req_001","project_id":"my_project","question":"What does this corpus say about grid risk?","mode":"my_topic_v1_corpus","evidence_requirements":{"top_k":10,"include_conflicts":true,"include_source_diversity":true,"include_query_diagnostics":true}}'
 ```
 
-Run the production workbench with Qdrant-backed retrieval and typed model review:
+Run the production workbench with Qdrant-backed retrieval and the default
+two-model generation comparison:
 
 ```powershell
-Invoke-RestMethod -Method Post http://localhost:8000/v1/production/evidence-workbench -ContentType "application/json" -Body '{"query":"What does this corpus say about grid risk?","mode":"my_topic_v1_corpus","retrieval_engine":"model_candidate_pool","candidate_scope":"vector_store","vector_backend":"qdrant","retrieval_provider":"openrouter","retrieval_model":"qwen/qwen3-embedding-8b","reranker_provider":"cohere","reranker_model":"rerank-v4.0-pro","generator_provider":"openrouter","generator_model":"openai/gpt-4.1-mini","run_model_review":true,"model_review_provider":"openrouter","model_review_model":"openai/gpt-4.1-mini","allow_external_model_review":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/production/evidence-workbench -ContentType "application/json" -Body '{"query":"What does this corpus say about grid risk?","mode":"my_topic_v1_corpus","retrieval_engine":"model_candidate_pool","candidate_scope":"vector_store","vector_backend":"qdrant","retrieval_provider":"openrouter","retrieval_model":"qwen/qwen3-embedding-8b","reranker_provider":"cohere","reranker_model":"rerank-v4.0-pro","generator_provider":"openrouter","generator_model":"openai/gpt-4.1-mini","comparison_generator_model":"moonshotai/kimi-k3","model_pair_enabled":true}'
 ```
 
 Hosted retrieval sends query/chunk text to the selected embedding/rerank
-providers. Hosted model review sends relevance-gated snippets to OpenRouter and
-returns typed stance/extraction diagnostics; it is not a human-review label.
+providers. Hosted generation sends relevance-gated snippets to two OpenRouter
+models and stores per-model run rows in
+`reports/production_model_runs_v1.jsonl`. Add `"run_model_review": true`,
+`"model_review_provider": "openrouter"`, `"model_review_model":
+"openai/gpt-4.1-mini"`, and `"allow_external_model_review": true` when you also
+want typed stance/extraction diagnostics. Model comparison and review outputs
+are product analysis data, not human-review labels.
 
 Check whether retrieved evidence visibly covers the frame you asked for:
 

@@ -418,6 +418,20 @@ def render_app() -> str:
               </select>
             </label>
           </div>
+          <div class="row2">
+            <label>
+              Comparison Model
+              <select id="comparisonGeneratorModel">
+                <option value="moonshotai/kimi-k3">Kimi K3</option>
+                <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
+                <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
+                <option value="moonshotai/kimi-k2.7-code">Kimi K2.7 Code</option>
+                <option value="moonshotai/kimi-k2.6">Kimi K2.6</option>
+                <option value="moonshotai/kimi-k2-thinking">Kimi K2 Thinking</option>
+              </select>
+            </label>
+            <label class="checkrow"><input id="modelPairEnabled" type="checkbox" checked> Compare two generation models</label>
+          </div>
           <div class="toggles">
             <label class="checkrow"><input id="suggestExternal" type="checkbox"> External-search suggestions</label>
             <label class="checkrow"><input id="executeExternalSearch" type="checkbox"> OpenAlex online results</label>
@@ -587,6 +601,10 @@ def render_app() -> str:
           <div id="runDiagnosis" class="diagnosis">
             <div class="empty">No run diagnosis yet.</div>
           </div>
+          <h2>Model Comparison</h2>
+          <div id="modelComparison" class="diagnosis">
+            <div class="empty">No model comparison yet.</div>
+          </div>
           <h2>Model Review</h2>
           <div id="modelReview" class="diagnosis">
             <div class="empty">No model review yet.</div>
@@ -679,6 +697,8 @@ def render_app() -> str:
       $("rerankerModel").value = status.recommended_defaults?.reranker_model || "rerank-v4.0-pro";
       $("generatorProvider").value = status.recommended_defaults?.generator_provider || "openrouter";
       $("generatorModel").value = status.recommended_defaults?.generator_model || "openai/gpt-4.1-mini";
+      $("comparisonGeneratorModel").value = status.recommended_defaults?.comparison_generator_model || "moonshotai/kimi-k3";
+      $("modelPairEnabled").checked = status.recommended_defaults?.model_pair_enabled !== false;
       $("modelReviewModel").value = status.recommended_defaults?.model_review_model || "openai/gpt-4.1-mini";
       $("boundaryList").innerHTML = (status.shippable_without_human_review || []).map((item) =>
         `<li>${esc(item)}</li>`
@@ -704,6 +724,7 @@ def render_app() -> str:
       const cards = session.evidence_cards || [];
       $("evidence").innerHTML = cards.length ? cards.map(renderEvidenceCard).join("") : `<div class="empty">No evidence was retrieved.</div>`;
       $("runDiagnosis").innerHTML = renderRunDiagnosis(session.run_diagnosis || {});
+      $("modelComparison").innerHTML = renderModelComparison(session.model_comparison || {});
       $("modelReview").innerHTML = renderModelReview(session.model_review || {});
       $("queryLingo").innerHTML = renderQueryLingo(session.query_lingo || {});
       $("gaps").innerHTML = (session.coverage_gaps || []).map((gap) => `<li>${esc(gap.gap || gap)}</li>`).join("");
@@ -831,6 +852,40 @@ def render_app() -> str:
       <div>${stanceRows || `<div class="empty">No usable stance rows returned.</div>`}</div>`;
     }
 
+    function renderModelComparison(comparison) {
+      if (!comparison.status || comparison.status === "disabled") {
+        return `<div class="empty">${esc(comparison.boundary || "Model comparison disabled.")}</div>`;
+      }
+      const runs = (comparison.runs || []).map((run) => {
+        const generator = run.generator || {};
+        const selected = generator.model === comparison.selected_model ? `<span class="pill">selected</span>` : "";
+        const tone = String(run.status || "").includes("failed") || String(run.status || "").includes("empty") ? "danger" : "";
+        return `<div class="diagnosis-stage">
+          <div class="stage-head">
+            <span class="stage-name">${esc(run.model_role || "")} ${esc(generator.model || "")} ${selected}</span>
+            <span class="stage-status ${tone}">${esc(run.status || "")}</span>
+          </div>
+          <div class="signals">
+            <span><strong>latency_ms:</strong> ${esc(run.elapsed_ms ?? "-")}</span>
+            <span><strong>input_tokens:</strong> ${esc(run.input_tokens ?? "-")}</span>
+            <span><strong>output_tokens:</strong> ${esc(run.output_tokens ?? "-")}</span>
+            <span><strong>citations:</strong> ${esc(run.citation_count ?? 0)}</span>
+          </div>
+          <div class="evidence-meta">${esc(run.error || run.boundary || "")}</div>
+        </div>`;
+      }).join("");
+      return `<div class="banner warn">
+        <strong>${esc(comparison.status)}</strong>: ${esc(comparison.success_count ?? 0)} / ${esc(comparison.call_count ?? 0)} model calls succeeded.
+      </div>
+      <div class="signals">
+        <span><strong>primary:</strong> ${esc(comparison.primary_model || "")}</span>
+        <span><strong>comparison:</strong> ${esc(comparison.comparison_model || "")}</span>
+        <span><strong>selected:</strong> ${esc(comparison.selected_model || "")}</span>
+        <span><strong>stored:</strong> ${esc(comparison.stored_at || "")}</span>
+      </div>
+      <div>${runs || `<div class="empty">No model runs were recorded.</div>`}</div>`;
+    }
+
     function renderSignalValue(value) {
       if (Array.isArray(value)) return value.join(", ") || "-";
       if (value && typeof value === "object") return JSON.stringify(value);
@@ -858,6 +913,8 @@ def render_app() -> str:
           fusion: $("fusion").value,
           generator_provider: $("generatorProvider").value,
           generator_model: $("generatorProvider").value === "openrouter" ? $("generatorModel").value : "",
+          comparison_generator_model: $("generatorProvider").value === "openrouter" ? $("comparisonGeneratorModel").value : "",
+          model_pair_enabled: $("modelPairEnabled").checked,
           run_model_review: $("runModelReview").checked,
           model_review_provider: "openrouter",
           model_review_model: $("modelReviewModel").value,

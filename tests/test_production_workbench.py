@@ -142,6 +142,7 @@ class ProductionWorkbenchTests(unittest.TestCase):
                             "query": "grid risk",
                             "mode": "m",
                             "top_k": 8,
+                            "generator_provider": "deterministic",
                             "suggest_external_expansion": True,
                             "allowed_source_types": ["official"],
                             "max_external_queries": 2,
@@ -241,6 +242,7 @@ class ProductionWorkbenchTests(unittest.TestCase):
                                 "session_id": "prod_external",
                                 "query": "grid risk",
                                 "mode": "m",
+                                "generator_provider": "deterministic",
                                 "execute_external_search": True,
                                 "write_telemetry": False,
                             }
@@ -541,6 +543,87 @@ class ProductionWorkbenchTests(unittest.TestCase):
         self.assertEqual(report["draft_brief"]["generator"]["provider"], "openrouter")
         self.assertEqual(report["draft_brief"]["citations"], [{"citation_id": "C1"}, {"citation_id": "C3"}])
         self.assertIn("[C1]", report["draft_brief"]["text"])
+
+    def test_production_evidence_workbench_defaults_to_two_model_calls_and_logs_runs(self):
+        packet_response = {
+            "status": "complete",
+            "query": "grid risks around AI data center expansion",
+            "mode": "m",
+            "policy": "rag",
+            "evidence_packets": [
+                {
+                    "packet_id": "packet_1",
+                    "supporting_evidence": [
+                        {
+                            "evidence_id": "C1",
+                            "rank": 1,
+                            "title": "Grid Interconnection Note",
+                            "source_name": "Regulator",
+                            "text": "AI data center loads increase grid interconnection pressure.",
+                        }
+                    ],
+                }
+            ],
+            "query_diagnostics": {
+                "matched_terms": ["ai", "data", "center", "grid", "risks"],
+                "weak_terms": [],
+            },
+            "coverage_gaps": [],
+            "external_expansion": {"status": "disabled", "executed": False},
+            "answer_report": {
+                "citations": [{"citation_id": "C1"}],
+                "support_assessment": {
+                    "support_level": "strong",
+                    "query_term_coverage": 1.0,
+                    "covered_focus_terms": ["ai", "data", "center", "grid", "risks"],
+                    "missing_focus_terms": [],
+                },
+            },
+            "contract_validation": {"status": "pass"},
+        }
+        providers = {}
+
+        def provider_factory(provider_name, model):
+            providers[model] = ModelAwareGenerationProvider(model)
+            return providers[model]
+
+        with TemporaryDirectory() as temp_dir:
+            reports_dir = Path(temp_dir)
+            settings = SimpleNamespace(reports_dir=reports_dir)
+            with patch("canon.product.service.load_settings", return_value=settings):
+                with patch("canon.product.service.evidence_packets", return_value=packet_response):
+                    with patch("canon.product.service.get_generation_provider", side_effect=provider_factory) as factory:
+                        report = service.production_evidence_workbench(
+                            {
+                                "session_id": "prod_two_models",
+                                "query": "grid risks around AI data center expansion",
+                                "mode": "m",
+                            }
+                        )
+
+            model_rows = [
+                json.loads(line)
+                for line in (reports_dir / "production_model_runs_v1.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+            telemetry_rows = [
+                json.loads(line)
+                for line in (reports_dir / "production_workbench_telemetry_v1.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(factory.call_count, 2)
+        self.assertEqual(
+            [call.args[1] for call in factory.call_args_list],
+            ["openai/gpt-4.1-mini", "moonshotai/kimi-k3"],
+        )
+        self.assertEqual(report["draft_brief"]["status"], "model_draft_ready")
+        self.assertEqual(report["model_comparison"]["status"], "model_pair_complete")
+        self.assertEqual(report["model_comparison"]["call_count"], 2)
+        self.assertEqual(report["model_comparison"]["success_count"], 2)
+        self.assertEqual(report["model_comparison"]["selected_model"], "openai/gpt-4.1-mini")
+        self.assertEqual([row["model"] for row in model_rows], ["openai/gpt-4.1-mini", "moonshotai/kimi-k3"])
+        self.assertTrue(all(row["text"] for row in model_rows))
+        self.assertEqual(telemetry_rows[0]["model_call_count"], 2)
+        self.assertEqual(telemetry_rows[0]["model_success_count"], 2)
 
     def test_production_evidence_workbench_can_use_model_candidate_pool_and_reranker(self):
         candidate_report = {
@@ -1061,6 +1144,19 @@ class FakeGenerationProvider:
     def generate(self, prompt):
         self.prompt = prompt
         return FakeGenerationResult()
+
+
+class ModelAwareGenerationProvider:
+    def __init__(self, model: str):
+        self.model = model
+        self.prompt = ""
+
+    def generate(self, prompt):
+        self.prompt = prompt
+        return FakeGenerationResult(
+            model=self.model,
+            text=f"{self.model} found grid interconnection pressure in the evidence [C1].",
+        )
 
 
 class EmptyGenerationProvider:
