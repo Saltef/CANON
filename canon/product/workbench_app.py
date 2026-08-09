@@ -58,6 +58,29 @@ def render_app() -> str:
     textarea { min-height: 104px; resize: vertical; }
     label { display: grid; gap: 6px; font-weight: 700; color: var(--ink); }
     small { color: var(--muted); font-weight: 400; }
+    .help {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 400;
+      line-height: 1.35;
+    }
+    .recommendation {
+      color: #10483f;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .guide-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding-left: 20px;
+    }
+    .guide-list li { padding-left: 2px; }
+    .mini-note {
+      color: var(--muted);
+      font-size: 13px;
+      margin: -4px 0 2px;
+    }
     button:focus-visible,
     input:focus-visible,
     select:focus-visible,
@@ -152,7 +175,7 @@ def render_app() -> str:
     .advanced > .corpus-result {
       margin: 0 12px 12px;
     }
-    .row2 { display: grid; grid-template-columns: 1fr 110px; gap: 10px; align-items: end; }
+    .row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
     .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: end; }
     .toggles { display: grid; gap: 8px; }
     .checkrow { display: flex; gap: 8px; align-items: center; font-weight: 400; color: var(--ink); }
@@ -338,172 +361,242 @@ def render_app() -> str:
 
   <main>
     <aside>
+      <details class="advanced">
+        <summary>Quick Guide</summary>
+        <ol class="guide-list">
+          <li>Choose the corpus you want to search.</li>
+          <li>Ask one focused question in ordinary language.</li>
+          <li>Start with the recommended settings unless the evidence looks thin.</li>
+          <li>Read the evidence cards before trusting the draft.</li>
+          <li>Use Diagnostics when the note says evidence is weak, missing, or mixed.</li>
+        </ol>
+      </details>
+
       <section>
         <h2>Ask</h2>
         <form id="queryForm" class="formgrid">
           <label>
             Question
             <textarea id="query" required>Radioiodine treatment of non-toxic multinodular goitre reduces thyroid volume.</textarea>
+            <small class="help">Ask one specific question or claim. Avoid very broad prompts until you know the corpus covers the topic.</small>
+            <small class="recommendation">Recommended: one sentence, with the key people, place, method, or outcome named.</small>
           </label>
           <div class="row2">
             <label>
               Corpus
               <select id="mode"></select>
+              <small class="help">The document collection CANON will search.</small>
+              <small class="recommendation">Recommended: use your own indexed corpus; use beir_scifact_mini only for quick testing.</small>
             </label>
             <label>
               Reading Depth
               <input id="topK" type="number" min="1" max="50" value="12">
+              <small class="help">How many evidence items are shown and considered for the note.</small>
+              <small class="recommendation">Recommended: 12 for normal work; 5 for quick checks; 20+ for difficult reviews.</small>
             </label>
+          </div>
+          <div class="buttonrow">
+            <button id="runButton" type="submit">Run Search</button>
+            <button class="secondary" id="sampleButton" type="button">Use Sample</button>
           </div>
           <details class="advanced">
             <summary>Advanced settings</summary>
             <div class="advanced-body">
+              <p class="mini-note">These defaults are tuned for hosted Qdrant retrieval plus two OpenRouter generation calls. Change them only when you are testing a failure mode or comparing models.</p>
               <label>
                 Query Mode
                 <select id="freedomLevel">
-                  <option value="balanced">Balanced</option>
+                  <option value="balanced">Balanced - recommended</option>
                   <option value="strict">Strict</option>
                   <option value="exploratory">Exploratory</option>
                 </select>
+                <small class="help">Controls how tightly CANON interprets the wording of your question.</small>
+                <small class="recommendation">Recommended: Balanced. Use Strict for exact claim checking; Exploratory when you are still learning the vocabulary.</small>
               </label>
               <label>
                 Retrieval Engine
                 <select id="retrievalEngine">
-                  <option value="model_candidate_pool">Model candidate pool</option>
+                  <option value="model_candidate_pool">Model candidate pool - recommended</option>
                   <option value="canon_synthesis">CANON synthesis retriever</option>
                 </select>
+                <small class="help">Chooses the retrieval path before drafting.</small>
+                <small class="recommendation">Recommended: Model candidate pool for production-like search. CANON synthesis is useful for simpler local comparisons.</small>
               </label>
               <div class="row2">
                 <label>
                   Candidate Scope
                   <select id="candidateScope">
-                    <option value="vector_store">Qdrant/ANN index</option>
+                    <option value="vector_store">Qdrant/ANN index - recommended</option>
                     <option value="lexical_window">Fast full-corpus scan</option>
                     <option value="full_embedding_store">Full semantic index</option>
                   </select>
+                  <small class="help">Where candidates come from before reranking.</small>
+                  <small class="recommendation">Recommended: Qdrant/ANN index after corpus setup. Use lexical scan when Qdrant is unavailable.</small>
                 </label>
                 <label>
                   Candidate K
                   <input id="candidateK" type="number" min="1" max="100" value="12">
+                  <small class="help">How many candidate chunks are gathered before final evidence selection.</small>
+                  <small class="recommendation">Recommended: 12 for interactive use; raise it when key evidence is missing.</small>
                 </label>
               </div>
               <label>
                 Lexical Window
                 <input id="lexicalWindowK" type="number" min="12" max="500" value="96">
+                <small class="help">How many lexical matches to inspect when the fallback scan is used.</small>
+                <small class="recommendation">Recommended: 96. Increase only for broad corpora or hard-to-match wording.</small>
               </label>
               <div class="row3">
                 <label>
                   Embeddings
                   <select id="retrievalProvider">
-                    <option value="openrouter">OpenRouter</option>
+                    <option value="openrouter">OpenRouter - recommended</option>
                     <option value="sentence-transformers">Local BGE</option>
                     <option value="cohere">Cohere</option>
                     <option value="local">Local hashed</option>
                   </select>
+                  <small class="help">The service used to turn text into semantic vectors.</small>
+                  <small class="recommendation">Recommended: OpenRouter for hosted alpha. Local hashed is only a fallback/control.</small>
                 </label>
                 <label>
                   Embedding Model
                   <select id="retrievalModel">
-                    <option value="qwen/qwen3-embedding-8b">Qwen3 embedding 8B</option>
+                    <option value="qwen/qwen3-embedding-8b">Qwen3 embedding 8B - recommended</option>
                     <option value="baai/bge-m3">BGE-M3</option>
                     <option value="openai/text-embedding-3-small">text-embedding-3-small via OpenRouter</option>
                     <option value="BAAI/bge-small-en-v1.5">BGE small local</option>
                     <option value="embed-v4.0">Cohere embed v4</option>
                     <option value="hashed-semantic-v1">Hashed lexical fallback</option>
                   </select>
+                  <small class="help">The embedding model used for semantic search and Qdrant indexing compatibility.</small>
+                  <small class="recommendation">Recommended: Qwen3 embedding 8B. Rebuild the vector index if you change this.</small>
                 </label>
                 <label>
                   Fusion
                   <select id="fusion">
-                    <option value="weighted_bm25_dense">Weighted BM25 + dense</option>
+                    <option value="weighted_bm25_dense">Weighted BM25 + dense - recommended</option>
                     <option value="union">Union</option>
                   </select>
+                  <small class="help">Combines keyword and semantic retrieval before reranking.</small>
+                  <small class="recommendation">Recommended: Weighted BM25 + dense for mixed technical and plain-language queries.</small>
                 </label>
               </div>
               <div class="row2">
                 <label>
                   Reranker
                   <select id="rerankerProvider">
-                    <option value="cohere">Cohere</option>
+                    <option value="cohere">Cohere - recommended</option>
                     <option value="openrouter">OpenRouter Cohere</option>
                     <option value="heuristic">Heuristic</option>
                   </select>
+                  <small class="help">Reorders candidate evidence after initial retrieval.</small>
+                  <small class="recommendation">Recommended: Cohere for quality. Heuristic is a no-cost fallback, not the best result path.</small>
                 </label>
                 <label>
                   Reranker Model
                   <select id="rerankerModel">
-                    <option value="rerank-v4.0-pro">Cohere rerank v4 pro</option>
+                    <option value="rerank-v4.0-pro">Cohere rerank v4 pro - recommended</option>
                     <option value="cohere/rerank-v3.5">OpenRouter Cohere rerank v3.5</option>
                     <option value="lexical-overlap-rerank-v1">Lexical overlap</option>
                   </select>
+                  <small class="help">The model used for reranking retrieved snippets.</small>
+                  <small class="recommendation">Recommended: rerank-v4.0-pro when Cohere is configured.</small>
                 </label>
               </div>
               <div class="row2">
                 <label>
                   Generator
                   <select id="generatorProvider">
-                    <option value="openrouter">OpenRouter</option>
+                    <option value="openrouter">OpenRouter - recommended</option>
                     <option value="deterministic">Deterministic</option>
                   </select>
+                  <small class="help">The service used to write the draft note from retrieved evidence.</small>
+                  <small class="recommendation">Recommended: OpenRouter. Deterministic mode is only for debugging without model calls.</small>
                 </label>
                 <label>
                   Model
                   <select id="generatorModel">
-                    <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
+                    <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter - recommended</option>
                     <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
                     <option value="moonshotai/kimi-k3">Kimi K3</option>
                     <option value="moonshotai/kimi-k2.7-code">Kimi K2.7 Code</option>
                     <option value="moonshotai/kimi-k2.6">Kimi K2.6</option>
                     <option value="moonshotai/kimi-k2-thinking">Kimi K2 Thinking</option>
                   </select>
+                  <small class="help">The primary model selected for the visible draft when it succeeds.</small>
+                  <small class="recommendation">Recommended: GPT-4.1 mini for quick, concise first drafts.</small>
                 </label>
               </div>
               <div class="row2">
                 <label>
                   Comparison Model
                   <select id="comparisonGeneratorModel">
-                    <option value="moonshotai/kimi-k3">Kimi K3</option>
+                    <option value="moonshotai/kimi-k3">Kimi K3 - recommended</option>
                     <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
                     <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
                     <option value="moonshotai/kimi-k2.7-code">Kimi K2.7 Code</option>
                     <option value="moonshotai/kimi-k2.6">Kimi K2.6</option>
                     <option value="moonshotai/kimi-k2-thinking">Kimi K2 Thinking</option>
                   </select>
+                  <small class="help">A second model runs on the same evidence so you can compare phrasing, abstention, and latency.</small>
+                  <small class="recommendation">Recommended: Kimi K3 as an independent comparison model.</small>
                 </label>
-                <label class="checkrow"><input id="modelPairEnabled" type="checkbox" checked> Compare two generation models</label>
+                <label>
+                  <span class="checkrow"><input id="modelPairEnabled" type="checkbox" checked> Compare two generation models</span>
+                  <small class="help">Runs both the primary and comparison model and stores both outputs for analysis.</small>
+                  <small class="recommendation">Recommended: on. Turn off only when reducing cost or latency.</small>
+                </label>
               </div>
               <div class="toggles">
-                <label class="checkrow"><input id="suggestExternal" type="checkbox"> External-search suggestions</label>
-                <label class="checkrow"><input id="executeExternalSearch" type="checkbox"> OpenAlex online results</label>
-                <label class="checkrow"><input id="runModelReview" type="checkbox"> Model stance review</label>
-                <label class="checkrow"><input id="writeTelemetry" type="checkbox" checked> Local telemetry</label>
+                <label>
+                  <span class="checkrow"><input id="suggestExternal" type="checkbox"> External-search suggestions</span>
+                  <small class="help">Suggests online searches when the corpus looks incomplete.</small>
+                  <small class="recommendation">Recommended: off for first pass; on when coverage gaps are expected.</small>
+                </label>
+                <label>
+                  <span class="checkrow"><input id="executeExternalSearch" type="checkbox"> OpenAlex online results</span>
+                  <small class="help">Adds clearly marked online results alongside corpus evidence.</small>
+                  <small class="recommendation">Recommended: off when validating your own corpus; on for discovery work.</small>
+                </label>
+                <label>
+                  <span class="checkrow"><input id="runModelReview" type="checkbox"> Model stance review</span>
+                  <small class="help">Asks a model to classify stance and extraction issues over the retrieved evidence.</small>
+                  <small class="recommendation">Recommended: off for quick searches; on before sharing or acting on a note.</small>
+                </label>
+                <label>
+                  <span class="checkrow"><input id="writeTelemetry" type="checkbox" checked> Local telemetry</span>
+                  <small class="help">Stores local run records, model outputs, timing, and failure types for later analysis.</small>
+                  <small class="recommendation">Recommended: on. Turn off only for throwaway experiments.</small>
+                </label>
               </div>
               <div class="row2">
                 <label>
                   Review Model
                   <select id="modelReviewModel">
-                    <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
+                    <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter - recommended</option>
                     <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
                     <option value="moonshotai/kimi-k3">Kimi K3</option>
                   </select>
+                  <small class="help">The model used only when Model stance review is enabled.</small>
+                  <small class="recommendation">Recommended: GPT-4.1 mini for fast review notes.</small>
                 </label>
                 <label>
                   Vector Backend
                   <select id="vectorBackend">
-                    <option value="qdrant">Qdrant</option>
+                    <option value="qdrant">Qdrant - recommended</option>
                   </select>
+                  <small class="help">The hosted vector database used for indexed retrieval.</small>
+                  <small class="recommendation">Recommended: Qdrant for hosted alpha; the processed corpus remains the source of truth.</small>
                 </label>
               </div>
               <label>
                 Online Results
                 <input id="maxExternalResults" type="number" min="1" max="10" value="5">
+                <small class="help">Maximum number of online items to add when OpenAlex online results are enabled.</small>
+                <small class="recommendation">Recommended: 5 so online results help without crowding corpus evidence.</small>
               </label>
             </div>
           </details>
-          <div class="buttonrow">
-            <button id="runButton" type="submit">Run Search</button>
-            <button class="secondary" id="sampleButton" type="button">Use Sample</button>
-          </div>
         </form>
       </section>
 
@@ -513,47 +606,77 @@ def render_app() -> str:
           <label>
             Local Path
             <input id="inputPath" type="text" placeholder="C:\\path\\to\\docs or data/my_docs">
+            <small class="help">Folder or file path containing the documents you want to research.</small>
+            <small class="recommendation">Recommended: one project folder per research topic.</small>
           </label>
           <div class="row2">
             <label>
               Mode ID
               <input id="corpusMode" type="text" placeholder="my_topic_v1">
+              <small class="help">Short name used to run searches against this corpus.</small>
+              <small class="recommendation">Recommended: lowercase words with underscores, such as grid_risk_v1.</small>
             </label>
             <label>
               Corpus ID
               <input id="corpusId" type="text" placeholder="my_topic_v1_corpus">
+              <small class="help">Internal storage name for the processed document collection.</small>
+              <small class="recommendation">Recommended: use the mode ID plus _corpus.</small>
             </label>
           </div>
           <div class="row2">
             <label>
               Domain
               <input id="corpusDomain" type="text" placeholder="optional">
+              <small class="help">Optional topic label attached to processed sources.</small>
+              <small class="recommendation">Recommended: fill this when the project has a clear domain.</small>
             </label>
             <label>
               Source Name
               <input id="sourceName" type="text" placeholder="optional">
+              <small class="help">Optional source label used when documents come from one collection or client folder.</small>
+              <small class="recommendation">Recommended: leave blank for mixed folders.</small>
             </label>
           </div>
-          <label class="checkrow"><input id="profileOnly" type="checkbox"> Profile only</label>
+          <label>
+            <span class="checkrow"><input id="profileOnly" type="checkbox"> Profile only</span>
+            <small class="help">Checks what CANON can ingest without building or indexing the corpus.</small>
+            <small class="recommendation">Recommended: off when you are ready to search; on for a dry run.</small>
+          </label>
           <div class="toggles">
-            <label class="checkrow"><input id="indexVectorStore" type="checkbox" checked> Refresh vector index</label>
-            <label class="checkrow"><input id="deleteStaleVectors" type="checkbox" checked> Remove stale vectors</label>
-            <label class="checkrow"><input id="forceRefresh" type="checkbox"> Force refresh</label>
+            <label>
+              <span class="checkrow"><input id="indexVectorStore" type="checkbox" checked> Refresh vector index</span>
+              <small class="help">Uploads new/changed chunks to Qdrant after processing documents.</small>
+              <small class="recommendation">Recommended: on for normal use.</small>
+            </label>
+            <label>
+              <span class="checkrow"><input id="deleteStaleVectors" type="checkbox" checked> Remove stale vectors</span>
+              <small class="help">Removes index entries for files that were deleted or changed.</small>
+              <small class="recommendation">Recommended: on to keep Qdrant aligned with your folder.</small>
+            </label>
+            <label>
+              <span class="checkrow"><input id="forceRefresh" type="checkbox"> Force refresh</span>
+              <small class="help">Rebuilds even when file hashes look unchanged.</small>
+              <small class="recommendation">Recommended: off; turn on after changing embedding model or chunking settings.</small>
+            </label>
           </div>
           <div class="row2">
             <label>
               Index Backend
               <select id="indexVectorBackend">
-                <option value="qdrant">Qdrant</option>
+                <option value="qdrant">Qdrant - recommended</option>
               </select>
+              <small class="help">Where semantic vectors are stored for search.</small>
+              <small class="recommendation">Recommended: Qdrant for hosted alpha.</small>
             </label>
             <label>
               Index Model
               <select id="indexEmbeddingModel">
-                <option value="qwen/qwen3-embedding-8b">Qwen3 embedding 8B</option>
+                <option value="qwen/qwen3-embedding-8b">Qwen3 embedding 8B - recommended</option>
                 <option value="baai/bge-m3">BGE-M3</option>
                 <option value="openai/text-embedding-3-small">text-embedding-3-small via OpenRouter</option>
               </select>
+              <small class="help">Embedding model used when refreshing the vector index.</small>
+              <small class="recommendation">Recommended: match the search embedding model, usually Qwen3 embedding 8B.</small>
             </label>
           </div>
           <div class="buttonrow">
@@ -566,6 +689,7 @@ def render_app() -> str:
 
       <details class="advanced">
         <summary>Boundary</summary>
+        <p class="mini-note">Use this to remind yourself what the system can safely do without human review.</p>
         <ul class="list" id="boundaryList"></ul>
       </details>
 
@@ -582,6 +706,8 @@ def render_app() -> str:
               <option value="2">2</option>
               <option value="1">1 - not useful</option>
             </select>
+            <small class="help">Your usefulness score for the run.</small>
+            <small class="recommendation">Recommended: rate after checking the evidence cards.</small>
           </label>
           <label>
             Type
@@ -592,10 +718,14 @@ def render_app() -> str:
               <option value="citation_issue">Citation issue</option>
               <option value="query_needs_refinement">Query needs refinement</option>
             </select>
+            <small class="help">The main category of feedback for this run.</small>
+            <small class="recommendation">Recommended: choose the most concrete failure type you noticed.</small>
           </label>
           <label>
             Note
             <textarea id="feedbackComment" placeholder="What worked or failed?"></textarea>
+            <small class="help">Short free-text note for later analysis.</small>
+            <small class="recommendation">Recommended: mention missing sources, wrong evidence, or useful phrasing.</small>
           </label>
           <button class="secondary" id="feedbackButton" type="submit" disabled>Save Feedback</button>
         </form>
