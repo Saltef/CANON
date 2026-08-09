@@ -66,8 +66,10 @@ class ProductReadinessTests(unittest.TestCase):
         self.assertIn("POST /v1/production/corpus-refresh", current)
         self.assertIn("GET /v1/routes", current)
         self.assertIn("POST /v1/stage2-synthesis", current)
-        self.assertNotIn("POST /v1/intelligence-brief/evaluate", current)
-        self.assertNotIn("POST /v1/alert-digest/evaluate", current)
+        self.assertIn("POST /v1/intelligence-brief", current)
+        self.assertIn("POST /v1/intelligence-brief/evaluate", current)
+        self.assertIn("POST /v1/alert-digest/evaluate", current)
+        self.assertIn("POST /v1/intelligence-review/import-csv", current)
 
     def test_release_console_scripts_are_registered(self):
         pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))

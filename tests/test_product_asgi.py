@@ -125,6 +125,98 @@ class ProductAsgiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         paths = {route["path"] for route in response.json()["routes"]}
         self.assertIn("/v1/production/corpus-refresh", paths)
+        self.assertIn("/v1/intelligence-brief", paths)
+        self.assertIn("/v1/intelligence-brief/evaluate", paths)
+        self.assertIn("/v1/alert-digest/evaluate", paths)
+        self.assertIn("/v1/intelligence-review/import-csv", paths)
+        self.assertIn("/v1/summary", paths)
+        self.assertTrue(all(route.get("description") for route in response.json()["routes"]))
+
+    def test_asgi_route_metadata_matches_registered_surface(self):
+        try:
+            from fastapi.testclient import TestClient
+        except ImportError:
+            self.skipTest("fastapi serve extra is not installed")
+
+        with TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "ops.jsonl"
+            try:
+                app = create_app(max_concurrency=1, max_queue_depth=1, log_path=log_path)
+                with TestClient(app) as client:
+                    response = client.get("/v1/routes")
+            finally:
+                close_json_logging(log_path)
+
+        documented = {
+            (route["method"], route["path"])
+            for route in response.json()["routes"]
+        }
+        registered = {
+            (method, route.path)
+            for route in app.routes
+            for method in getattr(route, "methods", set())
+            if method in {"GET", "POST"}
+        }
+        missing = documented - registered
+        self.assertEqual(missing, set())
+
+    def test_asgi_serves_intelligence_review_routes(self):
+        try:
+            from fastapi.testclient import TestClient
+        except ImportError:
+            self.skipTest("fastapi serve extra is not installed")
+
+        with TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "ops.jsonl"
+            try:
+                app = create_app(max_concurrency=1, max_queue_depth=1, log_path=log_path)
+                with patch(
+                    "canon.product.asgi.service.intelligence_brief",
+                    return_value={"status": "ready_for_human_review"},
+                ) as intelligence_brief:
+                    with patch(
+                        "canon.product.asgi.service.intelligence_review_import_csv",
+                        return_value={"status": "imported"},
+                    ) as import_csv:
+                        with TestClient(app) as client:
+                            brief = client.post("/v1/intelligence-brief", json={"query": "grid risk"})
+                            imported = client.post(
+                                "/v1/intelligence-review/import-csv",
+                                json={"records_path": "reports/tasks.json", "csv_path": "reports/tasks.csv"},
+                            )
+            finally:
+                close_json_logging(log_path)
+
+        self.assertEqual(brief.status_code, 200)
+        self.assertEqual(brief.json()["status"], "ready_for_human_review")
+        self.assertEqual(imported.status_code, 200)
+        self.assertEqual(imported.json()["status"], "imported")
+        intelligence_brief.assert_called_once_with({"query": "grid risk", "request_id": brief.json()["request_id"]})
+        import_csv.assert_called_once()
+
+    def test_asgi_serves_summary_get_route(self):
+        try:
+            from fastapi.testclient import TestClient
+        except ImportError:
+            self.skipTest("fastapi serve extra is not installed")
+
+        with TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "ops.jsonl"
+            try:
+                app = create_app(max_concurrency=1, max_queue_depth=1, log_path=log_path)
+                with patch(
+                    "canon.product.asgi.service.product_summary",
+                    return_value={"status": "ready", "mode": "demo"},
+                ) as product_summary:
+                    with TestClient(app) as client:
+                        response = client.get("/v1/summary?mode=demo", headers={"X-Request-ID": "req-summary"})
+            finally:
+                close_json_logging(log_path)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ready")
+        self.assertEqual(response.json()["request_id"], "req-summary")
+        product_summary.assert_called_once_with("demo")
 
     def test_auth_keeps_health_public_and_protects_app(self):
         try:

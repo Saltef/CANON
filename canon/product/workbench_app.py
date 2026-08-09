@@ -10,20 +10,26 @@ def render_app() -> str:
   <title>CANON Evidence Discovery</title>
   <style>
     :root {
-      --bg: #f4f6f2;
+      --bg: #f6f7f4;
       --surface: #ffffff;
+      --surface-alt: #fbfcfa;
       --ink: #18201d;
       --muted: #59645f;
       --line: #d7ded8;
       --accent: #19675a;
+      --accent-strong: #10483f;
       --accent-soft: #dcefeb;
+      --blue: #2f5597;
+      --blue-soft: #e8eef8;
       --amber: #8a5a10;
       --amber-soft: #fff3d8;
       --red: #a33b2f;
       --red-soft: #fde9e4;
       --focus: #2d6cdf;
+      --shadow: 0 12px 32px rgba(22, 31, 28, 0.08);
     }
     * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
       min-height: 100vh;
@@ -38,13 +44,19 @@ def render_app() -> str:
       border: 1px solid transparent;
       background: var(--accent);
       color: #fff;
-      min-height: 44px;
-      padding: 0 16px;
+      min-height: 48px;
+      padding: 0 18px;
       border-radius: 6px;
       cursor: pointer;
+      font-weight: 800;
+      transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
     }
+    button:hover:not(:disabled) { background: var(--accent-strong); box-shadow: 0 6px 16px rgba(25, 103, 90, 0.18); }
+    button:active:not(:disabled) { transform: translateY(1px); }
     button.secondary { background: var(--surface); color: var(--accent); border-color: var(--accent); }
-    button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+    button.secondary:hover:not(:disabled),
+    button.ghost:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-strong); box-shadow: none; }
+    button.ghost { background: transparent; color: var(--ink); border-color: var(--line); font-weight: 700; }
     button:disabled { opacity: 0.55; cursor: wait; }
     input, select, textarea {
       width: 100%;
@@ -52,11 +64,11 @@ def render_app() -> str:
       border-radius: 6px;
       background: #fff;
       color: var(--ink);
-      padding: 10px 11px;
-      min-height: 44px;
+      padding: 11px 12px;
+      min-height: 48px;
     }
-    textarea { min-height: 104px; resize: vertical; }
-    label { display: grid; gap: 6px; font-weight: 700; color: var(--ink); }
+    textarea { min-height: 118px; resize: vertical; }
+    label { display: grid; gap: 6px; font-weight: 700; color: var(--ink); min-width: 0; }
     small { color: var(--muted); font-weight: 400; }
     .help {
       color: var(--muted);
@@ -92,34 +104,71 @@ def render_app() -> str:
     header {
       border-bottom: 1px solid var(--line);
       background: var(--surface);
+      box-shadow: 0 2px 18px rgba(24, 32, 29, 0.04);
     }
     .topbar {
       max-width: 1280px;
       margin: 0 auto;
-      padding: 14px 20px;
+      padding: 18px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 16px;
     }
-    .brand { display: flex; gap: 12px; align-items: center; min-width: 240px; }
+    .brand { display: flex; gap: 14px; align-items: center; min-width: 240px; }
     .mark {
-      width: 34px;
-      height: 34px;
+      width: 42px;
+      height: 42px;
       border-radius: 7px;
-      background: linear-gradient(135deg, #19675a, #b78b21);
+      background: var(--accent);
       color: #fff;
       display: grid;
       place-items: center;
       font-weight: 800;
+      box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12);
     }
-    .brand h1 { font-size: 21px; margin: 0; letter-spacing: 0; }
+    .brand h1 { font-size: 25px; margin: 0; letter-spacing: 0; line-height: 1.1; }
     .brand p {
-      margin: 1px 0 0;
+      margin: 4px 0 0;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 15px;
       max-width: 760px;
     }
+    .workflow-strip {
+      max-width: 1280px;
+      margin: 14px auto 0;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .workflow-step {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      min-height: 62px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 10px 12px;
+      box-shadow: 0 6px 18px rgba(22, 31, 28, 0.04);
+    }
+    .workflow-step > span,
+    .step-badge {
+      flex: 0 0 auto;
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      border: 1px solid #bdddd6;
+      font-weight: 900;
+      font-size: 14px;
+    }
+    .workflow-step strong { display: block; line-height: 1.2; }
+    .workflow-step small { display: block; margin-top: 2px; line-height: 1.25; }
     .pill {
       display: inline-flex;
       align-items: center;
@@ -139,32 +188,54 @@ def render_app() -> str:
       margin: 0 auto;
       padding: 18px 20px 28px;
       display: grid;
-      grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
-      gap: 18px;
+      grid-template-columns: minmax(330px, 410px) minmax(0, 1fr);
+      gap: 20px;
       align-items: start;
+      min-width: 0;
     }
     aside, .workspace {
       display: grid;
       gap: 14px;
+      min-width: 0;
     }
+    aside { position: sticky; top: 14px; }
     section, .panel {
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 14px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      min-width: 0;
     }
-    h2 { margin: 0 0 10px; font-size: 17px; letter-spacing: 0; }
+    h2 { margin: 0 0 10px; font-size: 18px; letter-spacing: 0; line-height: 1.25; }
     h3 { margin: 0 0 8px; font-size: 15px; letter-spacing: 0; }
-    .formgrid { display: grid; gap: 12px; }
+    .section-head {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+      min-width: 0;
+    }
+    .section-head > div { min-width: 0; }
+    .section-head h2 { margin-bottom: 3px; }
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.35;
+    }
+    .formgrid { display: grid; gap: 14px; min-width: 0; }
     .advanced {
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: #fbfcfa;
+      background: var(--surface);
       padding: 0;
+      box-shadow: 0 8px 24px rgba(22, 31, 28, 0.05);
+      min-width: 0;
     }
     .advanced summary {
       min-height: 46px;
-      padding: 10px 12px;
+      padding: 11px 13px;
       cursor: pointer;
       font-weight: 800;
       color: var(--ink);
@@ -194,11 +265,17 @@ def render_app() -> str:
       min-height: 76px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 10px;
-      background: #fbfcfa;
+      padding: 12px;
+      background: var(--surface-alt);
+      min-width: 0;
     }
-    .metric span { display: block; color: var(--muted); font-size: 12px; }
-    .metric strong { display: block; margin-top: 4px; font-size: 20px; }
+    .metric span { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .metric strong { display: block; margin-top: 4px; font-size: 20px; overflow-wrap: anywhere; line-height: 1.2; }
+    .result-summary {
+      color: var(--muted);
+      margin: -4px 0 14px;
+      font-size: 14px;
+    }
     .split {
       display: grid;
       grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
@@ -207,6 +284,10 @@ def render_app() -> str:
     }
     .draft {
       min-height: 180px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--surface-alt);
       white-space: pre-wrap;
     }
     .plain-summary {
@@ -219,6 +300,7 @@ def render_app() -> str:
       border-radius: 8px;
       padding: 12px;
       background: #fff;
+      box-shadow: 0 6px 18px rgba(22, 31, 28, 0.04);
     }
     .evidence-head {
       display: flex;
@@ -237,7 +319,7 @@ def render_app() -> str:
       border: 1px dashed var(--line);
       border-radius: 8px;
       padding: 18px;
-      background: #fbfcfa;
+      background: var(--surface-alt);
     }
     .banner {
       border: 1px solid var(--line);
@@ -245,7 +327,7 @@ def render_app() -> str:
       border-radius: 8px;
       padding: 12px 14px;
       margin-bottom: 14px;
-      background: #fbfcfa;
+      background: var(--surface-alt);
       color: var(--ink);
     }
     .banner.warn { border-left-color: var(--amber); background: var(--amber-soft); }
@@ -259,7 +341,7 @@ def render_app() -> str:
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 10px;
-      background: #fbfcfa;
+      background: var(--surface-alt);
     }
     .stage-head {
       display: flex;
@@ -299,19 +381,21 @@ def render_app() -> str:
       font-size: 12px;
       white-space: pre-wrap;
     }
-    .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin: -4px -4px 12px; padding: 0 4px; }
+    .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin: -4px -4px 14px; padding: 0 4px; overflow-x: auto; }
     .tab {
       color: var(--muted);
       background: transparent;
       border: 0;
       border-radius: 0;
-      min-height: 38px;
-      padding: 0 10px;
+      min-height: 42px;
+      padding: 0 12px;
+      white-space: nowrap;
     }
     .tab.active {
       color: var(--accent);
       border-bottom: 3px solid var(--accent);
     }
+    .tab:hover:not(:disabled) { box-shadow: none; background: var(--surface-alt); }
     .hidden { display: none; }
     .toast {
       position: fixed;
@@ -335,8 +419,10 @@ def render_app() -> str:
     }
     @media (max-width: 980px) {
       main { grid-template-columns: 1fr; }
+      aside { position: static; }
       .split { grid-template-columns: 1fr; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .workflow-strip { grid-template-columns: 1fr; }
       .topbar { align-items: flex-start; flex-direction: column; }
     }
     @media (max-width: 560px) {
@@ -359,6 +445,21 @@ def render_app() -> str:
     </div>
   </header>
 
+  <div class="workflow-strip" aria-label="CANON workflow">
+    <div class="workflow-step">
+      <span>1</span>
+      <div><strong>Ask</strong><small>Use one focused research question.</small></div>
+    </div>
+    <div class="workflow-step">
+      <span>2</span>
+      <div><strong>Search</strong><small>Retrieve, rerank, and compare models.</small></div>
+    </div>
+    <div class="workflow-step">
+      <span>3</span>
+      <div><strong>Inspect</strong><small>Read evidence before trusting the note.</small></div>
+    </div>
+  </div>
+
   <main>
     <aside>
       <details class="advanced">
@@ -373,7 +474,13 @@ def render_app() -> str:
       </details>
 
       <section>
-        <h2>Ask</h2>
+        <div class="section-head">
+          <span class="step-badge">1</span>
+          <div>
+            <h2>Ask CANON</h2>
+            <p>Choose a corpus, ask one question, and keep the recommended settings for the first pass.</p>
+          </div>
+        </div>
         <form id="queryForm" class="formgrid">
           <label>
             Question
@@ -734,6 +841,13 @@ def render_app() -> str:
 
     <div class="workspace">
       <section>
+        <div class="section-head">
+          <span class="step-badge">2</span>
+          <div>
+            <h2>Run Overview</h2>
+            <p id="resultSummary">Results will appear here after CANON searches the selected corpus.</p>
+          </div>
+        </div>
         <div class="metrics">
           <div class="metric"><span>Status</span><strong id="metricStatus">Idle</strong></div>
           <div class="metric"><span>Evidence</span><strong id="metricEvidence">0</strong></div>
@@ -744,6 +858,13 @@ def render_app() -> str:
       </section>
 
       <section>
+        <div class="section-head">
+          <span class="step-badge">3</span>
+          <div>
+            <h2>Inspect The Answer</h2>
+            <p>Start with the draft, then check the cited evidence and diagnostics before using the result.</p>
+          </div>
+        </div>
         <div class="tabs">
           <button class="tab active" data-tab="answer" type="button">Draft</button>
           <button class="tab" data-tab="evidence" type="button">Evidence</button>
@@ -838,6 +959,9 @@ def render_app() -> str:
       $("runButton").disabled = isBusy;
       $("runButton").setAttribute("aria-busy", isBusy ? "true" : "false");
       $("runButton").textContent = isBusy ? "Searching..." : "Run Search";
+      if (isBusy) {
+        $("resultSummary").textContent = "Searching the corpus, reranking evidence, and calling the configured models.";
+      }
     }
 
     function setCorpusBusy(isBusy) {
@@ -882,6 +1006,7 @@ def render_app() -> str:
       $("metricSupport").textContent = gate.status || packet.support_level || "-";
       $("metricModels").textContent = modelMetricText(session.model_comparison || {});
       $("metricGaps").textContent = (session.coverage_gaps || []).length;
+      $("resultSummary").textContent = plainRunSummary(session, packet, gate);
       $("feedbackButton").disabled = !session.session_id;
       renderRelevanceBanner(gate);
 
@@ -1060,6 +1185,15 @@ def render_app() -> str:
     function modelMetricText(comparison) {
       if (!comparison.status || comparison.status === "disabled") return "-";
       return `${comparison.success_count ?? 0}/${comparison.call_count ?? 0}`;
+    }
+
+    function plainRunSummary(session, packet, gate) {
+      const evidenceCount = packet.usable_evidence_count ?? packet.evidence_count ?? 0;
+      const gapCount = (session.coverage_gaps || []).length;
+      const modelText = modelMetricText(session.model_comparison || {});
+      const support = gate.status || packet.support_level || "not assessed";
+      const status = session.status || "complete";
+      return `${status}: ${evidenceCount} evidence item(s), support ${support}, ${modelText} model call(s), ${gapCount} coverage gap(s).`;
     }
 
     function renderModelPlainSummary(comparison) {

@@ -37,23 +37,28 @@ python -m canon.intelligence.evidence_runner "What are the emerging geopolitical
 
 The command writes JSON and Markdown reports under `reports/`.
 
-## Legacy Stdlib API
+## ASGI API
 
-These lower-level intelligence routes are exposed by the legacy stdlib debug
-server, not by the deployable ASGI service used for Docker and Render.
-Do not use this section to verify a hosted deployment; the Render ASGI API
-documents its live routes at `/v1/routes`.
+These lower-level intelligence routes are exposed by the deployable ASGI
+service used for Docker and Render. Verify the live hosted surface with
+`GET /v1/routes`; the stdlib server is kept only as a local compatibility path.
 
-Start the local debug server:
+Start the same ASGI server used by Docker and Render:
 
 ```powershell
-python -m canon.product.server --host 127.0.0.1 --port 8011
+python -m canon.product.asgi --host 127.0.0.1 --port 8000 --max-concurrency 8 --max-queue-depth 16
+```
+
+List the live routes:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/v1/routes
 ```
 
 Then request a grounded brief:
 
 ```powershell
-Invoke-RestMethod -Method Post http://localhost:8011/v1/intelligence-brief -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","policy":"rag","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-brief -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","policy":"rag","write_report":true}'
 ```
 
 The response includes `grounding_report`, `red_team`, `report_quality`, and the
@@ -63,36 +68,35 @@ Run a focused quality gate for one brief:
 
 ```powershell
 python -m canon.product.report_quality "What are the emerging geopolitical risks around AI data center expansion in Latin America?" --mode ai_infra_geo_risk_demo --policy rag
-Invoke-RestMethod -Method Post http://localhost:8011/v1/report-quality -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","policy":"rag","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/report-quality -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","policy":"rag","write_report":true}'
 ```
 
 This gate returns the grounding ratio, unsupported-claim count, red-team
 blockers, duplicate-agent rate, required-section checks, and the human-review
 boundary without requiring a reviewer to inspect the whole brief JSON first.
 
-Run the automated intelligence-brief evaluation gate through the legacy debug
-API:
+Run the automated intelligence-brief evaluation gate through the ASGI API:
 
 ```powershell
-Invoke-RestMethod -Method Post http://localhost:8011/v1/intelligence-brief/evaluate -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","queries_path":"gold/ai_infra_geo_risk_seed_queries.json","policy":"rag","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-brief/evaluate -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","queries_path":"gold/ai_infra_geo_risk_seed_queries.json","policy":"rag","write_report":true}'
 ```
 
-Generate an alert digest through the same legacy debug API:
+Generate an alert digest through the same ASGI API:
 
 ```powershell
-Invoke-RestMethod -Method Post http://localhost:8011/v1/alert-digest -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","policy":"rag","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/alert-digest -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","policy":"rag","write_report":true}'
 ```
 
-Run the automated alert-digest evaluation gate through the legacy debug API:
+Run the automated alert-digest evaluation gate through the ASGI API:
 
 ```powershell
-Invoke-RestMethod -Method Post http://localhost:8011/v1/alert-digest/evaluate -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","queries_path":"gold/ai_infra_geo_risk_seed_queries.json","policy":"rag","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/alert-digest/evaluate -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","queries_path":"gold/ai_infra_geo_risk_seed_queries.json","policy":"rag","write_report":true}'
 ```
 
-Run the full flagship demo handoff through the legacy debug API:
+Run the full flagship demo handoff through the ASGI API:
 
 ```powershell
-Invoke-RestMethod -Method Post http://localhost:8011/v1/flagship-handoff -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/flagship-handoff -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","write_report":true}'
 ```
 
 The flagship handoff returns `automated_pass_human_review_required` when the
@@ -102,7 +106,7 @@ Run the flagship acceptance checklist:
 
 ```powershell
 python -m canon.product.acceptance_scenario --mode ai_infra_geo_risk_demo
-Invoke-RestMethod -Method Post http://localhost:8011/v1/acceptance-scenario -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/acceptance-scenario -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","write_report":true}'
 ```
 
 The checklist verifies the project boundary, grounded claims/citations, at
@@ -110,14 +114,14 @@ least three issue categories, regional coverage or visible gaps, public opinion
 or a public-evidence gap, uncertainty, next-watch signals, alert readiness, and
 human-review packet creation. It still stops at human review.
 
-Prepare and manage the human review packet through the legacy debug API:
+Prepare and manage the human review packet through the ASGI API:
 
 ```powershell
-Invoke-RestMethod -Method Post http://localhost:8011/v1/intelligence-review/prepare -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","queries_path":"gold/ai_infra_geo_risk_seed_queries.json","policy":"rag","write_report":true}'
-Invoke-RestMethod -Method Post http://localhost:8011/v1/intelligence-review/export-csv -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json","output_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv"}'
-Invoke-RestMethod -Method Post http://localhost:8011/v1/intelligence-review/import-csv -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json","csv_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv","output_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
-Invoke-RestMethod -Method Post http://localhost:8011/v1/intelligence-review/status -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
-Invoke-RestMethod -Method Post http://localhost:8011/v1/intelligence-review/feedback -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/prepare -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","queries_path":"gold/ai_infra_geo_risk_seed_queries.json","policy":"rag","write_report":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/export-csv -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json","output_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv"}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/import-csv -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json","csv_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.review.csv","output_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/status -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/feedback -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
 ```
 
 The import endpoint validates human-entered labels. It does not create labels or

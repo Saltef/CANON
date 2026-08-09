@@ -191,6 +191,98 @@ def create_app(
             route="/v1/stage2-synthesis",
         )
 
+    @app.get("/favicon.ico")
+    async def favicon():
+        return Response(status_code=HTTPStatus.NO_CONTENT)
+
+    @app.get("/v1/summary")
+    async def summary(request: Request):
+        params = request_query_params(request)
+        mode = str(params.get("mode") or service.DEFAULT_MODE)
+        return await run_bounded_task(
+            payload=params,
+            request=request,
+            gate=gate,
+            retry_after_s=retry_after_s,
+            metrics=metrics,
+            run_in_threadpool=run_in_threadpool,
+            task=lambda: service.product_summary(mode),
+            route="/v1/summary",
+        )
+
+    def register_report_route(report_name: str) -> None:
+        path = f"/v1/reports/{report_name}"
+
+        async def report_endpoint(request: Request):
+            params = request_query_params(request)
+            mode = str(params.get("mode") or service.DEFAULT_MODE)
+            return await run_bounded_task(
+                payload=params,
+                request=request,
+                gate=gate,
+                retry_after_s=retry_after_s,
+                metrics=metrics,
+                run_in_threadpool=run_in_threadpool,
+                task=lambda: service.report(report_name, mode, params),
+                route=path,
+            )
+
+        report_endpoint.__name__ = f"get_report_{report_name.replace('-', '_')}"
+        app.get(path)(report_endpoint)
+
+    for report_name in [
+        "audit",
+        "claim-decision",
+        "data-card",
+        "diversity",
+        "diversity-gate",
+        "regression-gate",
+    ]:
+        register_report_route(report_name)
+
+    @app.get("/v1/diversity/queries")
+    async def diversity_queries(request: Request):
+        params = request_query_params(request)
+        params["mode"] = str(params.get("mode") or service.DEFAULT_DIVERSITY_MODE)
+        return await run_bounded_task(
+            payload=params,
+            request=request,
+            gate=gate,
+            retry_after_s=retry_after_s,
+            metrics=metrics,
+            run_in_threadpool=run_in_threadpool,
+            task=lambda: service.diversity_queries(params),
+            route="/v1/diversity/queries",
+        )
+
+    @app.get("/v1/diversity/queries/{query_id}")
+    async def diversity_query_detail(query_id: str, request: Request):
+        params = request_query_params(request)
+        params["mode"] = str(params.get("mode") or service.DEFAULT_DIVERSITY_MODE)
+        return await run_bounded_task(
+            payload=params,
+            request=request,
+            gate=gate,
+            retry_after_s=retry_after_s,
+            metrics=metrics,
+            run_in_threadpool=run_in_threadpool,
+            task=lambda: service.diversity_query_detail(query_id, params),
+            route="/v1/diversity/queries/{query_id}",
+        )
+
+    for path, handler_name in ASGI_POST_ROUTE_HANDLERS.items():
+        register_post_route(
+            app=app,
+            path=path,
+            handler_name=handler_name,
+            Body=Body,
+            Request=Request,
+            gate=gate,
+            retry_after_s=retry_after_s,
+            metrics=metrics,
+            run_in_threadpool=run_in_threadpool,
+        )
+
     @app.get("/metrics")
     async def prometheus_metrics():
         body, content_type = metrics.render()
@@ -204,17 +296,8 @@ def create_app(
             "service": "canon",
             "server": "asgi",
             "routes": [
-                "GET /health",
-                "GET /app",
-                "GET /metrics",
-                "GET /v1/production/status",
-                "GET /v1/routes",
-                "POST /v1/evidence-packets",
-                "POST /v1/production/evidence-workbench",
-                "POST /v1/production/corpus-setup",
-                "POST /v1/production/corpus-refresh",
-                "POST /v1/production/feedback",
-                "POST /v1/stage2-synthesis",
+                f"{route['method']} {route['path']}"
+                for route in asgi_routes()["routes"]
             ],
         }
 
@@ -224,40 +307,101 @@ def create_app(
 
 
 def asgi_routes() -> dict[str, Any]:
-    return {
-        "routes": [
-            {"method": "GET", "path": "/health", "description": "Health check for hosting platforms."},
-            {"method": "GET", "path": "/app", "description": "Evidence Discovery Workbench UI."},
-            {"method": "GET", "path": "/metrics", "description": "Prometheus metrics when installed."},
+    from canon.product.server import api_routes
+
+    metadata = api_routes()
+    routes = [
+        {
+            "method": route["method"],
+            "path": route["path"],
+            "description": route.get("purpose") or route.get("description", ""),
+            "required": route.get("required", []),
+            "optional": route.get("optional", []),
+            "example": route.get("example"),
+        }
+        for route in metadata["routes"]
+    ]
+    if not any(route["path"] == "/metrics" for route in routes):
+        routes.insert(
+            2,
             {
                 "method": "GET",
-                "path": "/v1/production/status",
-                "description": "Production defaults, corpus status, and recommended retrieval settings.",
+                "path": "/metrics",
+                "description": "Prometheus metrics when installed.",
+                "required": [],
+                "optional": [],
+                "example": None,
             },
-            {"method": "GET", "path": "/v1/routes", "description": "ASGI route metadata."},
-            {"method": "POST", "path": "/v1/evidence-packets", "description": "Evidence packet retrieval."},
-            {
-                "method": "POST",
-                "path": "/v1/production/evidence-workbench",
-                "description": "End-to-end retrieval, diagnostics, draft evidence note, and feedback metadata.",
-            },
-            {
-                "method": "POST",
-                "path": "/v1/production/corpus-setup",
-                "description": "Profile, ingest, build, and optionally index a user corpus.",
-            },
-            {
-                "method": "POST",
-                "path": "/v1/production/corpus-refresh",
-                "description": "Refresh a corpus and hosted vector index only when sources changed.",
-            },
-            {
-                "method": "POST",
-                "path": "/v1/production/feedback",
-                "description": "Capture local product feedback; not a formal human-review label.",
-            },
-            {"method": "POST", "path": "/v1/stage2-synthesis", "description": "Grounded Stage 2 synthesis."},
-        ]
+        )
+    return {
+        "service": "canon",
+        "version": metadata.get("version", "v1"),
+        "human_review_boundary": metadata.get("human_review_boundary"),
+        "routes": routes,
+    }
+
+
+ASGI_POST_ROUTE_HANDLERS = {
+    "/v1/answer": "answer",
+    "/v1/projects/start": "start_project",
+    "/v1/frame-coverage": "frame_coverage_report",
+    "/v1/research-workflow": "research_workflow",
+    "/v1/intelligence-brief": "intelligence_brief",
+    "/v1/report-quality": "report_quality_gate",
+    "/v1/intelligence-brief/evaluate": "intelligence_brief_evaluation",
+    "/v1/alert-digest": "alert_digest",
+    "/v1/alert-digest/evaluate": "alert_digest_evaluation",
+    "/v1/flagship-handoff": "flagship_handoff",
+    "/v1/acceptance-scenario": "acceptance_scenario",
+    "/v1/intelligence-review/prepare": "intelligence_review_prepare",
+    "/v1/intelligence-review/status": "intelligence_review_status",
+    "/v1/intelligence-review/feedback": "intelligence_review_feedback",
+    "/v1/intelligence-review/handoff": "intelligence_review_handoff",
+    "/v1/intelligence-review/export-csv": "intelligence_review_export_csv",
+    "/v1/intelligence-review/import-csv": "intelligence_review_import_csv",
+    "/v1/compare": "compare_retrieval",
+    "/v1/query-diagnostics": "query_diagnostics",
+    "/v1/sources/profile": "source_profile",
+    "/v1/sources/ingest": "source_ingest",
+    "/v1/corpora/build": "corpus_build",
+    "/v1/model-evaluation": "model_evaluation",
+    "/v1/prehuman-check": "prehuman_check",
+    "/v1/diversity-audit": "diversity_audit",
+}
+
+
+def register_post_route(
+    *,
+    app,
+    path: str,
+    handler_name: str,
+    Body,
+    Request,
+    gate: ConcurrencyGate,
+    retry_after_s: int,
+    metrics,
+    run_in_threadpool,
+) -> None:
+    async def endpoint(request: Request, payload: dict[str, Any] = Body(...)):
+        return await run_bounded(
+            payload=payload,
+            request=request,
+            gate=gate,
+            retry_after_s=retry_after_s,
+            metrics=metrics,
+            run_in_threadpool=run_in_threadpool,
+            handler=getattr(service, handler_name),
+            route=path,
+        )
+
+    endpoint.__name__ = f"post_{handler_name}"
+    app.post(path)(endpoint)
+
+
+def request_query_params(request) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in request.query_params.items()
     }
 
 
@@ -375,6 +519,59 @@ def env_bool(key: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+async def run_bounded_task(
+    *,
+    payload: dict[str, Any],
+    request,
+    gate: ConcurrencyGate,
+    retry_after_s: int,
+    metrics,
+    run_in_threadpool,
+    task,
+    route: str,
+):
+    from fastapi.responses import JSONResponse
+
+    payload = dict(payload)
+    request_id = request.headers.get("x-request-id") or str(payload.get("request_id") or uuid.uuid4())
+    payload.setdefault("request_id", request_id)
+    token = set_request_id(request_id)
+    started = time.perf_counter()
+    try:
+        try:
+            async with gate.acquire() as queue:
+                log_event("request_start", route=route, method=request.method, queue=queue)
+                report = await run_in_threadpool(task)
+        except QueueRejected:
+            metrics.queue_rejections.inc()
+            log_event("request_rejected", route=route, reason="queue_depth_exceeded")
+            return JSONResponse(
+                {"error": "queue_depth_exceeded", "request_id": request_id},
+                status_code=HTTPStatus.SERVICE_UNAVAILABLE,
+                headers={"Retry-After": str(retry_after_s)},
+            )
+        except service.ProductError as exc:
+            metrics.requests.labels(route=route, status=str(exc.status_code)).inc()
+            log_event("request_product_error", route=route, status_code=exc.status_code, error=str(exc))
+            return JSONResponse({"error": str(exc), "request_id": request_id}, status_code=exc.status_code)
+
+        elapsed = time.perf_counter() - started
+        report_payload = report if isinstance(report, dict) else {}
+        report_payload.setdefault("request_id", request_id)
+        metrics.observe_report(route, report_payload, elapsed)
+        log_event(
+            "request_complete",
+            route=route,
+            status_code=200,
+            elapsed_ms=round(elapsed * 1000, 3),
+            report_status=report_payload.get("status"),
+            degradation_flags=(report_payload.get("retrieval") or report_payload).get("degradation_flags") or [],
+        )
+        return report_payload if isinstance(report, dict) else report
+    finally:
+        reset_request_id(token)
 
 
 async def run_bounded(
