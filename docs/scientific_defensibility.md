@@ -61,7 +61,7 @@ list exists in the repository:
   `reports/stage1_fixed_qrels_v2_repeat_spread.json`
 - Stage 1 historical base-shift probe:
   `reports/stage1_payload_shift_probe.json`
-- LlamaIndex Stage 1 framework baseline:
+- LlamaIndex/CANON Stage 1 factor-correction baseline:
   `reports/llamaindex_stage1_head_to_head.json`
 - Public benchmark suite definition:
   `conf/benchmark_suites/stage1_public_full.json`

@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: canon-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: CANON_SETTINGS
+        value: /app/conf/settings.toml
+      - key: CANON_DATA_DIR
+        value: /app/data
+      - key: CANON_REPORTS_DIR
+        value: /app/reports
+      - key: CANON_VECTORSTORE
+        value: qdrant
+      - key: CANON_ALLOWED_ORIGINS
+        value: ""
+      - key: CANON_REQUIRE_AUTH
+        value: "true"
+      - key: CANON_MAX_CONCURRENCY
+        value: "8"
+      - key: CANON_MAX_QUEUE_DEPTH
+        value: "16"
+      - key: CANON_BASIC_AUTH_USER
+        sync: false
+      - key: CANON_BASIC_AUTH_PASSWORD
+        sync: false
+      - key: CANON_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: COHERE_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: OPENALEX_API_KEY
+        sync: false

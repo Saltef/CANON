@@ -12,6 +12,14 @@ from typing import Any
 
 from canon.config import load_settings
 from canon.corpus.build import run_phase16
+from canon.corpus.sync import (
+    SourceManifestOptions,
+    build_source_manifest,
+    diff_manifests,
+    load_previous_manifest,
+    write_source_manifest,
+)
+from canon.embeddings.index import build_vector_index
 from canon.eval.contracts import CONTRACT_VERSION, validate_report
 from canon.eval.model_evaluation import evaluate_semantic_models, parse_providers
 from canon.eval.diversity import run_diversity_audit
@@ -26,10 +34,16 @@ from canon.eval.source_diversity import (
 from canon.generation.providers import get_generation_provider
 from canon.ingest.openalex import abstract_from_inverted_index, fetch_json
 from canon.ingest.flexible import ingest_flexible_source, profile_source
+from canon.model_tasks import DEFAULT_MODEL_TASK_MODEL, run_evidence_model_review
 from canon.reports.claim_decision import build_claim_decision
 from canon.product.run_diagnosis import build_run_diagnosis
 from canon.retrieval.compare import compare
-from canon.retrieval.candidates import build_bm25_candidate_pool, build_candidate_pool, build_windowed_candidate_pool
+from canon.retrieval.candidates import (
+    build_bm25_candidate_pool,
+    build_candidate_pool,
+    build_vector_store_candidate_pool,
+    build_windowed_candidate_pool,
+)
 from canon.retrieval.experiment import cached_documents
 from canon.retrieval.query_diagnostics import FREEDOM_THRESHOLDS, content_terms, diagnose_query, term_matches_tokens
 from canon.rerank.providers import get_rerank_provider
@@ -42,9 +56,10 @@ DEFAULT_POLICY = "rag"
 DEFAULT_PRODUCTION_MODE = "beir_scifact_full"
 DEFAULT_PRODUCTION_TOP_K = 12
 DEFAULT_PRODUCTION_CANDIDATE_K = 12
-DEFAULT_PRODUCTION_CANDIDATE_SCOPE = "lexical_window"
+DEFAULT_PRODUCTION_CANDIDATE_SCOPE = "vector_store"
 DEFAULT_PRODUCTION_LEXICAL_WINDOW_K = 96
 DEFAULT_PRODUCTION_RERANK_TIMEOUT_S = 15.0
+DEFAULT_VECTOR_BACKEND = "qdrant"
 DEFAULT_EXTERNAL_SEARCH_PROVIDER = "openalex"
 DEFAULT_EXTERNAL_RESULT_COUNT = 5
 DEFAULT_POLICIES = ["lexical", "balanced", "semantic", "rag", "diverse", "conflict_aware"]
@@ -330,7 +345,8 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
             "freedom_level": "balanced",
             "external_expansion": "off_by_default_opt_in_openalex",
             "retrieval_engine": "model_candidate_pool",
-            "candidate_scope": DEFAULT_PRODUCTION_CANDIDATE_SCOPE,
+            "candidate_scope": "vector_store",
+            "vector_backend": DEFAULT_VECTOR_BACKEND,
             "lexical_window_k": DEFAULT_PRODUCTION_LEXICAL_WINDOW_K,
             "retrieval_provider": "openrouter",
             "retrieval_model": "qwen/qwen3-embedding-8b",
@@ -338,6 +354,8 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
             "reranker_model": "rerank-v4.0-pro",
             "generator_provider": "openrouter",
             "generator_model": "openai/gpt-4.1-mini",
+            "model_review_provider": "openrouter",
+            "model_review_model": DEFAULT_MODEL_TASK_MODEL,
         },
         "retrieval_engines": [
             {
@@ -358,6 +376,12 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
         ],
         "candidate_scopes": [
             {
+                "scope": "vector_store",
+                "label": "Qdrant/ANN semantic index plus full-corpus BM25",
+                "status": "available_after_vector_index_build",
+                "boundary": "BM25 scans the local full corpus; ANN search uses the configured vector backend and joins by chunk_id.",
+            },
+            {
                 "scope": "lexical_window",
                 "label": "Full-corpus lexical scan plus bounded dense window",
                 "status": "default_interactive",
@@ -368,6 +392,20 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
                 "label": "Full-corpus semantic index",
                 "status": "available_when_embedding_store_exists_or_can_be_built",
                 "boundary": "Dense retrieval covers the full corpus, but first use may build or require a full embedding store.",
+            },
+        ],
+        "vector_backends": [
+            {
+                "backend": "qdrant",
+                "status": "preferred_hosted_index_requires_QDRANT_URL",
+                "source_of_truth": False,
+                "migration_boundary": "Rebuild from local processed corpus JSON when switching backend or embedding model.",
+            },
+            {
+                "backend": "memory",
+                "status": "test_only",
+                "source_of_truth": False,
+                "migration_boundary": "Used for deterministic unit tests and local adapter validation.",
             },
         ],
         "retrieval_models": [
@@ -443,12 +481,6 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
             },
             {
                 "provider": "openrouter",
-                "model": "google/gemini-2.5-flash",
-                "hosted": True,
-                "status": "available_if_openrouter_key_configured",
-            },
-            {
-                "provider": "openrouter",
                 "model": "moonshotai/kimi-k3",
                 "hosted": True,
                 "status": "available_if_openrouter_key_configured",
@@ -472,6 +504,19 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
                 "status": "available_if_openrouter_key_configured",
             },
         ],
+        "model_review": {
+            "status": "available_when_requested",
+            "default_provider": "openrouter",
+            "default_model": DEFAULT_MODEL_TASK_MODEL,
+            "disabled_models": ["cohere/*", "google/*", "*gemini*"],
+            "outputs": [
+                "stance_assessments",
+                "extracted_dimensions",
+                "disagreement_diagnosis",
+                "draft_plan",
+            ],
+            "boundary": "Typed model review is triage over retrieved evidence and remains human-review-bound.",
+        },
         "try_queries": production_try_queries(mode),
         "shippable_without_human_review": [
             "corpus-backed evidence packets",
@@ -502,18 +547,27 @@ def production_status(params: dict[str, Any] | None = None) -> dict[str, Any]:
             "default_data_flow": "local corpus retrieval and local report generation",
             "hosted_models": "called only when generator_provider selects a hosted model; query and relevance-gated snippets are sent",
             "hosted_retrieval": "called only when retrieval_engine selects model_candidate_pool; query and corpus chunks are sent for embedding/reranking",
+            "vector_index": (
+                "Qdrant is an optional ANN index over local chunk IDs and previews. "
+                "Processed corpus JSON remains the canonical source and can rebuild another backend."
+            ),
             "external_web": (
                 "off by default; when execute_external_search is true, the workbench sends only the query string "
                 "to OpenAlex and marks returned evidence as external_source/ONLINE"
             ),
             "feedback": "stored as local product feedback, not as authoritative human-review labels",
             "corpus_setup": "users can profile, ingest, and build local corpora from paths the local API process can read",
+            "corpus_refresh": (
+                "local source manifests detect added, changed, or removed files before rebuilding the processed corpus "
+                "and refreshing the vector index"
+            ),
         },
         "endpoints": {
             "app": "GET /app",
             "run": "POST /v1/production/evidence-workbench",
             "feedback": "POST /v1/production/feedback",
             "corpus_setup": "POST /v1/production/corpus-setup",
+            "corpus_refresh": "POST /v1/production/corpus-refresh",
             "raw_packet": "POST /v1/evidence-packets",
         },
     }
@@ -574,6 +628,7 @@ def production_try_queries(mode: str) -> list[str]:
 def production_corpus_setup(payload: dict[str, Any]) -> dict[str, Any]:
     input_path = require_path(payload, "input_path")
     mode = require_text(payload, "mode")
+    settings = load_settings()
     profile = source_profile(
         {
             "input_path": str(input_path),
@@ -621,9 +676,12 @@ def production_corpus_setup(payload: dict[str, Any]) -> dict[str, Any]:
         else {}
     )
     recommended_mode = corpus_id if build_corpus else mode
+    vector_index = maybe_build_production_vector_index(payload, recommended_mode)
+    source_manifest = production_source_manifest(input_path, mode, settings.reports_dir)
+    source_manifest_path = write_source_manifest(source_manifest, reports_dir=settings.reports_dir)
     return {
         "report_id": "production_corpus_setup_v1",
-        "status": "corpus_ready" if build_corpus else "source_ingested",
+        "status": production_corpus_setup_status(build_corpus, vector_index),
         "input_path": str(input_path),
         "mode": mode,
         "corpus_id": corpus_id if build_corpus else None,
@@ -632,9 +690,124 @@ def production_corpus_setup(payload: dict[str, Any]) -> dict[str, Any]:
         "ingest": ingest,
         "corpus": corpus.get("corpus", {}),
         "validation": corpus.get("validation", {}),
+        "vector_index": vector_index,
+        "source_snapshot": compact_source_manifest(source_manifest),
+        "source_manifest_path": str(source_manifest_path),
         "next_action": f"Select mode '{recommended_mode}' in the workbench and run a question.",
         "boundary": "The corpus is locally indexed. Evidence quality still depends on source fit and human inspection.",
     }
+
+
+def production_corpus_refresh(payload: dict[str, Any]) -> dict[str, Any]:
+    input_path = require_path(payload, "input_path")
+    mode = require_text(payload, "mode")
+    settings = load_settings()
+    try:
+        current_manifest = production_source_manifest(input_path, mode, settings.reports_dir)
+    except FileNotFoundError as exc:
+        raise ProductError(str(exc), status_code=404) from exc
+    previous_manifest = load_previous_manifest(mode, reports_dir=settings.reports_dir)
+    source_diff = diff_manifests(previous_manifest, current_manifest)
+    force = optional_bool(payload.get("force"), default=False)
+    profile_only = optional_bool(payload.get("profile_only"), default=False)
+    if source_diff["status"] == "unchanged" and not force:
+        return {
+            "report_id": "production_corpus_refresh_v1",
+            "status": "no_source_changes",
+            "input_path": str(input_path),
+            "mode": mode,
+            "source_diff": source_diff,
+            "source_snapshot": compact_source_manifest(current_manifest),
+            "next_action": "No rebuild was run. Use force=true to rebuild with new chunking, embedding, or backend settings.",
+            "boundary": "No-change refreshes do not prove corpus quality; they only show local source files are unchanged.",
+        }
+    if profile_only:
+        return {
+            "report_id": "production_corpus_refresh_v1",
+            "status": "source_changes_detected_profile_only",
+            "input_path": str(input_path),
+            "mode": mode,
+            "source_diff": source_diff,
+            "source_snapshot": compact_source_manifest(current_manifest),
+            "next_action": "Run refresh without profile_only to ingest, rebuild the corpus, and refresh the vector index.",
+            "boundary": "Profile-only refresh does not update processed corpus files or vector indexes.",
+        }
+
+    setup_report = production_corpus_setup(payload)
+    return {
+        **setup_report,
+        "report_id": "production_corpus_refresh_v1",
+        "refresh_status": "forced_refresh" if force else "source_changes_refreshed",
+        "source_diff": source_diff,
+        "previous_source_digest": source_diff.get("previous_digest"),
+        "current_source_digest": source_diff.get("current_digest"),
+    }
+
+
+def production_source_manifest(input_path: Path, mode: str, reports_dir: Path) -> dict[str, Any]:
+    return build_source_manifest(SourceManifestOptions(mode=mode, input_path=input_path))
+
+
+def compact_source_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "manifest_version": manifest.get("manifest_version"),
+        "mode": manifest.get("mode"),
+        "input_path": manifest.get("input_path"),
+        "input_kind": manifest.get("input_kind"),
+        "file_count": manifest.get("file_count"),
+        "supported_file_count": manifest.get("supported_file_count"),
+        "unsupported_file_count": manifest.get("unsupported_file_count"),
+        "content_digest": manifest.get("content_digest"),
+        "boundary": manifest.get("boundary"),
+    }
+
+
+def production_corpus_setup_status(build_corpus: bool, vector_index: dict[str, Any]) -> str:
+    if vector_index and vector_index.get("status") in {"index_failed", "setup_required"}:
+        return "corpus_ready_vector_index_pending" if build_corpus else "source_ingested_vector_index_pending"
+    if vector_index and vector_index.get("status") == "indexed":
+        return "corpus_ready_vector_indexed" if build_corpus else "source_ingested_vector_indexed"
+    return "corpus_ready" if build_corpus else "source_ingested"
+
+
+def maybe_build_production_vector_index(payload: dict[str, Any], mode: str) -> dict[str, Any]:
+    if not optional_bool(payload.get("index_vector_store"), default=False):
+        return {
+            "status": "not_requested",
+            "backend": optional_text(payload, "vector_backend") or DEFAULT_VECTOR_BACKEND,
+            "boundary": "Run corpus setup with index_vector_store=true after Qdrant is configured.",
+        }
+    vector_backend = optional_text(payload, "vector_backend") or DEFAULT_VECTOR_BACKEND
+    embedding_provider = optional_text(payload, "index_embedding_provider") or optional_text(payload, "retrieval_provider") or "openrouter"
+    embedding_model = optional_text(payload, "index_embedding_model") or optional_text(payload, "retrieval_model")
+    collection = optional_text(payload, "vector_collection")
+    batch_size = optional_positive_int(payload.get("index_batch_size"), "index_batch_size") or 32
+    delete_stale = optional_bool(payload.get("delete_stale_vectors"), default=True)
+    try:
+        return build_vector_index(
+            mode=mode,
+            embedding_provider_name=embedding_provider,
+            embedding_model=embedding_model,
+            vector_backend=vector_backend,
+            collection=collection,
+            batch_size=batch_size,
+            delete_stale=delete_stale,
+        )
+    except Exception as exc:  # noqa: BLE001 - corpus setup should still succeed if Qdrant is not configured yet.
+        return {
+            "report_id": "vector_index_build_v1",
+            "status": "setup_required" if vector_backend == "qdrant" else "index_failed",
+            "mode": mode,
+            "vector_backend": vector_backend,
+            "embedding_provider": embedding_provider,
+            "embedding_model": embedding_model,
+            "collection": collection,
+            "error": str(exc),
+            "boundary": (
+                "The local corpus was built, but the vector backend could not be refreshed. "
+                "Set QDRANT_URL/QDRANT_API_KEY or choose another vector backend, then rerun indexing."
+            ),
+        }
 
 
 def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
@@ -689,6 +862,8 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
         "provider": packet_response.get("retrieval_provider"),
         "model": packet_response.get("retrieval_model"),
         "candidate_scope": packet_response.get("candidate_scope"),
+        "vector_backend": packet_response.get("vector_backend"),
+        "vector_collection": packet_response.get("vector_collection"),
         "lexical_window_k": packet_response.get("lexical_window_k"),
         "reranker_provider": packet_response.get("reranker_provider"),
         "reranker_model": packet_response.get("reranker_model"),
@@ -715,6 +890,7 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
         )
         span.set_attribute("draft_status", draft_brief.get("status"))
         span.set_attribute("output_tokens", estimate_tokens(draft_brief.get("text") or draft_brief.get("abstention")))
+    model_review = production_model_review(payload, query, evidence)
     run_diagnosis = build_run_diagnosis(
         query=query,
         packet_response=packet_response,
@@ -751,6 +927,7 @@ def production_evidence_workbench(payload: dict[str, Any]) -> dict[str, Any]:
         },
         "relevance_gate": relevance_gate,
         "draft_brief": draft_brief,
+        "model_review": model_review,
         "run_diagnosis": run_diagnosis,
         "evidence_packet": {
             "packet_id": packet.get("packet_id"),
@@ -837,6 +1014,8 @@ def production_model_candidate_packet(
     lexical_k = optional_positive_int(payload.get("lexical_k"), "lexical_k") or candidate_k
     vector_k = optional_positive_int(payload.get("vector_k"), "vector_k") or candidate_k
     candidate_scope = optional_text(payload, "candidate_scope") or DEFAULT_PRODUCTION_CANDIDATE_SCOPE
+    vector_backend = optional_text(payload, "vector_backend") or DEFAULT_VECTOR_BACKEND
+    vector_collection = optional_text(payload, "vector_collection")
     lexical_window_k = optional_positive_int(payload.get("lexical_window_k"), "lexical_window_k") or max(
         DEFAULT_PRODUCTION_LEXICAL_WINDOW_K,
         candidate_k * 6,
@@ -851,6 +1030,8 @@ def production_model_candidate_packet(
             query=query,
             mode=mode,
             candidate_scope=candidate_scope,
+            vector_backend=vector_backend,
+            vector_collection=vector_collection,
             lexical_window_k=lexical_window_k,
             lexical_k=lexical_k,
             vector_k=vector_k,
@@ -880,6 +1061,8 @@ def production_model_candidate_packet(
                 "retrieval_provider": retrieval_provider,
                 "retrieval_model": retrieval_model,
                 "candidate_scope": candidate_scope,
+                "vector_backend": vector_backend,
+                "vector_collection": vector_collection,
                 "lexical_window_k": lexical_window_k
                 if candidate_scope in {"lexical_window", "windowed", "bounded_lexical_window"}
                 else None,
@@ -967,6 +1150,8 @@ def production_model_candidate_packet(
         "retrieval_provider": retrieval_provider,
         "retrieval_model": retrieval_model,
         "candidate_scope": candidate_scope,
+        "vector_backend": vector_backend,
+        "vector_collection": candidate_report.get("collection") or vector_collection,
         "lexical_window_k": lexical_window_k if candidate_scope in {"lexical_window", "windowed", "bounded_lexical_window"} else None,
         "reranker_provider": rerank_summary.get("provider"),
         "reranker_model": rerank_summary.get("model"),
@@ -978,6 +1163,8 @@ def production_model_candidate_packet(
         "candidate_generation": {
             "engine": "model_candidate_pool",
             "candidate_scope": candidate_scope,
+            "vector_backend": vector_backend,
+            "vector_collection": candidate_report.get("collection") or vector_collection,
             "lexical_window_k": candidate_report.get("lexical_window_k"),
             "window_document_count": candidate_report.get("window_document_count"),
             "document_count": candidate_report.get("document_count"),
@@ -1052,6 +1239,8 @@ def production_candidate_report(
     query: str,
     mode: str,
     candidate_scope: str,
+    vector_backend: str,
+    vector_collection: str | None,
     lexical_window_k: int,
     lexical_k: int,
     vector_k: int,
@@ -1059,6 +1248,18 @@ def production_candidate_report(
     retrieval_model: str | None,
     fusion: str,
 ) -> dict[str, Any]:
+    if candidate_scope in {"vector_store", "qdrant", "ann_index", "external_vector_store"}:
+        return build_vector_store_candidate_pool(
+            query=query,
+            mode=mode,
+            lexical_k=lexical_k,
+            vector_k=vector_k,
+            provider=retrieval_provider,
+            model=retrieval_model,
+            vector_backend=vector_backend,
+            collection=vector_collection,
+            fusion=fusion,
+        )
     if candidate_scope in {"lexical_window", "windowed", "bounded_lexical_window"}:
         return build_windowed_candidate_pool(
             query=query,
@@ -1080,7 +1281,7 @@ def production_candidate_report(
             model=retrieval_model,
             fusion=fusion,
         )
-    raise ProductError("candidate_scope must be lexical_window or full_embedding_store.")
+    raise ProductError("candidate_scope must be vector_store, lexical_window, or full_embedding_store.")
 
 
 class RerankTimeoutError(TimeoutError):
@@ -1732,6 +1933,37 @@ def production_draft_brief(
         "support_assessment": support,
         "boundary": "This is an evidence-derived note, not model-generated synthesis or final analysis.",
     }
+
+
+def production_model_review(payload: dict[str, Any], query: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
+    if not optional_bool(payload.get("run_model_review"), default=False):
+        return {
+            "status": "not_requested",
+            "provider": optional_text(payload, "model_review_provider") or "openrouter",
+            "model": optional_text(payload, "model_review_model") or DEFAULT_MODEL_TASK_MODEL,
+            "boundary": "Set run_model_review=true to send gated evidence snippets for typed stance/extraction review.",
+        }
+    provider = optional_text(payload, "model_review_provider") or "openrouter"
+    model = optional_text(payload, "model_review_model") or DEFAULT_MODEL_TASK_MODEL
+    try:
+        return run_evidence_model_review(
+            query=query,
+            evidence=evidence,
+            provider=provider,
+            model=model,
+            allow_external_data=optional_bool(payload.get("allow_external_model_review"), default=False),
+            max_evidence=optional_positive_int(payload.get("model_review_max_evidence"), "model_review_max_evidence") or 8,
+        )
+    except Exception as exc:  # noqa: BLE001 - provider failures are part of the product trace.
+        return {
+            "report_id": "evidence_model_review_v1",
+            "status": "model_review_failed",
+            "provider": provider,
+            "model": model,
+            "error": str(exc),
+            "human_review_required": True,
+            "boundary": "Typed model review failed; no synthetic review labels were substituted.",
+        }
 
 
 def model_generated_draft_brief(

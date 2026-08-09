@@ -272,7 +272,7 @@ Existing modules:
 Current commands:
 
 ```powershell
-python -m canon.eval.model_evaluation --mode social_science_ir_v1_harvest10 --qrels gold/ir_qrels_social_science_ir_v1_harvest10.json --providers local,openai,cohere --k 10
+python -m canon.eval.model_evaluation --mode social_science_ir_v1_harvest10 --qrels gold/ir_qrels_social_science_ir_v1_harvest10.json --providers local,openrouter,cohere --k 10
 python -m canon.eval.rerank_evaluation --mode social_science_ir_v1_harvest10 --qrels gold/ir_qrels_social_science_ir_v1_harvest10.json --rerankers heuristic,cohere --base-policy rag --candidate-k 25 --k 10
 ```
 

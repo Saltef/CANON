@@ -257,7 +257,7 @@ def call_stage2_model(provider: str, model: str, prompt: dict[str, Any]) -> dict
     if normalized == "openrouter":
         return call_openrouter_json(model, prompt)
     if normalized == "openai":
-        return call_openai_json(model, prompt)
+        return call_openrouter_json(openrouter_model_id(model), prompt)
     raise ValueError(f"Unsupported Stage 2 model provider: {provider}")
 
 
@@ -288,46 +288,6 @@ def call_openrouter_json(model: str, prompt: dict[str, Any]) -> dict[str, Any]:
     with urllib.request.urlopen(request, timeout=180) as response:
         payload = json.loads(response.read().decode("utf-8"))
     return json.loads(payload["choices"][0]["message"]["content"])
-
-
-def call_openai_json(model: str, prompt: dict[str, Any]) -> dict[str, Any]:
-    load_local_env()
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is required for OpenAI Stage 2 synthesis.")
-    request = urllib.request.Request(
-        "https://api.openai.com/v1/responses",
-        data=json.dumps(
-            {
-                "model": model,
-                "input": [
-                    {"role": "system", "content": "You return only strict JSON for evidence synthesis."},
-                    {"role": "user", "content": json.dumps(prompt, ensure_ascii=False)},
-                ],
-                "text": {"format": {"type": "json_object"}},
-                "temperature": 0,
-            }
-        ).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=180) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-    return json.loads(extract_openai_text(payload))
-
-
-def extract_openai_text(payload: dict[str, Any]) -> str:
-    if payload.get("output_text"):
-        return str(payload["output_text"])
-    parts = []
-    for item in payload.get("output", []):
-        for content in item.get("content", []):
-            if content.get("type") in {"output_text", "text"}:
-                parts.append(str(content.get("text") or ""))
-    return "\n".join(parts).strip()
 
 
 def sanitize_model_claims(payload: dict[str, Any], evidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -437,11 +397,13 @@ def clamped_float(value: Any, default: float = 0.0) -> float:
 
 
 def default_stage2_model(provider: str) -> str:
-    if provider.lower() == "openrouter":
+    if provider.lower() in {"openrouter", "openai"}:
         return "openai/gpt-4.1-mini"
-    if provider.lower() == "openai":
-        return "gpt-4.1-mini"
     return "unknown"
+
+
+def openrouter_model_id(model: str) -> str:
+    return model if "/" in model else f"openai/{model}"
 
 
 def cluster_claim_candidates(candidates: list[tuple[str, dict[str, Any]]]) -> list[list[tuple[str, dict[str, Any]]]]:

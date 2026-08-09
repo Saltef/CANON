@@ -8,7 +8,7 @@ from canon.config import load_settings
 from canon.embeddings.store import build_embedding_store
 
 
-DEFAULT_PROVIDERS = ["local", "openai", "cohere"]
+DEFAULT_PROVIDERS = ["local", "openrouter", "cohere"]
 
 
 def parse_providers(value: str | None) -> list[str]:

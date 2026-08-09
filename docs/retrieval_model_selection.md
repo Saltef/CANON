@@ -6,7 +6,7 @@ for production retrieval.
 The current implementation can compare providers with:
 
 ```powershell
-python -m canon.eval.model_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --providers local,openai,cohere --k 10
+python -m canon.eval.model_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --providers local,openrouter,cohere --k 10
 ```
 
 The Stage 1 automated suite also treats hosted models as core benchmark
@@ -16,8 +16,8 @@ candidates:
 python -m canon.product.automated_benchmark_suite --suite conf/benchmark_suites/stage1_public_multi_topic.json
 ```
 
-In that suite, `local` is the reproducible control, while OpenAI/Cohere are
-candidate production models. Missing API keys are reported as unavailable rows,
+In that suite, `local` is the reproducible control, while OpenRouter/Cohere are
+candidate production model routes. Missing API keys are reported as unavailable rows,
 not as model failures.
 
 That proves the evaluation path works, but it does not prove a global winner.
@@ -31,8 +31,9 @@ Use this default stack until corpus-specific evidence says otherwise:
 - **Retrieval baseline:** hybrid retrieval with lexical plus semantic signals.
 - **Local deterministic fallback:** `local` / `hashed-semantic-v1`, a hashed
   lexical n-gram control rather than a neural semantic model.
-- **Remote candidates:** OpenAI and Cohere embedding providers when API keys are
-  configured.
+- **Remote candidates:** OpenRouter and Cohere embedding providers when API keys
+  are configured. Vendor-named model IDs are routed through OpenRouter, not
+  vendor-specific API keys.
 - **Future open-weight candidates:** multilingual retrieval models such as BGE-M3
   or multilingual E5, added behind the same provider interface.
 
@@ -175,7 +176,7 @@ To reduce manual review, run provisional judge labels first:
 
 ```powershell
 python -m canon.eval.llm_judge qrels --csv reports/qrels_review_tasks_<corpus_id>.csv --output reports/qrels_review_tasks_<corpus_id>.judged.csv --provider heuristic
-python -m canon.eval.llm_judge qrels --csv reports/qrels_review_tasks_<corpus_id>.csv --output reports/qrels_review_tasks_<corpus_id>.openai_judged.csv --provider openai --model gpt-4.1-mini
+python -m canon.eval.llm_judge qrels --csv reports/qrels_review_tasks_<corpus_id>.csv --output reports/qrels_review_tasks_<corpus_id>.openrouter_judged.csv --provider openrouter --model openai/gpt-4.1-mini
 ```
 
 Judge labels are triage labels. Keep human labels authoritative, and audit all
@@ -229,7 +230,7 @@ Current smoke evidence:
 
 - `local` / `hashed-semantic-v1` runs successfully as a deterministic hashed
   lexical fallback.
-- OpenAI and Cohere providers are marked `unavailable` when API keys are absent.
+- OpenRouter and Cohere providers are marked `unavailable` when API keys are absent.
 - The smoke qrels file proves the evaluation path works.
 
 This is enough to validate the harness. It is not enough to pick the production
@@ -241,7 +242,7 @@ To choose the best retrieval model, create a labeled qrels file for the target
 corpus and run:
 
 ```powershell
-python -m canon.eval.model_evaluation --mode <corpus_id> --qrels gold/<corpus>_qrels.json --providers local,openai,cohere --k 10
+python -m canon.eval.model_evaluation --mode <corpus_id> --qrels gold/<corpus>_qrels.json --providers local,openrouter,cohere --k 10
 ```
 
 Then compare:

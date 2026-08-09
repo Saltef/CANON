@@ -341,6 +341,7 @@ def render_app() -> str:
             <label>
               Candidate Scope
               <select id="candidateScope">
+                <option value="vector_store">Qdrant/ANN index</option>
                 <option value="lexical_window">Fast full-corpus scan</option>
                 <option value="full_embedding_store">Full semantic index</option>
               </select>
@@ -365,7 +366,7 @@ def render_app() -> str:
               <select id="retrievalModel">
                 <option value="qwen/qwen3-embedding-8b">Qwen3 embedding 8B</option>
                 <option value="baai/bge-m3">BGE-M3</option>
-                <option value="openai/text-embedding-3-small">OpenAI text-embedding-3-small</option>
+                <option value="openai/text-embedding-3-small">text-embedding-3-small via OpenRouter</option>
                 <option value="BAAI/bge-small-en-v1.5">BGE small local</option>
                 <option value="embed-v4.0">Cohere embed v4</option>
                 <option value="hashed-semantic-v1">Hashed lexical fallback</option>
@@ -408,9 +409,8 @@ def render_app() -> str:
             <label>
               Model
               <select id="generatorModel">
-                <option value="openai/gpt-4.1-mini">GPT-4.1 mini</option>
-                <option value="openai/gpt-4o-mini">GPT-4o mini</option>
-                <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
+                <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
+                <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
                 <option value="moonshotai/kimi-k3">Kimi K3</option>
                 <option value="moonshotai/kimi-k2.7-code">Kimi K2.7 Code</option>
                 <option value="moonshotai/kimi-k2.6">Kimi K2.6</option>
@@ -421,7 +421,24 @@ def render_app() -> str:
           <div class="toggles">
             <label class="checkrow"><input id="suggestExternal" type="checkbox"> External-search suggestions</label>
             <label class="checkrow"><input id="executeExternalSearch" type="checkbox"> OpenAlex online results</label>
+            <label class="checkrow"><input id="runModelReview" type="checkbox"> Model stance review</label>
             <label class="checkrow"><input id="writeTelemetry" type="checkbox" checked> Local telemetry</label>
+          </div>
+          <div class="row2">
+            <label>
+              Review Model
+              <select id="modelReviewModel">
+                <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
+                <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
+                <option value="moonshotai/kimi-k3">Kimi K3</option>
+              </select>
+            </label>
+            <label>
+              Vector Backend
+              <select id="vectorBackend">
+                <option value="qdrant">Qdrant</option>
+              </select>
+            </label>
           </div>
           <label>
             Online Results
@@ -462,7 +479,31 @@ def render_app() -> str:
             </label>
           </div>
           <label class="checkrow"><input id="profileOnly" type="checkbox"> Profile only</label>
-          <button class="secondary" id="corpusButton" type="submit">Set Up Corpus</button>
+          <div class="toggles">
+            <label class="checkrow"><input id="indexVectorStore" type="checkbox" checked> Refresh vector index</label>
+            <label class="checkrow"><input id="deleteStaleVectors" type="checkbox" checked> Remove stale vectors</label>
+            <label class="checkrow"><input id="forceRefresh" type="checkbox"> Force refresh</label>
+          </div>
+          <div class="row2">
+            <label>
+              Index Backend
+              <select id="indexVectorBackend">
+                <option value="qdrant">Qdrant</option>
+              </select>
+            </label>
+            <label>
+              Index Model
+              <select id="indexEmbeddingModel">
+                <option value="qwen/qwen3-embedding-8b">Qwen3 embedding 8B</option>
+                <option value="baai/bge-m3">BGE-M3</option>
+                <option value="openai/text-embedding-3-small">text-embedding-3-small via OpenRouter</option>
+              </select>
+            </label>
+          </div>
+          <div class="buttonrow">
+            <button class="secondary" id="corpusButton" type="submit">Set Up Corpus</button>
+            <button class="ghost" id="refreshCorpusButton" type="button">Refresh Changed Files</button>
+          </div>
         </form>
         <pre id="corpusResult" class="corpus-result">{}</pre>
       </section>
@@ -546,6 +587,10 @@ def render_app() -> str:
           <div id="runDiagnosis" class="diagnosis">
             <div class="empty">No run diagnosis yet.</div>
           </div>
+          <h2>Model Review</h2>
+          <div id="modelReview" class="diagnosis">
+            <div class="empty">No model review yet.</div>
+          </div>
           <div class="split">
             <div>
               <h2>Query Lingo</h2>
@@ -604,7 +649,9 @@ def render_app() -> str:
 
     function setCorpusBusy(isBusy) {
       $("corpusButton").disabled = isBusy;
+      $("refreshCorpusButton").disabled = isBusy;
       $("corpusButton").textContent = isBusy ? "Working..." : "Set Up Corpus";
+      $("refreshCorpusButton").textContent = isBusy ? "Working..." : "Refresh Changed Files";
     }
 
     function renderStatus(status) {
@@ -623,7 +670,8 @@ def render_app() -> str:
       $("topK").value = status.recommended_defaults?.top_k || 12;
       $("candidateK").value = status.recommended_defaults?.candidate_k || 12;
       $("retrievalEngine").value = status.recommended_defaults?.retrieval_engine || "model_candidate_pool";
-      $("candidateScope").value = status.recommended_defaults?.candidate_scope || "lexical_window";
+      $("candidateScope").value = status.recommended_defaults?.candidate_scope || "vector_store";
+      $("vectorBackend").value = status.recommended_defaults?.vector_backend || "qdrant";
       $("lexicalWindowK").value = status.recommended_defaults?.lexical_window_k || 96;
       $("retrievalProvider").value = status.recommended_defaults?.retrieval_provider || "openrouter";
       $("retrievalModel").value = status.recommended_defaults?.retrieval_model || "qwen/qwen3-embedding-8b";
@@ -631,6 +679,7 @@ def render_app() -> str:
       $("rerankerModel").value = status.recommended_defaults?.reranker_model || "rerank-v4.0-pro";
       $("generatorProvider").value = status.recommended_defaults?.generator_provider || "openrouter";
       $("generatorModel").value = status.recommended_defaults?.generator_model || "openai/gpt-4.1-mini";
+      $("modelReviewModel").value = status.recommended_defaults?.model_review_model || "openai/gpt-4.1-mini";
       $("boundaryList").innerHTML = (status.shippable_without_human_review || []).map((item) =>
         `<li>${esc(item)}</li>`
       ).join("");
@@ -655,6 +704,7 @@ def render_app() -> str:
       const cards = session.evidence_cards || [];
       $("evidence").innerHTML = cards.length ? cards.map(renderEvidenceCard).join("") : `<div class="empty">No evidence was retrieved.</div>`;
       $("runDiagnosis").innerHTML = renderRunDiagnosis(session.run_diagnosis || {});
+      $("modelReview").innerHTML = renderModelReview(session.model_review || {});
       $("queryLingo").innerHTML = renderQueryLingo(session.query_lingo || {});
       $("gaps").innerHTML = (session.coverage_gaps || []).map((gap) => `<li>${esc(gap.gap || gap)}</li>`).join("");
       $("rawJson").textContent = JSON.stringify(session, null, 2);
@@ -748,6 +798,39 @@ def render_app() -> str:
       <div>${stages}</div>`;
     }
 
+    function renderModelReview(review) {
+      if (!review.status || review.status === "not_requested") {
+        return `<div class="empty">${esc(review.boundary || "No model review requested.")}</div>`;
+      }
+      if (review.status === "model_review_failed") {
+        return `<div class="banner danger"><strong>${esc(review.status)}</strong>: ${esc(review.error || "")}</div>`;
+      }
+      const diagnosis = review.disagreement_diagnosis || {};
+      const stanceRows = (review.stance_assessments || []).map((row) =>
+        `<div class="diagnosis-stage">
+          <div class="stage-head">
+            <span class="stage-name">${esc(row.evidence_id || "")} ${esc(row.stance || "")}</span>
+            <span class="stage-status">${esc(row.confidence ?? "")}</span>
+          </div>
+          <div>${esc(row.claim || "")}</div>
+          <div class="evidence-meta">${esc(row.excerpt || "")}</div>
+        </div>`
+      ).join("");
+      const dimensions = (review.extracted_dimensions || []).slice(0, 8).map((row) =>
+        `<span><strong>${esc(row.dimension || "")}:</strong> ${esc(row.value || "")}</span>`
+      ).join("");
+      return `<div class="banner warn">
+        <strong>${esc(review.status)}</strong>: ${esc(diagnosis.axis || "review")} ${diagnosis.summary ? "- " + esc(diagnosis.summary) : ""}
+      </div>
+      <div class="signals">
+        <span><strong>provider:</strong> ${esc(review.provider || "")}</span>
+        <span><strong>model:</strong> ${esc(review.model || "")}</span>
+        <span><strong>human_review:</strong> ${esc(review.human_review_required ? "required" : "not flagged")}</span>
+        ${dimensions}
+      </div>
+      <div>${stanceRows || `<div class="empty">No usable stance rows returned.</div>`}</div>`;
+    }
+
     function renderSignalValue(value) {
       if (Array.isArray(value)) return value.join(", ") || "-";
       if (value && typeof value === "object") return JSON.stringify(value);
@@ -766,6 +849,7 @@ def render_app() -> str:
           freedom_level: $("freedomLevel").value,
           retrieval_engine: $("retrievalEngine").value,
           candidate_scope: $("candidateScope").value,
+          vector_backend: $("vectorBackend").value,
           lexical_window_k: Number($("lexicalWindowK").value || 96),
           retrieval_provider: $("retrievalProvider").value,
           retrieval_model: $("retrievalModel").value,
@@ -774,6 +858,10 @@ def render_app() -> str:
           fusion: $("fusion").value,
           generator_provider: $("generatorProvider").value,
           generator_model: $("generatorProvider").value === "openrouter" ? $("generatorModel").value : "",
+          run_model_review: $("runModelReview").checked,
+          model_review_provider: "openrouter",
+          model_review_model: $("modelReviewModel").value,
+          allow_external_model_review: $("runModelReview").checked,
           suggest_external_expansion: $("suggestExternal").checked,
           execute_external_search: $("executeExternalSearch").checked,
           external_search_provider: "openalex",
@@ -814,7 +902,7 @@ def render_app() -> str:
       }
     }
 
-    async function setupCorpus(event) {
+    async function setupCorpus(event, endpoint = "/v1/production/corpus-setup") {
       event.preventDefault();
       setCorpusBusy(true);
       try {
@@ -826,8 +914,14 @@ def render_app() -> str:
           source_name: $("sourceName").value,
           profile_only: $("profileOnly").checked,
           build_corpus: !$("profileOnly").checked,
+          index_vector_store: $("indexVectorStore").checked && !$("profileOnly").checked,
+          vector_backend: $("indexVectorBackend").value,
+          index_embedding_provider: "openrouter",
+          index_embedding_model: $("indexEmbeddingModel").value,
+          delete_stale_vectors: $("deleteStaleVectors").checked,
+          force: $("forceRefresh").checked,
         };
-        const result = await api("/v1/production/corpus-setup", {
+        const result = await api(endpoint, {
           method: "POST",
           body: JSON.stringify(payload),
         });
@@ -892,6 +986,7 @@ def render_app() -> str:
       setupEvidenceFeedback();
       $("queryForm").addEventListener("submit", runSearch);
       $("corpusForm").addEventListener("submit", setupCorpus);
+      $("refreshCorpusButton").addEventListener("click", (event) => setupCorpus(event, "/v1/production/corpus-refresh"));
       $("feedbackForm").addEventListener("submit", submitFeedback);
       $("sampleButton").addEventListener("click", useSample);
       try {

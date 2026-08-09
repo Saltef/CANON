@@ -14,10 +14,10 @@ Supported first-pass inputs:
 - CSV
 - TXT
 - Markdown
-- folders containing a mix of those files
+- PDF, DOCX, XLSX, PPTX, HTML, notebooks, source files, and folders containing
+  a mix of supported files
 
-PDF and Word files still need to be converted to text, Markdown, CSV, JSON, or
-JSONL before ingest.
+Images and scanned PDFs still need OCR before they can become evidence text.
 
 ## 1. Create a Test Corpus
 
@@ -140,6 +140,47 @@ Use `--freedom-level strict` when you want conservative terminology suggestions.
 Use `--freedom-level exploratory` when you want lower-probability adjacent
 phrases that still need human inspection.
 
+## 4a. Refresh The Hosted Vector Index
+
+For the hosted workbench path, keep the processed CANON corpus as the source of
+truth and use Qdrant only as a replaceable vector index. Add keys to `.env`:
+
+```powershell
+OPENROUTER_API_KEY=...
+COHERE_API_KEY=...
+QDRANT_URL=...
+QDRANT_API_KEY=...
+```
+
+Then refresh the ANN index whenever you add, change, or remove documents:
+
+```powershell
+python -m canon.embeddings.index --mode battery_storage_v1_corpus --embedding-provider openrouter --embedding-model qwen/qwen3-embedding-8b --vector-backend qdrant
+```
+
+The index build uses deterministic point IDs and deletes stale points recorded
+in the previous manifest by default. Switching from Qdrant to another backend
+should be a reindex from `data/processed/works_<mode>.json` and
+`data/processed/chunks_<mode>.json`, not a migration from Qdrant as source.
+
+Through the workbench API, corpus setup can do the ingest/build/index sequence:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/production/corpus-setup -ContentType "application/json" -Body '{"input_path":"data/my_docs/battery_storage","mode":"battery_storage_v1","corpus_id":"battery_storage_v1_corpus","build_corpus":true,"index_vector_store":true,"vector_backend":"qdrant","index_embedding_provider":"openrouter","index_embedding_model":"qwen/qwen3-embedding-8b"}'
+```
+
+The setup endpoint writes `reports/corpus_source_manifest_<mode>.json`. After
+you add, edit, or remove files in the same folder, use the refresh endpoint:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/production/corpus-refresh -ContentType "application/json" -Body '{"input_path":"data/my_docs/battery_storage","mode":"battery_storage_v1","corpus_id":"battery_storage_v1_corpus","build_corpus":true,"index_vector_store":true,"vector_backend":"qdrant","index_embedding_provider":"openrouter","index_embedding_model":"qwen/qwen3-embedding-8b"}'
+```
+
+If no supported source files changed, refresh returns `no_source_changes` and
+does not rebuild the processed corpus or Qdrant index. Use `"force": true` when
+the files are unchanged but you changed chunking, embedding model, vector
+backend, or collection settings.
+
 ## 5. Build a Topic Test Set
 
 Create 10 to 30 questions for each topic. Include:
@@ -180,7 +221,7 @@ python -m canon.eval.rag --mode battery_storage_v1_corpus --top-k 5 --policies l
 If you have relevance labels, compare semantic models on your own questions:
 
 ```powershell
-python -m canon.eval.model_evaluation --mode battery_storage_v1_corpus --qrels gold/battery_storage_qrels.json --providers local,openai,cohere --k 10
+python -m canon.eval.model_evaluation --mode battery_storage_v1_corpus --qrels gold/battery_storage_qrels.json --providers local,openrouter,cohere --k 10
 ```
 
 Remote providers are marked `unavailable` when API keys are not configured. The

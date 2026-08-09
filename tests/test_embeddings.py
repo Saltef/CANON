@@ -28,11 +28,18 @@ class EmbeddingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             get_embedding_provider("missing")
 
-    def test_openai_provider_requires_key(self):
+    def test_openai_alias_requires_openrouter_key(self):
         with patch.dict("os.environ", {}, clear=True):
             with patch("canon.embeddings.providers.load_local_env"):
                 with self.assertRaises(RuntimeError):
                     get_embedding_provider("openai")
+
+    def test_openai_alias_routes_through_openrouter(self):
+        with patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}, clear=True):
+            with patch("canon.embeddings.providers.load_local_env"):
+                provider = get_embedding_provider("openai", "text-embedding-3-small")
+        self.assertEqual(provider.provider, "openrouter")
+        self.assertEqual(provider.model, "openai/text-embedding-3-small")
 
     def test_openrouter_provider_uses_openrouter_key(self):
         with patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}, clear=True):

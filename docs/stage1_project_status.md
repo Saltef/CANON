@@ -67,27 +67,38 @@ therefore: do not claim an auto-expansion top-10 ranking gain from this pilot.
 Parent-neighborhood expansion still improves candidate coverage, but it should
 not be presented as a top-k ranking improvement.
 
-### LlamaIndex Head-to-Head
+### LlamaIndex Factor Correction
 
-CANON now includes a framework baseline under
-`canon.baselines.llamaindex_baseline`. It evaluates LlamaIndex's
-`VectorStoreIndex` retriever on the same 30 NFCorpus queries and 1,724 labels,
-then pairs its three repeats against the existing CANON repeat-spread report.
+CANON now includes a corrected LlamaIndex comparison under
+`canon.baselines.llamaindex_baseline`. The earlier head-to-head is superseded
+because it compared CANON with Qwen embeddings, BM25, RRF, and Cohere rerank
+against LlamaIndex with a hashed deterministic embedding adapter and no fusion
+or rerank. That result should not be cited as evidence that CANON's architecture
+earned its complexity.
 
-The compact machine-readable artifact is
+The corrected artifact evaluates a 2x2 retrieval-factor pilot on the same 30
+NFCorpus queries and 1,724 labels, with three repeats per configuration. The
+compact machine-readable artifact is
 `reports/llamaindex_stage1_head_to_head.json`; the reviewer-facing summary is
 `docs/llamaindex_head_to_head.md`.
 
-| Comparison | Paired runs | Mean nDCG@10 delta | Standing |
-|---|---:|---:|---|
-| LlamaIndex original qrels - CANON base Qwen+Cohere | 3 | -26.627 pp | `stands_under_repeat_spread_check` |
-| LlamaIndex fixed parent qrels - CANON auto expansion | 3 | -26.640 pp | `stands_under_repeat_spread_check` |
-| LlamaIndex fixed parent qrels - CANON parent-neighborhood | 3 | -26.652 pp | `stands_under_repeat_spread_check` |
+| Encoder | LlamaIndex single dense nDCG@10 | CANON BM25+dense RRF+Cohere nDCG@10 |
+|---|---:|---:|
+| `hashed-semantic-v1` | 0.128390 | 0.350162 |
+| `qwen/qwen3-embedding-8b` | 0.465538 | 0.395260 |
 
-Standing verdict: `canon`. The result should be described narrowly: CANON beats
-this LlamaIndex in-memory vector-index baseline on the current 30-query
-NFCorpus pilot. It is not a claim that CANON beats tuned LlamaIndex pipelines,
-OpenAI-backed LlamaIndex defaults, or full BEIR leaderboards.
+Standing verdict: `corrected_factorial_result_available`. The strongest current
+reading is that the old 26.6 point gap was mostly an encoder confound. With Qwen
+in both arms, LlamaIndex's single dense retriever beats the current CANON full
+pipeline by 7.028 percentage points on nDCG@10 in this pilot.
+
+The reranker ablation remains useful: Cohere rerank adds 10.496 points over
+CANON RRF-only with the hash encoder, but only 1.215 points with Qwen. The
+query-level diagnostics make the engineering lesson explicit: with shared Qwen,
+LlamaIndex wins 13 queries, CANON wins 6, and 11 are ties; the dominant failure
+classes are `encoder_rescues_llamaindex` and `llamaindex_qwen_ranking_advantage`.
+Publish this as a 2x2 retrieval-factor pilot with diagnostics, not as proof that
+either framework or architecture generally wins.
 
 ### Historical Base-Shift Audit
 
@@ -309,7 +320,7 @@ Stage 2 now has two synthesis modes:
 
 - deterministic local mode, used for offline tests and fallback behavior;
 - model-backed mode through `stage2_model_provider` / `stage2_model`, currently
-  supporting OpenRouter and OpenAI JSON synthesis.
+  supporting OpenRouter-routed JSON synthesis.
 
 Model-backed Stage 2 extracts atomic claims, clusters opposing evidence into
 shared claim structures, assigns stance and hedge scores, and emits the same

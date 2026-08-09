@@ -171,7 +171,7 @@ CANON already has an embedding provider interface and provider comparison path.
 The first task-level model-evaluation harness is implemented as:
 
 ```powershell
-python -m canon.eval.model_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --providers local,openai,cohere --k 10
+python -m canon.eval.model_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --providers local,openrouter,cohere --k 10
 ```
 
 It runs the same question set through each available embedding provider and
@@ -282,7 +282,7 @@ Pass criteria:
 - Ingest reports skipped records, inferred document types, source provenance,
   chunking strategy, and corpus limitations.
 - User can run a full test from their own files without editing code.
-- Model evaluation compares at least `local`, `openai`, and `cohere` when keys
+- Model evaluation compares at least `local`, `openrouter`, and `cohere` when keys
   are available, while degrading cleanly when remote providers are unavailable.
 - Evaluation reports retrieval quality, answer support, query-lingo usefulness,
   drift, latency, and cost.

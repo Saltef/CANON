@@ -7,11 +7,20 @@ services:
       CANON_SETTINGS: /app/conf/settings.toml
       CANON_DATA_DIR: /app/data
       CANON_REPORTS_DIR: /app/reports
-      DATABASE_URL: postgresql://canon:canon@postgres:5432/canon
-      GROBID_URL: http://grobid:8070
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CANON_VECTORSTORE: qdrant
+      CANON_ALLOWED_ORIGINS: ${CANON_ALLOWED_ORIGINS:-http://localhost:8000}
+      CANON_REQUIRE_AUTH: ${CANON_REQUIRE_AUTH:-false}
+      CANON_API_KEY: ${CANON_API_KEY:-}
+      CANON_BASIC_AUTH_USER: ${CANON_BASIC_AUTH_USER:-}
+      CANON_BASIC_AUTH_PASSWORD: ${CANON_BASIC_AUTH_PASSWORD:-}
+      CANON_MAX_CONCURRENCY: ${CANON_MAX_CONCURRENCY:-8}
+      CANON_MAX_QUEUE_DEPTH: ${CANON_MAX_QUEUE_DEPTH:-16}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       COHERE_API_KEY: ${COHERE_API_KEY:-}
+      QDRANT_URL: ${QDRANT_URL:-}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
       OPENALEX_API_KEY: ${OPENALEX_API_KEY:-}
+      PORT: 8000
     ports:
       - "8000:8000"
     volumes:
@@ -19,34 +28,26 @@ services:
       - ./reports:/app/reports
       - ./conf:/app/conf:ro
       - ./gold:/app/gold:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
 
-  postgres:
-    image: pgvector/pgvector:pg16
+  canon-render-smoke:
+    profiles: ["render-smoke"]
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
-      POSTGRES_USER: canon
-      POSTGRES_PASSWORD: canon
-      POSTGRES_DB: canon
+      CANON_SETTINGS: /app/conf/settings.toml
+      CANON_DATA_DIR: /app/data
+      CANON_REPORTS_DIR: /app/reports
+      CANON_VECTORSTORE: qdrant
+      CANON_ALLOWED_ORIGINS: ""
+      CANON_REQUIRE_AUTH: "false"
+      CANON_MAX_CONCURRENCY: 8
+      CANON_MAX_QUEUE_DEPTH: 16
+      OPENROUTER_API_KEY: ""
+      COHERE_API_KEY: ""
+      QDRANT_URL: ""
+      QDRANT_API_KEY: ""
+      OPENALEX_API_KEY: ""
+      PORT: 8000
     ports:
-      - "5432:5432"
-    volumes:
-      - canon_postgres:/var/lib/postgresql/data
-      - ./canon/db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
-      - ./canon/db:/app/canon/db:ro
-      - ./data:/app/data:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U canon -d canon"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  grobid:
-    image: lfoppiano/grobid:0.8.0
-    profiles: ["fulltext"]
-    ports:
-      - "8070:8070"
-
-volumes:
-  canon_postgres:
+      - "8001:8000"

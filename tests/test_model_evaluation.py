@@ -80,7 +80,7 @@ class SemanticModelEvaluationTests(unittest.TestCase):
             report = evaluate_semantic_models(
                 mode=mode,
                 qrels_path=qrels_path,
-                providers=["local", "openai"],
+                providers=["local", "openrouter"],
                 k=5,
             )
 

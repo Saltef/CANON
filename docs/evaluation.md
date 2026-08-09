@@ -43,7 +43,7 @@ python -m canon.product.automated_benchmark_suite --suite conf/benchmark_suites/
 This produces aggregate topic summaries, semantic retrieval metrics, pooled
 lexical/vector candidate-recall diagnostics, rerank metrics, and score
 observability. The default suite includes `local` as the reproducible control
-and OpenAI/Cohere as hosted model candidates. If API keys are missing, hosted
+and OpenRouter/Cohere as hosted model candidates. If API keys are missing, hosted
 models are reported as unavailable so the model matrix is visibly incomplete
 rather than silently treated as a loss.
 
@@ -63,9 +63,9 @@ python -m canon.product.stage1_sweep --suite conf/benchmark_suites/stage1_public
 ```
 
 The default Stage 1 suite includes local control embeddings, Cohere Embed v4,
-OpenRouter OpenAI text embeddings, OpenRouter Qwen3 Embedding 8B, and
+OpenRouter-hosted text embeddings, OpenRouter Qwen3 Embedding 8B, and
 OpenRouter BGE-M3. Qwen queries are instruction-prefixed according to its model
-guidance; BGE-M3 and OpenAI-style embeddings use raw query/document text; Cohere
+guidance; BGE-M3 and OpenRouter text embeddings use raw query/document text; Cohere
 uses separate `search_query` and `search_document` input modes.
 
 Run the AutoML-style Stage 1 optimizer when comparing full retrieval stacks:
@@ -267,7 +267,7 @@ python -m canon.eval.qrels_review import-csv --csv reports/qrels_review_tasks_my
 Evaluate retrieval models against reviewed qrels:
 
 ```powershell
-python -m canon.eval.model_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --providers local,openai,cohere --k 10
+python -m canon.eval.model_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --providers local,openrouter,cohere --k 10
 ```
 
 Evaluate rerankers:
@@ -301,3 +301,12 @@ notepad .env
 
 The local and heuristic paths are the safest first tests because they do not
 send corpus content to external model APIs.
+
+For hosted personal-corpus runs, Qdrant can be used as the vector index while
+CANON's processed corpus files remain canonical:
+
+```powershell
+python -m canon.embeddings.index --mode my_topic_v1_corpus --embedding-provider openrouter --embedding-model qwen/qwen3-embedding-8b --vector-backend qdrant
+```
+
+Use `candidate_scope=vector_store` in the workbench after the index is built.

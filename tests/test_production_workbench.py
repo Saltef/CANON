@@ -67,10 +67,16 @@ class ProductionWorkbenchTests(unittest.TestCase):
         self.assertIn("autonomous factual conclusions", report["blocked_without_human_review"])
         self.assertEqual(report["endpoints"]["run"], "POST /v1/production/evidence-workbench")
         self.assertEqual(report["endpoints"]["corpus_setup"], "POST /v1/production/corpus-setup")
+        self.assertEqual(report["endpoints"]["corpus_refresh"], "POST /v1/production/corpus-refresh")
+        self.assertEqual(report["recommended_defaults"]["candidate_scope"], "vector_store")
+        self.assertEqual(report["recommended_defaults"]["vector_backend"], "qdrant")
         self.assertIn("full_embedding_store", {row["scope"] for row in report["candidate_scopes"]})
+        self.assertIn("vector_store", {row["scope"] for row in report["candidate_scopes"]})
         self.assertIn("moonshotai/kimi-k3", {row["model"] for row in report["generation_models"]})
+        self.assertNotIn("google/gemini-2.5-flash", {row["model"] for row in report["generation_models"]})
         self.assertEqual(report["recommended_defaults"]["external_expansion"], "off_by_default_opt_in_openalex")
         self.assertIn("external_source/ONLINE", report["operational_boundary"]["external_web"])
+        self.assertIn("local source manifests", report["operational_boundary"]["corpus_refresh"])
 
     def test_production_evidence_workbench_builds_session_and_writes_telemetry(self):
         packet_response = {
@@ -593,6 +599,7 @@ class ProductionWorkbenchTests(unittest.TestCase):
                                     "mode": "m",
                                     "top_k": 3,
                                     "retrieval_engine": "model_candidate_pool",
+                                    "candidate_scope": "lexical_window",
                                     "retrieval_provider": "openrouter",
                                     "retrieval_model": "qwen/qwen3-embedding-8b",
                                     "reranker_provider": "cohere",
@@ -743,6 +750,69 @@ class ProductionWorkbenchTests(unittest.TestCase):
 
         self.assertIn("candidate_scope", str(context.exception))
 
+    def test_production_evidence_workbench_can_run_typed_model_review(self):
+        packet_response = {
+            "status": "complete",
+            "query": "grid risk",
+            "mode": "m",
+            "policy": "rag",
+            "evidence_packets": [
+                {
+                    "packet_id": "packet_1",
+                    "support_level": "mixed",
+                    "confidence": "medium",
+                    "supporting_evidence": [
+                        {
+                            "evidence_id": "C1",
+                            "rank": 1,
+                            "title": "Grid Study",
+                            "source_name": "Utility",
+                            "text": "Grid risk increases near data centers.",
+                        }
+                    ],
+                }
+            ],
+            "query_diagnostics": {"matched_terms": ["grid", "risk"], "weak_terms": []},
+            "coverage_gaps": [],
+            "external_expansion": {"status": "disabled", "executed": False},
+            "answer_report": {
+                "citations": [{"citation_id": "C1"}],
+                "support_assessment": {
+                    "support_level": "moderate",
+                    "query_term_coverage": 1.0,
+                    "covered_focus_terms": ["grid", "risk"],
+                    "missing_focus_terms": [],
+                },
+            },
+            "contract_validation": {"status": "pass"},
+        }
+        model_review = {
+            "status": "model_review_ready",
+            "provider": "openrouter",
+            "model": "openai/gpt-4.1-mini",
+            "stance_assessments": [{"evidence_id": "C1", "stance": "supports"}],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            settings = SimpleNamespace(reports_dir=Path(temp_dir))
+            with patch("canon.product.service.load_settings", return_value=settings):
+                with patch("canon.product.service.evidence_packets", return_value=packet_response):
+                    with patch("canon.product.service.run_evidence_model_review", return_value=model_review) as review:
+                        report = service.production_evidence_workbench(
+                            {
+                                "session_id": "prod_review",
+                                "query": "grid risk",
+                                "mode": "m",
+                                "run_model_review": True,
+                                "allow_external_model_review": True,
+                                "write_telemetry": False,
+                            }
+                        )
+
+        self.assertEqual(report["model_review"]["status"], "model_review_ready")
+        self.assertEqual(review.call_args.kwargs["provider"], "openrouter")
+        self.assertTrue(review.call_args.kwargs["allow_external_data"])
+
     def test_production_corpus_setup_profiles_only_or_builds_user_corpus(self):
         with patch("canon.product.service.source_profile", return_value={"source_shape": "folder"}) as profile:
             with patch("canon.product.service.source_ingest", return_value={"status": "ingested"}) as ingest:
@@ -750,17 +820,23 @@ class ProductionWorkbenchTests(unittest.TestCase):
                     "canon.product.service.corpus_build",
                     return_value={"corpus": {"corpus_id": "my_topic_corpus"}, "validation": {"status": "pass"}},
                 ) as build:
-                    report = service.production_corpus_setup(
-                        {
-                            "input_path": "data/my_docs",
-                            "mode": "my_topic_v1",
-                            "corpus_id": "my_topic_corpus",
-                            "build_corpus": True,
-                        }
-                    )
+                    with patch(
+                        "canon.product.service.production_source_manifest",
+                        return_value={"manifest_version": 1, "content_digest": "abc"},
+                    ):
+                        with patch("canon.product.service.write_source_manifest", return_value=Path("reports/m.json")):
+                            report = service.production_corpus_setup(
+                                {
+                                    "input_path": "data/my_docs",
+                                    "mode": "my_topic_v1",
+                                    "corpus_id": "my_topic_corpus",
+                                    "build_corpus": True,
+                                }
+                            )
 
         self.assertEqual(report["status"], "corpus_ready")
         self.assertEqual(report["recommended_mode"], "my_topic_corpus")
+        self.assertEqual(report["source_snapshot"]["content_digest"], "abc")
         profile.assert_called_once()
         ingest.assert_called_once()
         build.assert_called_once()
@@ -774,6 +850,154 @@ class ProductionWorkbenchTests(unittest.TestCase):
         self.assertEqual(report["status"], "profile_ready")
         profile.assert_called_once()
         ingest.assert_not_called()
+
+    def test_production_corpus_setup_can_request_vector_index_refresh(self):
+        with patch("canon.product.service.source_profile", return_value={"source_shape": "folder"}):
+            with patch("canon.product.service.source_ingest", return_value={"status": "ingested"}):
+                with patch(
+                    "canon.product.service.corpus_build",
+                    return_value={"corpus": {"corpus_id": "my_topic_corpus"}, "validation": {"status": "pass"}},
+                ):
+                    with patch(
+                        "canon.product.service.build_vector_index",
+                        return_value={"status": "indexed", "collection": "canon_my_topic"},
+                    ) as index:
+                        with patch(
+                            "canon.product.service.production_source_manifest",
+                            return_value={"manifest_version": 1, "content_digest": "abc"},
+                        ):
+                            with patch("canon.product.service.write_source_manifest", return_value=Path("reports/m.json")):
+                                report = service.production_corpus_setup(
+                                    {
+                                        "input_path": "data/my_docs",
+                                        "mode": "my_topic_v1",
+                                        "corpus_id": "my_topic_corpus",
+                                        "build_corpus": True,
+                                        "index_vector_store": True,
+                                        "vector_backend": "qdrant",
+                                        "index_embedding_provider": "openrouter",
+                                        "index_embedding_model": "qwen/qwen3-embedding-8b",
+                                    }
+                                )
+
+        self.assertEqual(report["status"], "corpus_ready_vector_indexed")
+        self.assertEqual(report["vector_index"]["collection"], "canon_my_topic")
+        self.assertEqual(index.call_args.kwargs["mode"], "my_topic_corpus")
+        self.assertEqual(index.call_args.kwargs["vector_backend"], "qdrant")
+
+    def test_production_corpus_refresh_skips_when_manifest_is_unchanged(self):
+        current = {
+            "manifest_version": 1,
+            "mode": "my_topic_v1",
+            "input_path": "data/my_docs",
+            "file_count": 1,
+            "supported_file_count": 1,
+            "unsupported_file_count": 0,
+            "content_digest": "abc",
+            "entries": [
+                {
+                    "relative_path": "a.md",
+                    "supported": True,
+                    "size_bytes": 10,
+                    "sha256": "h1",
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            settings = SimpleNamespace(reports_dir=Path(temp_dir))
+            with patch("canon.product.service.load_settings", return_value=settings):
+                with patch("canon.product.service.production_source_manifest", return_value=current):
+                    with patch("canon.product.service.load_previous_manifest", return_value=current):
+                        with patch("canon.product.service.production_corpus_setup") as setup:
+                            report = service.production_corpus_refresh(
+                                {"input_path": "data/my_docs", "mode": "my_topic_v1"}
+                            )
+
+        self.assertEqual(report["status"], "no_source_changes")
+        self.assertEqual(report["source_diff"]["status"], "unchanged")
+        setup.assert_not_called()
+
+    def test_production_corpus_refresh_runs_setup_when_source_changes(self):
+        previous = {
+            "content_digest": "old",
+            "entries": [
+                {
+                    "relative_path": "a.md",
+                    "supported": True,
+                    "size_bytes": 10,
+                    "sha256": "h1",
+                }
+            ],
+        }
+        current = {
+            "manifest_version": 1,
+            "mode": "my_topic_v1",
+            "input_path": "data/my_docs",
+            "file_count": 1,
+            "supported_file_count": 1,
+            "unsupported_file_count": 0,
+            "content_digest": "new",
+            "entries": [
+                {
+                    "relative_path": "a.md",
+                    "supported": True,
+                    "size_bytes": 11,
+                    "sha256": "h2",
+                }
+            ],
+        }
+        setup_report = {"report_id": "production_corpus_setup_v1", "status": "corpus_ready"}
+
+        with TemporaryDirectory() as temp_dir:
+            settings = SimpleNamespace(reports_dir=Path(temp_dir))
+            with patch("canon.product.service.load_settings", return_value=settings):
+                with patch("canon.product.service.production_source_manifest", return_value=current):
+                    with patch("canon.product.service.load_previous_manifest", return_value=previous):
+                        with patch("canon.product.service.production_corpus_setup", return_value=setup_report) as setup:
+                            report = service.production_corpus_refresh(
+                                {"input_path": "data/my_docs", "mode": "my_topic_v1"}
+                            )
+
+        self.assertEqual(report["report_id"], "production_corpus_refresh_v1")
+        self.assertEqual(report["refresh_status"], "source_changes_refreshed")
+        self.assertEqual(report["source_diff"]["changed"], ["a.md"])
+        setup.assert_called_once()
+
+    def test_production_corpus_refresh_force_rebuilds_even_without_source_changes(self):
+        current = {
+            "manifest_version": 1,
+            "mode": "my_topic_v1",
+            "input_path": "data/my_docs",
+            "file_count": 1,
+            "supported_file_count": 1,
+            "unsupported_file_count": 0,
+            "content_digest": "abc",
+            "entries": [
+                {
+                    "relative_path": "a.md",
+                    "supported": True,
+                    "size_bytes": 10,
+                    "sha256": "h1",
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            settings = SimpleNamespace(reports_dir=Path(temp_dir))
+            with patch("canon.product.service.load_settings", return_value=settings):
+                with patch("canon.product.service.production_source_manifest", return_value=current):
+                    with patch("canon.product.service.load_previous_manifest", return_value=current):
+                        with patch(
+                            "canon.product.service.production_corpus_setup",
+                            return_value={"report_id": "production_corpus_setup_v1", "status": "corpus_ready"},
+                        ) as setup:
+                            report = service.production_corpus_refresh(
+                                {"input_path": "data/my_docs", "mode": "my_topic_v1", "force": True}
+                            )
+
+        self.assertEqual(report["refresh_status"], "forced_refresh")
+        setup.assert_called_once()
 
     def test_production_feedback_writes_user_experience_jsonl(self):
         with TemporaryDirectory() as temp_dir:

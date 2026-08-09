@@ -16,6 +16,7 @@ from canon.retrieval.bm25 import BM25Index
 from canon.retrieval.clusters import load_cluster_assignments
 from canon.retrieval.corpus import RetrievalDocument, load_processed_corpus
 from canon.retrieval.topic_profile import ensure_topic_profile, topic_query_variants
+from canon.vectorstores import VectorStore, get_vector_store, vector_collection_name
 
 
 @dataclass(frozen=True)
@@ -280,6 +281,108 @@ def build_bm25_candidate_pool(
     return report
 
 
+def build_vector_store_candidate_pool(
+    query: str,
+    mode: str,
+    lexical_k: int = 50,
+    vector_k: int = 50,
+    provider: str = "openrouter",
+    model: str | None = None,
+    vector_backend: str = "qdrant",
+    collection: str | None = None,
+    fusion: str = "weighted_bm25_dense",
+    vector_store: VectorStore | None = None,
+) -> dict[str, Any]:
+    settings = load_settings()
+    documents = load_processed_corpus(
+        settings.data_dir,
+        mode,
+        cluster_assignments=load_cluster_assignments(settings.data_dir, mode),
+    )
+    provider_instance = get_embedding_provider(provider, model)
+    collection = collection or vector_collection_name(mode, provider_instance.provider, provider_instance.model)
+    with stage_span(
+        "bm25",
+        mode=mode,
+        lexical_k=lexical_k,
+        document_count=len(documents),
+        input_tokens=estimate_tokens(query),
+    ) as span:
+        lexical_ranked = ranked_lexical(query, documents, lexical_k)
+        span.set_attribute("candidate_count", len(lexical_ranked))
+    with stage_span(
+        "embed",
+        mode=mode,
+        provider=provider_instance.provider,
+        model=provider_instance.model,
+        vector_backend=vector_backend,
+        collection=collection,
+        input_tokens=estimate_tokens(query),
+    ) as span:
+        query_embedding = embed_queries(provider_instance, [query])[0]
+        span.set_attribute("embedding_dimensions", query_embedding.dimensions)
+    store = vector_store or get_vector_store(vector_backend)
+    with stage_span(
+        "vector_search",
+        mode=mode,
+        provider=provider_instance.provider,
+        model=provider_instance.model,
+        vector_backend=vector_backend,
+        collection=collection,
+        vector_k=vector_k,
+    ) as span:
+        vector_ranked = ranked_vector_store(
+            store=store,
+            collection=collection,
+            query_vector=query_embedding.vector,
+            vector_k=vector_k,
+            mode=mode,
+        )
+        span.set_attribute("candidate_count", len(vector_ranked))
+    with stage_span(
+        "fuse",
+        mode=mode,
+        provider=provider_instance.provider,
+        model=provider_instance.model,
+        vector_backend=vector_backend,
+        fusion=fusion,
+    ) as span:
+        hits = candidate_pool_from_ranked_rows(
+            documents=documents,
+            ranked_sources=[
+                ("lexical", lexical_ranked),
+                (f"vector:{vector_backend}", vector_ranked),
+            ],
+            fusion=fusion,
+        )
+        span.set_attribute("candidate_count", len(hits))
+    report = {
+        "report_id": "vector_store_candidate_pool_v1",
+        "query": query,
+        "mode": mode,
+        "provider": provider_instance.provider,
+        "model": provider_instance.model,
+        "vector_backend": vector_backend,
+        "collection": collection,
+        "document_count": len(documents),
+        "candidate_count": len(hits),
+        "lexical_k": lexical_k,
+        "vector_k": vector_k,
+        "fusion": fusion,
+        "source_counts": source_counts(hits),
+        "candidates": [hit.to_dict() for hit in hits],
+        "boundary": (
+            "BM25 scanned the local full corpus while dense ANN search used the configured vector backend. "
+            "Vector hits are joined back to local CANON chunks by chunk_id."
+        ),
+    }
+    report_io.write_json(
+        settings.reports_dir / f"candidate_pool_{mode}_{safe_slug(query)}_{safe_slug(vector_backend)}.json",
+        report,
+    )
+    return report
+
+
 def embed_window_documents(
     documents: Sequence[RetrievalDocument],
     provider_name: str,
@@ -305,6 +408,33 @@ def embed_window_documents(
             for document, embedding in zip(batch, embeddings, strict=True)
         )
     return records
+
+
+def candidate_pool_from_ranked_rows(
+    documents: Sequence[RetrievalDocument],
+    ranked_sources: Sequence[tuple[str, list[tuple[str, float]]]],
+    fusion: str,
+) -> list[CandidateHit]:
+    rows: dict[str, dict[str, Any]] = {}
+    doc_by_id = {document.chunk_id: document for document in documents}
+    for source, ranked in ranked_sources:
+        add_ranked_rows(rows, ranked, source=source)
+    hits = [
+        CandidateHit(
+            document=doc_by_id[chunk_id],
+            retrieval_sources=tuple(sorted(row["sources"])),
+            best_rank=min(row["ranks"].values()),
+            best_score=max(row["scores"].values()),
+            scores=row["scores"],
+            ranks=row["ranks"],
+        )
+        for chunk_id, row in sorted(
+            rows.items(),
+            key=lambda item: (min(item[1]["ranks"].values()), -max(item[1]["scores"].values()), item[0]),
+        )
+        if chunk_id in doc_by_id
+    ]
+    return sort_hits(hits, fusion)
 
 
 def candidate_pool_from_documents(
@@ -510,6 +640,23 @@ def ranked_lexical(
         if score > 0
     ]
     return sorted(scored, key=lambda row: (row[1], row[0]), reverse=True)[:k]
+
+
+def ranked_vector_store(
+    *,
+    store: VectorStore,
+    collection: str,
+    query_vector: list[float],
+    vector_k: int,
+    mode: str,
+) -> list[tuple[str, float]]:
+    results = store.search(collection, query_vector, top_k=vector_k, filters={"mode": mode})
+    ranked = []
+    for result in results:
+        chunk_id = str(result.payload.get("chunk_id") or "")
+        if chunk_id:
+            ranked.append((chunk_id, float(result.score)))
+    return ranked
 
 
 def ranked_vectors(

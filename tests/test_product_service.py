@@ -625,13 +625,13 @@ class ProductServiceTests(unittest.TestCase):
                 {
                     "mode": "m",
                     "qrels_path": "gold/qrels.json",
-                    "providers": ["local", "openai"],
+                    "providers": ["local", "openrouter"],
                     "k": "5",
                 }
             )
 
         self.assertEqual(report["report_id"], "semantic_model_evaluation_v1")
-        self.assertEqual(evaluate.call_args.kwargs["providers"], ["local", "openai"])
+        self.assertEqual(evaluate.call_args.kwargs["providers"], ["local", "openrouter"])
         self.assertEqual(evaluate.call_args.kwargs["k"], 5)
         with self.assertRaises(service.ProductError):
             service.model_evaluation({"mode": "m"})

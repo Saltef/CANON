@@ -247,18 +247,18 @@ Implementation sketch:
   Scholar, Unpaywall, and DOAJ/CORE remain planned verification/backfill sources
   until connectors are implemented and audited.
 
-## First Product Endpoints
+## Current ASGI Product Endpoints
 
 - `GET /health`
-- `GET /v1/summary`
-- `GET /v1/reports/audit`
-- `GET /v1/reports/claim-decision`
-- `GET /v1/reports/data-card`
-- `GET /v1/reports/regression-gate`
-- `GET /v1/reports/diversity`
-- `GET /v1/diversity/queries`
-- `GET /v1/diversity/queries/{query_id}`
-- `POST /v1/answer`
-- `POST /v1/compare`
+- `GET /app`
+- `GET /metrics`
+- `GET /v1/production/status`
+- `GET /v1/routes`
+- `POST /v1/evidence-packets`
+- `POST /v1/production/evidence-workbench`
+- `POST /v1/production/corpus-setup`
+- `POST /v1/production/corpus-refresh`
+- `POST /v1/production/feedback`
+- `POST /v1/stage2-synthesis`
 - `POST /v1/query-diagnostics`
 - `POST /v1/diversity-audit`

@@ -15,7 +15,7 @@ bootstrap-fixtures:
 	python -c "from pathlib import Path; import json; path = Path('reports'); path.mkdir(parents=True, exist_ok=True); (path / 'human_review_tasks_v1.json').write_text(json.dumps({'records': []}) + '\\n', encoding='utf-8')"
 
 ci: bootstrap-fixtures
-	python -m pip install -e .
+	python -m pip install -e ".[serve,vectorstores,docs,baselines]"
 	python -m unittest discover -s tests
 	python -m canon.ingest.pipeline --dry-run
 	python -m canon.quality.diagnostics --mode dry_run

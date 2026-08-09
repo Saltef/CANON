@@ -114,23 +114,17 @@ python -m canon.product.flagship_handoff --mode ai_infra_geo_risk_demo
 python -m canon.product.acceptance_scenario --mode ai_infra_geo_risk_demo
 ```
 
-Start the product API:
+Start the product API by installing the deploy extras and running the FastAPI
+ASGI server:
 
 ```powershell
-python -m canon.product.server --host 127.0.0.1 --port 8000
-```
-
-For the production serving path, install the optional ASGI stack and run the
-FastAPI server with bounded concurrency:
-
-```powershell
-python -m pip install -e ".[serve]"
+python -m pip install -e ".[serve,vectorstores,docs]"
 python -m canon.product.asgi --host 127.0.0.1 --port 8000 --max-concurrency 8 --max-queue-depth 16
 ```
 
-`serve` keeps the core CANON package dependency-free while adding FastAPI,
-uvicorn, pooled `httpx` provider calls, and Prometheus metrics. `otel` is a
-separate optional extra for OpenTelemetry instrumentation:
+`serve` adds FastAPI, uvicorn, pooled `httpx` provider calls, and Prometheus
+metrics. `vectorstores` adds Qdrant support. `otel` is a separate optional extra
+for OpenTelemetry instrumentation:
 
 ```powershell
 python -m pip install -e ".[serve,otel]"
@@ -166,22 +160,24 @@ if the selected corpus does not visibly match the query, it blocks the evidence
 note and marks retrieved rows as diagnostic candidates instead of usable
 supporting evidence.
 
-Check the API:
+For hosted deployment, see [docs/deploy_render.md](docs/deploy_render.md). The
+repo includes a Render Blueprint for a free Docker preview service. That target
+is intentionally not durable storage for uploaded corpora; durable hosted
+corpora need a paid Render disk or another persistent source of truth. The
+Docker path runs the same ASGI server and expects provider secrets in runtime
+environment variables, not in the image. The Render Blueprint sets
+`CANON_REQUIRE_AUTH=true`, so configure Basic Auth or `CANON_API_KEY` before
+deploying a public backend.
+
+Check the ASGI API:
 
 ```powershell
 Invoke-WebRequest http://localhost:8000/health
 Invoke-RestMethod http://localhost:8000/v1/production/status
 Invoke-RestMethod -Method Post http://localhost:8000/v1/production/corpus-setup -ContentType "application/json" -Body '{"input_path":"data/my_docs","mode":"my_topic_v1","corpus_id":"my_topic_v1_corpus","build_corpus":true}'
 Invoke-RestMethod -Method Post http://localhost:8000/v1/production/evidence-workbench -ContentType "application/json" -Body '{"query":"What are the grid risks around AI data center expansion?","mode":"ai_infra_geo_risk_demo","top_k":12,"freedom_level":"balanced","suggest_external_expansion":true}'
+Invoke-RestMethod -Method Post http://localhost:8000/v1/production/corpus-refresh -ContentType "application/json" -Body '{"input_path":"data/my_docs","mode":"my_topic_v1","corpus_id":"my_topic_v1_corpus","build_corpus":true,"index_vector_store":true,"vector_backend":"qdrant","index_embedding_provider":"openrouter","index_embedding_model":"qwen/qwen3-embedding-8b"}'
 Invoke-RestMethod http://localhost:8000/v1/routes
-Invoke-RestMethod -Method Post http://localhost:8000/v1/projects/start -ContentType "application/json" -Body '{"project_name":"AI Infrastructure Geopolitical Risk","domain":"AI infrastructure and geopolitical risk","regions":["Latin America","Brazil","Chile","Mexico"],"languages":["English","Spanish","Portuguese"],"issue_categories":["energy demand","water and cooling","cloud dependency"],"desired_report_types":["weekly_intelligence_brief","alert_digest"],"source_boundaries":["G:/My Drive/CANON Corpus"]}'
-Invoke-RestMethod -Method Post http://localhost:8000/v1/sources/profile -ContentType "application/json" -Body '{"input_path":"data/my_docs","sample_size":25}'
-Invoke-RestMethod -Method Post http://localhost:8000/v1/frame-coverage -ContentType "application/json" -Body '{"question":"What does this corpus cover about grid risk?","mode":"my_topic_v1_corpus","research_frame":{"subdomains":["energy","water"],"regions":["Latin America"],"languages":["English","Spanish"]},"evidence_requirements":{"top_k":10,"minimum_source_types":["official","local_media"]}}'
-Invoke-RestMethod -Method Post http://localhost:8000/v1/report-quality -ContentType "application/json" -Body '{"query":"What are the emerging geopolitical risks around AI data center expansion in Latin America?","mode":"ai_infra_geo_risk_demo","write_report":true}'
-Invoke-RestMethod -Method Post http://localhost:8000/v1/prehuman-check -ContentType "application/json" -Body '{"mode":"my_topic_v1_corpus","benchmark_id":"llm_judged_my_topic_v1","judge_provider":"heuristic","model_providers":["local"],"rerankers":["heuristic"],"top_k":10,"candidate_k":25}'
-Invoke-RestMethod -Method Post http://localhost:8000/v1/acceptance-scenario -ContentType "application/json" -Body '{"mode":"ai_infra_geo_risk_demo","write_report":true}'
-Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/handoff -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.json"}'
-Invoke-RestMethod -Method Post http://localhost:8000/v1/intelligence-review/feedback -ContentType "application/json" -Body '{"records_path":"reports/intelligence_brief_review_tasks_ai_infra_geo_risk_demo.completed.json"}'
 ```
 
 Run the local ASGI load ramp against a frozen query set:
@@ -195,15 +191,16 @@ total. It writes raw samples plus JSON/Markdown reports under `reports/load/`.
 The first published local ASGI run is summarized in
 [docs/asgi_load_test_report.md](docs/asgi_load_test_report.md).
 
-Run the LlamaIndex framework baseline against the same Stage 1 fixed-qrels
-protocol:
+Run the corrected LlamaIndex/CANON factor comparison against the same Stage 1
+fixed-qrels protocol:
 
 ```powershell
 python -m pip install -e ".[baselines]"
 python -m canon.baselines.llamaindex_baseline --repeats 3 --no-resume
 ```
 
-The current head-to-head is summarized in
+The current report supersedes the old confounded head-to-head by running hash
+and Qwen embedding cells for both LlamaIndex and CANON. It is summarized in
 [docs/llamaindex_head_to_head.md](docs/llamaindex_head_to_head.md), with the
 compact machine-readable artifact in
 `reports/llamaindex_stage1_head_to_head.json`.

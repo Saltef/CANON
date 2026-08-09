@@ -52,8 +52,10 @@ docs = [
 ]
 models = [
   "cohere>=5.0",
-  "openai>=1.0",
   "sentence-transformers>=3.0",
+]
+vectorstores = [
+  "qdrant-client>=1.12",
 ]
 baselines = [
   "llama-index-core>=0.12,<0.13",
@@ -66,8 +68,9 @@ dev = [
 
 [project.scripts]
 canon-acceptance-scenario = "canon.product.acceptance_scenario:main"
-canon-api = "canon.product.server:main"
+canon-api = "canon.product.asgi:main"
 canon-asgi = "canon.product.asgi:main"
+canon-stdlib-api = "canon.product.server:main"
 canon-alert-digest = "canon.intelligence.alerts:main"
 canon-alert-eval = "canon.eval.alert_digest:main"
 canon-demo = "canon.product.demo:main"
@@ -77,6 +80,7 @@ canon-flagship-handoff = "canon.product.flagship_handoff:main"
 canon-frame-coverage = "canon.product.frame_coverage:main"
 canon-human-review-scaffold = "canon.product.human_review_scaffold:main"
 canon-ingest = "canon.ingest.flexible:main"
+canon-index-vectors = "canon.embeddings.index:main"
 canon-intelligence-brief = "canon.intelligence.evidence_runner:main"
 canon-intelligence-eval = "canon.eval.intelligence_brief:main"
 canon-intelligence-review = "canon.product.intelligence_review:main"

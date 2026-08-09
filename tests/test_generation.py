@@ -16,11 +16,18 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(result.provider, "template")
         self.assertEqual(result.text, "grounded answer")
 
-    def test_openai_generation_requires_key(self):
+    def test_openai_alias_generation_requires_openrouter_key(self):
         with patch.dict("os.environ", {}, clear=True):
             with patch("canon.generation.providers.load_local_env"):
                 with self.assertRaises(RuntimeError):
                     get_generation_provider("openai")
+
+    def test_openai_alias_generation_routes_through_openrouter(self):
+        with patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}, clear=True):
+            with patch("canon.generation.providers.load_local_env"):
+                provider = get_generation_provider("openai", "gpt-4.1-mini")
+        self.assertEqual(provider.provider, "openrouter")
+        self.assertEqual(provider.model, "openai/gpt-4.1-mini")
 
     def test_openrouter_generation_requires_key(self):
         with patch.dict("os.environ", {}, clear=True):

@@ -239,7 +239,7 @@ def write_source_reports(path: Path, review_status: str, industry_status: str) -
 def write_public_repo_files(path: Path, include_license: bool = True) -> None:
     (path / "README.md").write_text("# CANON\n", encoding="utf-8")
     (path / "SECURITY.md").write_text("# Security Policy\n", encoding="utf-8")
-    (path / ".env.example").write_text("OPENAI_API_KEY=\nCOHERE_API_KEY=\n", encoding="utf-8")
+    (path / ".env.example").write_text("OPENROUTER_API_KEY=\nCOHERE_API_KEY=\n", encoding="utf-8")
     (path / ".gitignore").write_text(".env\n.env.*\n!.env.example\n", encoding="utf-8")
     if include_license:
         (path / "LICENSE").write_text("Test license fixture.\n", encoding="utf-8")

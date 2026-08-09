@@ -89,12 +89,45 @@ python -m canon.product.mounted_corpus --input "G:\My Drive\CANON Corpus" --mode
 Generated raw/processed artifacts are written under `data/`. Generated reports
 are written under `reports/`. Both locations are gitignored.
 
+To refresh the hosted vector index after building the corpus, configure
+`OPENROUTER_API_KEY`, `COHERE_API_KEY`, `QDRANT_URL`, and `QDRANT_API_KEY` in
+`.env`, then run:
+
+```powershell
+python -m canon.embeddings.index --mode my_topic_v1_corpus --embedding-provider openrouter --embedding-model qwen/qwen3-embedding-8b --vector-backend qdrant
+```
+
+Qdrant is a replaceable ANN index, not the source of truth. Re-run the index
+command after adding documents to the folder and rebuilding the corpus.
+On a free Render web service, uploaded or generated corpus files are not durable
+across restart, redeploy, or spin-down. Use the free target for workflow testing;
+use a paid persistent disk or another durable corpus store before relying on
+hosted user corpora.
+
+The production API can run setup and write a local source manifest in one step:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/production/corpus-setup -ContentType "application/json" -Body '{"input_path":"data/my_docs","mode":"my_topic_v1","corpus_id":"my_topic_v1_corpus","build_corpus":true,"index_vector_store":true,"vector_backend":"qdrant","index_embedding_provider":"openrouter","index_embedding_model":"qwen/qwen3-embedding-8b"}'
+```
+
+After you add, edit, or remove files, call refresh instead of blindly
+rebuilding:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/production/corpus-refresh -ContentType "application/json" -Body '{"input_path":"data/my_docs","mode":"my_topic_v1","corpus_id":"my_topic_v1_corpus","build_corpus":true,"index_vector_store":true,"vector_backend":"qdrant","index_embedding_provider":"openrouter","index_embedding_model":"qwen/qwen3-embedding-8b"}'
+```
+
+If the source manifest is unchanged, the refresh endpoint returns
+`no_source_changes`. Use `"force": true` when files are unchanged but chunking,
+embedding model, or vector-backend settings changed.
+
 ## 7. Query Through The API
 
 Start the API:
 
 ```powershell
-python -m canon.product.server --host 127.0.0.1 --port 8000
+python -m pip install -e ".[serve,vectorstores,docs]"
+python -m canon.product.asgi --host 127.0.0.1 --port 8000 --max-concurrency 8 --max-queue-depth 16
 ```
 
 Health check:
@@ -109,23 +142,26 @@ See available routes and example request bodies:
 Invoke-RestMethod http://localhost:8000/v1/routes
 ```
 
-Create the same project boundary through the API:
-
-```powershell
-Invoke-RestMethod -Method Post http://localhost:8000/v1/projects/start -ContentType "application/json" -Body '{"project_name":"AI Infrastructure Geopolitical Risk","domain":"AI infrastructure and geopolitical risk","regions":["Latin America","Brazil","Chile","Mexico"],"languages":["English","Spanish","Portuguese"],"issue_categories":["energy demand","water and cooling","cloud dependency"],"desired_report_types":["weekly_intelligence_brief","alert_digest"],"source_boundaries":["G:/My Drive/CANON Corpus"]}'
-```
-
 Ask for evidence:
 
 ```powershell
 Invoke-RestMethod -Method Post http://localhost:8000/v1/evidence-packets -ContentType "application/json" -Body '{"request_id":"req_001","project_id":"my_project","question":"What does this corpus say about grid risk?","mode":"my_topic_v1_corpus","evidence_requirements":{"top_k":10,"include_conflicts":true,"include_source_diversity":true,"include_query_diagnostics":true}}'
 ```
 
+Run the production workbench with Qdrant-backed retrieval and typed model review:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/v1/production/evidence-workbench -ContentType "application/json" -Body '{"query":"What does this corpus say about grid risk?","mode":"my_topic_v1_corpus","retrieval_engine":"model_candidate_pool","candidate_scope":"vector_store","vector_backend":"qdrant","retrieval_provider":"openrouter","retrieval_model":"qwen/qwen3-embedding-8b","reranker_provider":"cohere","reranker_model":"rerank-v4.0-pro","generator_provider":"openrouter","generator_model":"openai/gpt-4.1-mini","run_model_review":true,"model_review_provider":"openrouter","model_review_model":"openai/gpt-4.1-mini","allow_external_model_review":true}'
+```
+
+Hosted retrieval sends query/chunk text to the selected embedding/rerank
+providers. Hosted model review sends relevance-gated snippets to OpenRouter and
+returns typed stance/extraction diagnostics; it is not a human-review label.
+
 Check whether retrieved evidence visibly covers the frame you asked for:
 
 ```powershell
 python -m canon.product.frame_coverage "What does this corpus say about grid risk?" --mode my_topic_v1_corpus --top-k 10
-Invoke-RestMethod -Method Post http://localhost:8000/v1/frame-coverage -ContentType "application/json" -Body '{"question":"What does this corpus say about grid risk?","mode":"my_topic_v1_corpus","research_frame":{"subdomains":["energy","water"],"regions":["Latin America"],"languages":["English","Spanish"]},"evidence_requirements":{"top_k":10,"minimum_source_types":["official","local_media"]}}'
 ```
 
 Frame coverage is diagnostic. It highlights missing dimensions and follow-up

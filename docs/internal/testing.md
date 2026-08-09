@@ -17,9 +17,9 @@ python -m pytest tests/test_flexible_ingest.py tests/test_mounted_corpus.py test
 ## Local API
 
 ```powershell
-python -m canon.product.server --host 127.0.0.1 --port 8000
+python -m canon.product.asgi --host 127.0.0.1 --port 8000 --max-concurrency 8 --max-queue-depth 16
 Invoke-WebRequest http://localhost:8000/health
-Invoke-WebRequest http://localhost:8000/v1/summary
+Invoke-WebRequest http://localhost:8000/v1/routes
 ```
 
 ## Flexible Ingest
@@ -54,7 +54,7 @@ python -m canon.product.prehuman_check --mode my_topic_v1_corpus --benchmark-id 
 ```powershell
 python -m canon.eval.qrels_review prepare --mode my_topic_v1_corpus --top-k 10
 python -m canon.eval.qrels_review import-csv --csv reports/qrels_review_tasks_my_topic_v1_corpus.csv --benchmark-id my_topic_qrels --output gold/my_topic_qrels.json
-python -m canon.eval.model_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --providers local,openai,cohere --k 10
+python -m canon.eval.model_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --providers local,openrouter,cohere --k 10
 python -m canon.eval.rerank_evaluation --mode my_topic_v1_corpus --qrels gold/my_topic_qrels.json --rerankers heuristic,cohere --base-policy rag --candidate-k 25 --k 10
 ```
 
@@ -77,3 +77,4 @@ docker compose run --rm canon python -m pytest
 ```
 
 The Docker service exposes the product API on `http://localhost:8000`.
+It runs the ASGI server, not the legacy stdlib debug server.

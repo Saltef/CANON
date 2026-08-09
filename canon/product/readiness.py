@@ -29,32 +29,25 @@ def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
         check("summary_has_claim_boundaries", bool(summary.get("claim_boundaries"))),
         check("summary_has_audit_status", bool(summary.get("audit_status"))),
         check("small_corpus_limitation_visible", bool(summary.get("corpus", {}).get("limitations"))),
+        check("serving_target_is_asgi", route_metadata.get("serving_target") == "asgi"),
         check("routes_metadata_endpoint_documented", "GET /v1/routes" in available_endpoints),
         check("routes_metadata_has_human_review_boundary", bool(route_metadata.get("human_review_boundary"))),
-        check("routes_metadata_examples_present", all_post_routes_have_examples(route_metadata)),
+        check("routes_metadata_descriptions_present", all_routes_have_descriptions(route_metadata)),
         check("browser_workbench_endpoint_documented", "GET /app" in available_endpoints),
+        check("metrics_endpoint_documented", "GET /metrics" in available_endpoints),
         check("production_status_endpoint_documented", "GET /v1/production/status" in available_endpoints),
         check("production_workbench_endpoint_documented", "POST /v1/production/evidence-workbench" in available_endpoints),
         check("production_feedback_endpoint_documented", "POST /v1/production/feedback" in available_endpoints),
         check("production_corpus_setup_endpoint_documented", "POST /v1/production/corpus-setup" in available_endpoints),
-        check("project_start_endpoint_documented", "POST /v1/projects/start" in available_endpoints),
-        check("query_diagnostics_endpoint_documented", "POST /v1/query-diagnostics" in available_endpoints),
+        check("production_corpus_refresh_endpoint_documented", "POST /v1/production/corpus-refresh" in available_endpoints),
         check("evidence_packets_endpoint_documented", "POST /v1/evidence-packets" in available_endpoints),
-        check("frame_coverage_endpoint_documented", "POST /v1/frame-coverage" in available_endpoints),
-        check("intelligence_brief_endpoint_documented", "POST /v1/intelligence-brief" in available_endpoints),
-        check("report_quality_endpoint_documented", "POST /v1/report-quality" in available_endpoints),
-        check("prehuman_check_endpoint_documented", "POST /v1/prehuman-check" in available_endpoints),
-        check("alert_digest_endpoint_documented", "POST /v1/alert-digest" in available_endpoints),
-        check("flagship_handoff_endpoint_documented", "POST /v1/flagship-handoff" in available_endpoints),
-        check("acceptance_scenario_endpoint_documented", "POST /v1/acceptance-scenario" in available_endpoints),
-        check("intelligence_review_endpoint_documented", "POST /v1/intelligence-review/prepare" in available_endpoints),
-        check("intelligence_feedback_endpoint_documented", "POST /v1/intelligence-review/feedback" in available_endpoints),
-        check("intelligence_handoff_endpoint_documented", "POST /v1/intelligence-review/handoff" in available_endpoints),
+        check("stage2_synthesis_endpoint_documented", "POST /v1/stage2-synthesis" in available_endpoints),
         check("product_smoke_passed", smoke_report.get("status") == "pass"),
     ]
     report = {
         "mode": mode,
         "status": "pass" if all(item["passed"] for item in checks) else "fail",
+        "serving_target": route_metadata.get("serving_target"),
         "checks": checks,
         "endpoints": available_endpoints,
         "route_metadata": {
@@ -124,16 +117,21 @@ def endpoints() -> list[str]:
 
 
 def routes_metadata() -> dict:
-    from canon.product.server import api_routes
+    from canon.product.asgi import asgi_routes
 
-    return api_routes()
+    return asgi_routes() | {
+        "serving_target": "asgi",
+        "human_review_boundary": (
+            "Automated ASGI routes prepare evidence, reports, and gates for review. "
+            "They do not establish final factual correctness or release-level model quality."
+        ),
+    }
 
 
-def all_post_routes_have_examples(metadata: dict) -> bool:
+def all_routes_have_descriptions(metadata: dict) -> bool:
     return all(
-        route.get("example") is not None
+        bool(route.get("description"))
         for route in metadata.get("routes", [])
-        if route.get("method") == "POST"
     )
 
 

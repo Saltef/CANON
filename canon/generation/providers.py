@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass
 from typing import Protocol
@@ -31,39 +30,6 @@ class TemplateGenerationProvider:
 
     def generate(self, prompt: str) -> GenerationResult:
         return GenerationResult(provider=self.provider, model=self.model, text=prompt)
-
-
-class OpenAIGenerationProvider:
-    provider = "openai"
-
-    def __init__(self, model: str = "gpt-4.1-mini", api_key: str | None = None) -> None:
-        load_local_env()
-        self.model = model
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise RuntimeError("OPENAI_API_KEY is required for OpenAI generation.")
-
-    def generate(self, prompt: str) -> GenerationResult:
-        payload = post_json(
-            "https://api.openai.com/v1/responses",
-            {
-                "model": self.model,
-                "input": prompt,
-                "temperature": 0,
-            },
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            timeout=120,
-        )
-        text = payload.get("output_text") or extract_response_text(payload)
-        return GenerationResult(
-            provider=self.provider,
-            model=self.model,
-            text=text,
-            raw={"id": payload.get("id"), "model": payload.get("model")},
-        )
 
 
 class OpenRouterGenerationProvider:
@@ -111,15 +77,6 @@ class OpenRouterGenerationProvider:
         )
 
 
-def extract_response_text(payload: dict) -> str:
-    parts = []
-    for item in payload.get("output", []):
-        for content in item.get("content", []):
-            if content.get("type") in {"output_text", "text"}:
-                parts.append(content.get("text", ""))
-    return "\n".join(part for part in parts if part).strip()
-
-
 def extract_chat_completion_text(payload: dict) -> str:
     choices = payload.get("choices") or []
     if not choices:
@@ -138,7 +95,11 @@ def get_generation_provider(name: str, model: str | None = None) -> GenerationPr
     if normalized in {"template", "local"}:
         return TemplateGenerationProvider()
     if normalized == "openai":
-        return OpenAIGenerationProvider(model=model or "gpt-4.1-mini")
+        return OpenRouterGenerationProvider(model=openrouter_model_id(model or "gpt-4.1-mini"))
     if normalized == "openrouter":
         return OpenRouterGenerationProvider(model=model or "openai/gpt-4.1-mini")
     raise ValueError(f"Unknown generation provider: {name}")
+
+
+def openrouter_model_id(model: str) -> str:
+    return model if "/" in model else f"openai/{model}"

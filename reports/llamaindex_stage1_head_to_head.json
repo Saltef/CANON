@@ -1,32 +1,55 @@
 {
-  "report_id": "llamaindex_stage1_head_to_head_v1",
-  "created_at": "2026-07-31",
-  "status": "head_to_head_complete",
+  "report_id": "llamaindex_canon_stage1_factorial_correction_v2",
+  "created_at": "2026-08-08",
+  "status": "factorial_correction_complete",
   "mode": "beir_nfcorpus_stage1_title_preserve",
   "qrels_path": "gold/beir_nfcorpus_stage1_title_preserve_qrels.json",
   "query_count": 30,
   "label_count": 1724,
   "metric_k": 10,
   "repeat_count_requested": 3,
-  "completed_llamaindex_run_count": 6,
-  "expected_llamaindex_run_count": 6,
+  "completed_run_count": 18,
+  "expected_run_count": 18,
   "protocol": {
     "benchmark": "BEIR NFCorpus 30-query public slice expanded to CANON chunks",
     "parent_qrels_protocol": "fixed_corpus_parent_map_v2",
-    "paired_repeat_protocol": "CANON repeat numbers are paired with LlamaIndex repeat numbers 1..N.",
-    "primary_question": "Does LlamaIndex's off-the-shelf VectorStoreIndex retrieval path beat CANON on the same fixed-qrels NFCorpus pilot?"
+    "paired_repeat_protocol": "Repeat numbers are paired across all cells 1..N.",
+    "primary_question": "How much of the old LlamaIndex-vs-CANON gap is encoder choice, how much is retrieval pipeline, and how much is reranking?",
+    "supersedes": {
+      "report": "llamaindex_stage1_head_to_head_v1",
+      "reason": "The old primary framing compared CANON with Qwen embeddings, BM25, RRF, and Cohere rerank against LlamaIndex with a hashed embedding adapter and no fusion/rerank. That was not a pipeline-only comparison."
+    },
+    "llamaindex_default_verification": {
+      "verified_on": "2026-08-08",
+      "finding": "Current official LlamaIndex embedding defaults are version-sensitive. This benchmark therefore passes explicit CANON/OpenRouter embedding adapters and does not claim to measure an implicit hosted provider default.",
+      "sources": [
+        "https://developers.llamaindex.ai/python/framework/module_guides/models/embeddings/",
+        "https://developers.llamaindex.ai/python/framework/module_guides/supporting_modules/settings/",
+        "https://developers.llamaindex.ai/python/framework/getting_started/starter_example_local/"
+      ]
+    }
   },
   "llamaindex_stack": {
     "framework": "llama-index-core",
     "index": "VectorStoreIndex",
     "retriever": "index.as_retriever(similarity_top_k=candidate_k)",
     "candidate_k": 250,
-    "embedding": "CANON local hashed-semantic-v1 adapter",
+    "embedding": "explicit CANON embedding adapter; hash and Qwen cells are run separately",
     "llm": "disabled",
-    "boundary": "This measures LlamaIndex's default in-memory vector index and retriever plumbing. It does not use LlamaIndex's hosted OpenAI default embedding because no OpenAI key is configured and CANON keeps public benchmark reruns reproducible by default."
+    "boundary": "This measures LlamaIndex VectorStoreIndex retrieval with explicit embeddings, not LlamaIndex generation and not an implicit hosted provider default."
+  },
+  "canon_stack": {
+    "candidate_k": 250,
+    "lexical_k": 250,
+    "vector_k": 250,
+    "sparse": "bm25",
+    "fusion": "rrf",
+    "reranker": "cohere:rerank-v4.0-fast",
+    "document_format": "structured",
+    "boundary": "The CANON full-pipeline cells compare BM25+dense RRF plus Cohere rerank against LlamaIndex single dense retrieval. RRF-only cells isolate reranker contribution."
   },
   "include_query_details": false,
-  "canon_report": {
+  "legacy_canon_report": {
     "status": "repeat_spread_complete",
     "path": "C:/Users/pc/Documents/Research AI/reports/stage1_fixed_qrels_v2_repeat_spread.json",
     "report_id": "stage1_fixed_qrels_v2_repeat_spread",
@@ -41,10 +64,96 @@
       "query_cache_root": "reports/rerank_query_cache_fixed_qrels_v2_repeats"
     }
   },
+  "factor_matrix": {
+    "primary_metric": "nDCG@10",
+    "cells": {
+      "llamaindex_hashed": {
+        "configuration": "llamaindex_hash_original_qrels",
+        "label": "LlamaIndex VectorStoreIndex + hashed-semantic-v1, original qrels",
+        "completed_runs": 3,
+        "mean": 0.12839,
+        "spread_pp": 0.0,
+        "candidate_recall_mean": 0.201228,
+        "zero_candidate_recall_queries": [
+          "7/30",
+          "7/30",
+          "7/30"
+        ]
+      },
+      "llamaindex_qwen": {
+        "configuration": "llamaindex_qwen_original_qrels",
+        "label": "LlamaIndex VectorStoreIndex + Qwen3 Embedding 8B, original qrels",
+        "completed_runs": 3,
+        "mean": 0.465538,
+        "spread_pp": 0.009,
+        "candidate_recall_mean": 0.3544,
+        "zero_candidate_recall_queries": [
+          "4/30",
+          "4/30",
+          "4/30"
+        ]
+      },
+      "canon_hashed_cohere": {
+        "configuration": "canon_hash_cohere_original_qrels",
+        "label": "CANON BM25+hash RRF + Cohere rerank, original qrels",
+        "completed_runs": 3,
+        "mean": 0.350162,
+        "spread_pp": 0.0,
+        "candidate_recall_mean": 0.237137,
+        "zero_candidate_recall_queries": [
+          "7/30",
+          "7/30",
+          "7/30"
+        ]
+      },
+      "canon_qwen_cohere": {
+        "configuration": "canon_qwen_cohere_original_qrels",
+        "label": "CANON BM25+Qwen RRF + Cohere rerank, original qrels",
+        "completed_runs": 3,
+        "mean": 0.39526,
+        "spread_pp": 0.101,
+        "candidate_recall_mean": 0.365927,
+        "zero_candidate_recall_queries": [
+          "4/30",
+          "4/30",
+          "4/30"
+        ]
+      }
+    },
+    "rrf_only_ablation": {
+      "canon_hashed_rrf_only": {
+        "configuration": "canon_hash_rrf_only_original_qrels",
+        "label": "CANON BM25+hash RRF without rerank, original qrels",
+        "completed_runs": 3,
+        "mean": 0.245204,
+        "spread_pp": 0.0,
+        "candidate_recall_mean": 0.237137,
+        "zero_candidate_recall_queries": [
+          "7/30",
+          "7/30",
+          "7/30"
+        ]
+      },
+      "canon_qwen_rrf_only": {
+        "configuration": "canon_qwen_rrf_only_original_qrels",
+        "label": "CANON BM25+Qwen RRF without rerank, original qrels",
+        "completed_runs": 3,
+        "mean": 0.383108,
+        "spread_pp": 0.096,
+        "candidate_recall_mean": 0.365927,
+        "zero_candidate_recall_queries": [
+          "4/30",
+          "4/30",
+          "4/30"
+        ]
+      }
+    },
+    "boundary": "The four primary cells decompose encoder and pipeline effects. The RRF-only cells are deterministic ablations for the Cohere reranker contribution."
+  },
   "llamaindex_configuration_summaries": [
     {
-      "id": "llamaindex_vector_original_qrels",
-      "label": "LlamaIndex VectorStoreIndex + CANON hash embeddings, original qrels",
+      "id": "llamaindex_hash_original_qrels",
+      "label": "LlamaIndex VectorStoreIndex + hashed-semantic-v1, original qrels",
       "auto_query_expansion": false,
       "parent_qrels": false,
       "parent_expansion_limit": 0,
@@ -53,92 +162,92 @@
       "metrics": {
         "nDCG@10": {
           "n": 3,
-          "mean": 0.128245,
-          "min": 0.128245,
-          "max": 0.128245,
+          "mean": 0.12839,
+          "min": 0.12839,
+          "max": 0.12839,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.128245,
-            0.128245,
-            0.128245
+            0.12839,
+            0.12839,
+            0.12839
           ]
         },
         "Recall@10": {
           "n": 3,
-          "mean": 0.087082,
-          "min": 0.087082,
-          "max": 0.087082,
+          "mean": 0.084375,
+          "min": 0.084375,
+          "max": 0.084375,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.087082,
-            0.087082,
-            0.087082
+            0.084375,
+            0.084375,
+            0.084375
           ]
         },
         "MAP@10": {
           "n": 3,
-          "mean": 0.080939,
-          "min": 0.080939,
-          "max": 0.080939,
+          "mean": 0.08437,
+          "min": 0.08437,
+          "max": 0.08437,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.080939,
-            0.080939,
-            0.080939
+            0.08437,
+            0.08437,
+            0.08437
           ]
         },
         "MRR@10": {
           "n": 3,
-          "mean": 0.198148,
-          "min": 0.198148,
-          "max": 0.198148,
+          "mean": 0.201481,
+          "min": 0.201481,
+          "max": 0.201481,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.198148,
-            0.198148,
-            0.198148
+            0.201481,
+            0.201481,
+            0.201481
           ]
         },
         "candidate_recall_mean": {
           "n": 3,
-          "mean": 0.199087,
-          "min": 0.199087,
-          "max": 0.199087,
+          "mean": 0.201228,
+          "min": 0.201228,
+          "max": 0.201228,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.199087,
-            0.199087,
-            0.199087
+            0.201228,
+            0.201228,
+            0.201228
           ]
         },
         "work_level_hit_rate_mean": {
           "n": 3,
-          "mean": 0.20837,
-          "min": 0.20837,
-          "max": 0.20837,
+          "mean": 0.225176,
+          "min": 0.225176,
+          "max": 0.225176,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.20837,
-            0.20837,
-            0.20837
+            0.225176,
+            0.225176,
+            0.225176
           ]
         }
       },
@@ -154,102 +263,215 @@
       ]
     },
     {
-      "id": "llamaindex_vector_fixed_parent_qrels",
-      "label": "LlamaIndex VectorStoreIndex + CANON hash embeddings, fixed parent qrels",
+      "id": "llamaindex_qwen_original_qrels",
+      "label": "LlamaIndex VectorStoreIndex + Qwen3 Embedding 8B, original qrels",
       "auto_query_expansion": false,
-      "parent_qrels": true,
+      "parent_qrels": false,
       "parent_expansion_limit": 0,
-      "qrels_scope": "full_corpus_parent_map_v2",
+      "qrels_scope": "original_chunk_qrels",
       "completed_runs": 3,
       "metrics": {
         "nDCG@10": {
           "n": 3,
-          "mean": 0.128245,
-          "min": 0.128245,
-          "max": 0.128245,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
+          "mean": 0.465538,
+          "min": 0.465494,
+          "max": 0.465582,
+          "spread": 8.8e-05,
+          "sample_std": 4.4e-05,
+          "spread_pp": 0.009,
+          "sample_std_pp": 0.004,
           "values": [
-            0.128245,
-            0.128245,
-            0.128245
+            0.465538,
+            0.465582,
+            0.465494
           ]
         },
         "Recall@10": {
           "n": 3,
-          "mean": 0.087082,
-          "min": 0.087082,
-          "max": 0.087082,
+          "mean": 0.196567,
+          "min": 0.196567,
+          "max": 0.196567,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.087082,
-            0.087082,
-            0.087082
+            0.196567,
+            0.196567,
+            0.196567
           ]
         },
         "MAP@10": {
           "n": 3,
-          "mean": 0.080939,
-          "min": 0.080939,
-          "max": 0.080939,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
+          "mean": 0.367245,
+          "min": 0.367164,
+          "max": 0.367333,
+          "spread": 0.000169,
+          "sample_std": 8.5e-05,
+          "spread_pp": 0.017,
+          "sample_std_pp": 0.008,
           "values": [
-            0.080939,
-            0.080939,
-            0.080939
+            0.367333,
+            0.367238,
+            0.367164
           ]
         },
         "MRR@10": {
           "n": 3,
-          "mean": 0.198148,
-          "min": 0.198148,
-          "max": 0.198148,
+          "mean": 0.67037,
+          "min": 0.67037,
+          "max": 0.67037,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.198148,
-            0.198148,
-            0.198148
+            0.67037,
+            0.67037,
+            0.67037
           ]
         },
         "candidate_recall_mean": {
           "n": 3,
-          "mean": 0.199087,
-          "min": 0.199087,
-          "max": 0.199087,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
+          "mean": 0.3544,
+          "min": 0.354329,
+          "max": 0.354541,
+          "spread": 0.000212,
+          "sample_std": 0.000122,
+          "spread_pp": 0.021,
+          "sample_std_pp": 0.012,
           "values": [
-            0.199087,
-            0.199087,
-            0.199087
+            0.354329,
+            0.354541,
+            0.354329
           ]
         },
         "work_level_hit_rate_mean": {
           "n": 3,
-          "mean": 0.20837,
-          "min": 0.20837,
-          "max": 0.20837,
+          "mean": 0.379869,
+          "min": 0.379869,
+          "max": 0.379869,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.20837,
-            0.20837,
-            0.20837
+            0.379869,
+            0.379869,
+            0.379869
+          ]
+        }
+      },
+      "zero_candidate_recall_queries_values": [
+        "4/30",
+        "4/30",
+        "4/30"
+      ],
+      "queries_with_any_relevant_work_in_pool_values": [
+        "26/30",
+        "26/30",
+        "26/30"
+      ]
+    }
+  ],
+  "canon_configuration_summaries": [
+    {
+      "id": "canon_hash_cohere_original_qrels",
+      "label": "CANON BM25+hash RRF + Cohere rerank, original qrels",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "completed_runs": 3,
+      "metrics": {
+        "nDCG@10": {
+          "n": 3,
+          "mean": 0.350162,
+          "min": 0.350162,
+          "max": 0.350162,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.350162,
+            0.350162,
+            0.350162
+          ]
+        },
+        "Recall@10": {
+          "n": 3,
+          "mean": 0.127157,
+          "min": 0.127157,
+          "max": 0.127157,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.127157,
+            0.127157,
+            0.127157
+          ]
+        },
+        "MAP@10": {
+          "n": 3,
+          "mean": 0.250324,
+          "min": 0.250324,
+          "max": 0.250324,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.250324,
+            0.250324,
+            0.250324
+          ]
+        },
+        "MRR@10": {
+          "n": 3,
+          "mean": 0.619444,
+          "min": 0.619444,
+          "max": 0.619444,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.619444,
+            0.619444,
+            0.619444
+          ]
+        },
+        "candidate_recall_mean": {
+          "n": 3,
+          "mean": 0.237137,
+          "min": 0.237137,
+          "max": 0.237137,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.237137,
+            0.237137,
+            0.237137
+          ]
+        },
+        "work_level_hit_rate_mean": {
+          "n": 3,
+          "mean": 0.260862,
+          "min": 0.260862,
+          "max": 0.260862,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.260862,
+            0.260862,
+            0.260862
           ]
         }
       },
@@ -263,12 +485,10 @@
         "23/30",
         "23/30"
       ]
-    }
-  ],
-  "all_configuration_summaries": [
+    },
     {
-      "id": "base_qwen_cohere",
-      "label": "Base Qwen+Cohere",
+      "id": "canon_qwen_cohere_original_qrels",
+      "label": "CANON BM25+Qwen RRF + Cohere rerank, original qrels",
       "auto_query_expansion": false,
       "parent_qrels": false,
       "parent_expansion_limit": 0,
@@ -277,17 +497,17 @@
       "metrics": {
         "nDCG@10": {
           "n": 3,
-          "mean": 0.394511,
-          "min": 0.39372,
-          "max": 0.395128,
-          "spread": 0.001408,
-          "sample_std": 0.00072,
-          "spread_pp": 0.141,
-          "sample_std_pp": 0.072,
+          "mean": 0.39526,
+          "min": 0.394597,
+          "max": 0.395604,
+          "spread": 0.001007,
+          "sample_std": 0.000575,
+          "spread_pp": 0.101,
+          "sample_std_pp": 0.057,
           "values": [
-            0.395128,
-            0.39372,
-            0.394685
+            0.394597,
+            0.395604,
+            0.39558
           ]
         },
         "Recall@10": {
@@ -307,17 +527,17 @@
         },
         "MAP@10": {
           "n": 3,
-          "mean": 0.29547,
-          "min": 0.294622,
-          "max": 0.295911,
-          "spread": 0.001289,
-          "sample_std": 0.000735,
-          "spread_pp": 0.129,
-          "sample_std_pp": 0.073,
+          "mean": 0.296378,
+          "min": 0.295726,
+          "max": 0.296712,
+          "spread": 0.000986,
+          "sample_std": 0.000565,
+          "spread_pp": 0.099,
+          "sample_std_pp": 0.056,
           "values": [
-            0.295878,
-            0.294622,
-            0.295911
+            0.295726,
+            0.296697,
+            0.296712
           ]
         },
         "MRR@10": {
@@ -331,8 +551,678 @@
           "sample_std_pp": 0.16,
           "values": [
             0.65,
-            0.647222,
-            0.65
+            0.65,
+            0.647222
+          ]
+        },
+        "candidate_recall_mean": {
+          "n": 3,
+          "mean": 0.365927,
+          "min": 0.365927,
+          "max": 0.365927,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.365927,
+            0.365927,
+            0.365927
+          ]
+        },
+        "work_level_hit_rate_mean": {
+          "n": 3,
+          "mean": 0.395415,
+          "min": 0.395415,
+          "max": 0.395415,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.395415,
+            0.395415,
+            0.395415
+          ]
+        }
+      },
+      "zero_candidate_recall_queries_values": [
+        "4/30",
+        "4/30",
+        "4/30"
+      ],
+      "queries_with_any_relevant_work_in_pool_values": [
+        "26/30",
+        "26/30",
+        "26/30"
+      ]
+    }
+  ],
+  "canon_rrf_only_summaries": [
+    {
+      "id": "canon_hash_rrf_only_original_qrels",
+      "label": "CANON BM25+hash RRF without rerank, original qrels",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "completed_runs": 3,
+      "metrics": {
+        "nDCG@10": {
+          "n": 3,
+          "mean": 0.245204,
+          "min": 0.245204,
+          "max": 0.245204,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.245204,
+            0.245204,
+            0.245204
+          ]
+        },
+        "Recall@10": {
+          "n": 3,
+          "mean": 0.11326,
+          "min": 0.11326,
+          "max": 0.11326,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.11326,
+            0.11326,
+            0.11326
+          ]
+        },
+        "MAP@10": {
+          "n": 3,
+          "mean": 0.172377,
+          "min": 0.172377,
+          "max": 0.172377,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.172377,
+            0.172377,
+            0.172377
+          ]
+        },
+        "MRR@10": {
+          "n": 3,
+          "mean": 0.441667,
+          "min": 0.441667,
+          "max": 0.441667,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.441667,
+            0.441667,
+            0.441667
+          ]
+        },
+        "candidate_recall_mean": {
+          "n": 3,
+          "mean": 0.237137,
+          "min": 0.237137,
+          "max": 0.237137,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.237137,
+            0.237137,
+            0.237137
+          ]
+        },
+        "work_level_hit_rate_mean": {
+          "n": 3,
+          "mean": 0.260862,
+          "min": 0.260862,
+          "max": 0.260862,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.260862,
+            0.260862,
+            0.260862
+          ]
+        }
+      },
+      "zero_candidate_recall_queries_values": [
+        "7/30",
+        "7/30",
+        "7/30"
+      ],
+      "queries_with_any_relevant_work_in_pool_values": [
+        "23/30",
+        "23/30",
+        "23/30"
+      ]
+    },
+    {
+      "id": "canon_qwen_rrf_only_original_qrels",
+      "label": "CANON BM25+Qwen RRF without rerank, original qrels",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "completed_runs": 3,
+      "metrics": {
+        "nDCG@10": {
+          "n": 3,
+          "mean": 0.383108,
+          "min": 0.382467,
+          "max": 0.383428,
+          "spread": 0.000961,
+          "sample_std": 0.000555,
+          "spread_pp": 0.096,
+          "sample_std_pp": 0.055,
+          "values": [
+            0.382467,
+            0.383428,
+            0.383428
+          ]
+        },
+        "Recall@10": {
+          "n": 3,
+          "mean": 0.143627,
+          "min": 0.143627,
+          "max": 0.143627,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.143627,
+            0.143627,
+            0.143627
+          ]
+        },
+        "MAP@10": {
+          "n": 3,
+          "mean": 0.276783,
+          "min": 0.276413,
+          "max": 0.276968,
+          "spread": 0.000555,
+          "sample_std": 0.00032,
+          "spread_pp": 0.055,
+          "sample_std_pp": 0.032,
+          "values": [
+            0.276413,
+            0.276968,
+            0.276968
+          ]
+        },
+        "MRR@10": {
+          "n": 3,
+          "mean": 0.65291,
+          "min": 0.649206,
+          "max": 0.654762,
+          "spread": 0.005556,
+          "sample_std": 0.003208,
+          "spread_pp": 0.556,
+          "sample_std_pp": 0.321,
+          "values": [
+            0.649206,
+            0.654762,
+            0.654762
+          ]
+        },
+        "candidate_recall_mean": {
+          "n": 3,
+          "mean": 0.365927,
+          "min": 0.365927,
+          "max": 0.365927,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.365927,
+            0.365927,
+            0.365927
+          ]
+        },
+        "work_level_hit_rate_mean": {
+          "n": 3,
+          "mean": 0.395415,
+          "min": 0.395415,
+          "max": 0.395415,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.395415,
+            0.395415,
+            0.395415
+          ]
+        }
+      },
+      "zero_candidate_recall_queries_values": [
+        "4/30",
+        "4/30",
+        "4/30"
+      ],
+      "queries_with_any_relevant_work_in_pool_values": [
+        "26/30",
+        "26/30",
+        "26/30"
+      ]
+    }
+  ],
+  "all_configuration_summaries": [
+    {
+      "id": "llamaindex_hash_original_qrels",
+      "label": "LlamaIndex VectorStoreIndex + hashed-semantic-v1, original qrels",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "completed_runs": 3,
+      "metrics": {
+        "nDCG@10": {
+          "n": 3,
+          "mean": 0.12839,
+          "min": 0.12839,
+          "max": 0.12839,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.12839,
+            0.12839,
+            0.12839
+          ]
+        },
+        "Recall@10": {
+          "n": 3,
+          "mean": 0.084375,
+          "min": 0.084375,
+          "max": 0.084375,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.084375,
+            0.084375,
+            0.084375
+          ]
+        },
+        "MAP@10": {
+          "n": 3,
+          "mean": 0.08437,
+          "min": 0.08437,
+          "max": 0.08437,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.08437,
+            0.08437,
+            0.08437
+          ]
+        },
+        "MRR@10": {
+          "n": 3,
+          "mean": 0.201481,
+          "min": 0.201481,
+          "max": 0.201481,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.201481,
+            0.201481,
+            0.201481
+          ]
+        },
+        "candidate_recall_mean": {
+          "n": 3,
+          "mean": 0.201228,
+          "min": 0.201228,
+          "max": 0.201228,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.201228,
+            0.201228,
+            0.201228
+          ]
+        },
+        "work_level_hit_rate_mean": {
+          "n": 3,
+          "mean": 0.225176,
+          "min": 0.225176,
+          "max": 0.225176,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.225176,
+            0.225176,
+            0.225176
+          ]
+        }
+      },
+      "zero_candidate_recall_queries_values": [
+        "7/30",
+        "7/30",
+        "7/30"
+      ],
+      "queries_with_any_relevant_work_in_pool_values": [
+        "23/30",
+        "23/30",
+        "23/30"
+      ]
+    },
+    {
+      "id": "llamaindex_qwen_original_qrels",
+      "label": "LlamaIndex VectorStoreIndex + Qwen3 Embedding 8B, original qrels",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "completed_runs": 3,
+      "metrics": {
+        "nDCG@10": {
+          "n": 3,
+          "mean": 0.465538,
+          "min": 0.465494,
+          "max": 0.465582,
+          "spread": 8.8e-05,
+          "sample_std": 4.4e-05,
+          "spread_pp": 0.009,
+          "sample_std_pp": 0.004,
+          "values": [
+            0.465538,
+            0.465582,
+            0.465494
+          ]
+        },
+        "Recall@10": {
+          "n": 3,
+          "mean": 0.196567,
+          "min": 0.196567,
+          "max": 0.196567,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.196567,
+            0.196567,
+            0.196567
+          ]
+        },
+        "MAP@10": {
+          "n": 3,
+          "mean": 0.367245,
+          "min": 0.367164,
+          "max": 0.367333,
+          "spread": 0.000169,
+          "sample_std": 8.5e-05,
+          "spread_pp": 0.017,
+          "sample_std_pp": 0.008,
+          "values": [
+            0.367333,
+            0.367238,
+            0.367164
+          ]
+        },
+        "MRR@10": {
+          "n": 3,
+          "mean": 0.67037,
+          "min": 0.67037,
+          "max": 0.67037,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.67037,
+            0.67037,
+            0.67037
+          ]
+        },
+        "candidate_recall_mean": {
+          "n": 3,
+          "mean": 0.3544,
+          "min": 0.354329,
+          "max": 0.354541,
+          "spread": 0.000212,
+          "sample_std": 0.000122,
+          "spread_pp": 0.021,
+          "sample_std_pp": 0.012,
+          "values": [
+            0.354329,
+            0.354541,
+            0.354329
+          ]
+        },
+        "work_level_hit_rate_mean": {
+          "n": 3,
+          "mean": 0.379869,
+          "min": 0.379869,
+          "max": 0.379869,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.379869,
+            0.379869,
+            0.379869
+          ]
+        }
+      },
+      "zero_candidate_recall_queries_values": [
+        "4/30",
+        "4/30",
+        "4/30"
+      ],
+      "queries_with_any_relevant_work_in_pool_values": [
+        "26/30",
+        "26/30",
+        "26/30"
+      ]
+    },
+    {
+      "id": "canon_hash_cohere_original_qrels",
+      "label": "CANON BM25+hash RRF + Cohere rerank, original qrels",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "completed_runs": 3,
+      "metrics": {
+        "nDCG@10": {
+          "n": 3,
+          "mean": 0.350162,
+          "min": 0.350162,
+          "max": 0.350162,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.350162,
+            0.350162,
+            0.350162
+          ]
+        },
+        "Recall@10": {
+          "n": 3,
+          "mean": 0.127157,
+          "min": 0.127157,
+          "max": 0.127157,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.127157,
+            0.127157,
+            0.127157
+          ]
+        },
+        "MAP@10": {
+          "n": 3,
+          "mean": 0.250324,
+          "min": 0.250324,
+          "max": 0.250324,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.250324,
+            0.250324,
+            0.250324
+          ]
+        },
+        "MRR@10": {
+          "n": 3,
+          "mean": 0.619444,
+          "min": 0.619444,
+          "max": 0.619444,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.619444,
+            0.619444,
+            0.619444
+          ]
+        },
+        "candidate_recall_mean": {
+          "n": 3,
+          "mean": 0.237137,
+          "min": 0.237137,
+          "max": 0.237137,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.237137,
+            0.237137,
+            0.237137
+          ]
+        },
+        "work_level_hit_rate_mean": {
+          "n": 3,
+          "mean": 0.260862,
+          "min": 0.260862,
+          "max": 0.260862,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.260862,
+            0.260862,
+            0.260862
+          ]
+        }
+      },
+      "zero_candidate_recall_queries_values": [
+        "7/30",
+        "7/30",
+        "7/30"
+      ],
+      "queries_with_any_relevant_work_in_pool_values": [
+        "23/30",
+        "23/30",
+        "23/30"
+      ]
+    },
+    {
+      "id": "canon_qwen_cohere_original_qrels",
+      "label": "CANON BM25+Qwen RRF + Cohere rerank, original qrels",
+      "auto_query_expansion": false,
+      "parent_qrels": false,
+      "parent_expansion_limit": 0,
+      "qrels_scope": "original_chunk_qrels",
+      "completed_runs": 3,
+      "metrics": {
+        "nDCG@10": {
+          "n": 3,
+          "mean": 0.39526,
+          "min": 0.394597,
+          "max": 0.395604,
+          "spread": 0.001007,
+          "sample_std": 0.000575,
+          "spread_pp": 0.101,
+          "sample_std_pp": 0.057,
+          "values": [
+            0.394597,
+            0.395604,
+            0.39558
+          ]
+        },
+        "Recall@10": {
+          "n": 3,
+          "mean": 0.142102,
+          "min": 0.142102,
+          "max": 0.142102,
+          "spread": 0.0,
+          "sample_std": 0.0,
+          "spread_pp": 0.0,
+          "sample_std_pp": 0.0,
+          "values": [
+            0.142102,
+            0.142102,
+            0.142102
+          ]
+        },
+        "MAP@10": {
+          "n": 3,
+          "mean": 0.296378,
+          "min": 0.295726,
+          "max": 0.296712,
+          "spread": 0.000986,
+          "sample_std": 0.000565,
+          "spread_pp": 0.099,
+          "sample_std_pp": 0.056,
+          "values": [
+            0.295726,
+            0.296697,
+            0.296712
+          ]
+        },
+        "MRR@10": {
+          "n": 3,
+          "mean": 0.649074,
+          "min": 0.647222,
+          "max": 0.65,
+          "spread": 0.002778,
+          "sample_std": 0.001604,
+          "spread_pp": 0.278,
+          "sample_std_pp": 0.16,
+          "values": [
+            0.65,
+            0.65,
+            0.647222
           ]
         },
         "candidate_recall_mean": {
@@ -378,230 +1268,8 @@
       ]
     },
     {
-      "id": "auto_query_expansion_fixed_parent_qrels",
-      "label": "Auto query expansion + fixed parent qrels",
-      "auto_query_expansion": true,
-      "parent_qrels": true,
-      "parent_expansion_limit": 0,
-      "qrels_scope": "full_corpus_parent_map_v2",
-      "completed_runs": 3,
-      "metrics": {
-        "nDCG@10": {
-          "n": 3,
-          "mean": 0.394649,
-          "min": 0.394554,
-          "max": 0.394775,
-          "spread": 0.000221,
-          "sample_std": 0.000114,
-          "spread_pp": 0.022,
-          "sample_std_pp": 0.011,
-          "values": [
-            0.394554,
-            0.394775,
-            0.394619
-          ]
-        },
-        "Recall@10": {
-          "n": 3,
-          "mean": 0.142102,
-          "min": 0.142102,
-          "max": 0.142102,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
-          "values": [
-            0.142102,
-            0.142102,
-            0.142102
-          ]
-        },
-        "MAP@10": {
-          "n": 3,
-          "mean": 0.295595,
-          "min": 0.295431,
-          "max": 0.295693,
-          "spread": 0.000262,
-          "sample_std": 0.000143,
-          "spread_pp": 0.026,
-          "sample_std_pp": 0.014,
-          "values": [
-            0.29566,
-            0.295431,
-            0.295693
-          ]
-        },
-        "MRR@10": {
-          "n": 3,
-          "mean": 0.649074,
-          "min": 0.647222,
-          "max": 0.65,
-          "spread": 0.002778,
-          "sample_std": 0.001604,
-          "spread_pp": 0.278,
-          "sample_std_pp": 0.16,
-          "values": [
-            0.65,
-            0.65,
-            0.647222
-          ]
-        },
-        "candidate_recall_mean": {
-          "n": 3,
-          "mean": 0.382565,
-          "min": 0.382565,
-          "max": 0.382565,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
-          "values": [
-            0.382565,
-            0.382565,
-            0.382565
-          ]
-        },
-        "work_level_hit_rate_mean": {
-          "n": 3,
-          "mean": 0.418675,
-          "min": 0.418675,
-          "max": 0.418675,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
-          "values": [
-            0.418675,
-            0.418675,
-            0.418675
-          ]
-        }
-      },
-      "zero_candidate_recall_queries_values": [
-        "4/30",
-        "4/30",
-        "4/30"
-      ],
-      "queries_with_any_relevant_work_in_pool_values": [
-        "26/30",
-        "26/30",
-        "26/30"
-      ]
-    },
-    {
-      "id": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
-      "label": "Auto query expansion + fixed parent qrels + parent-neighborhood candidates",
-      "auto_query_expansion": true,
-      "parent_qrels": true,
-      "parent_expansion_limit": 2,
-      "qrels_scope": "full_corpus_parent_map_v2",
-      "completed_runs": 3,
-      "metrics": {
-        "nDCG@10": {
-          "n": 3,
-          "mean": 0.394767,
-          "min": 0.393671,
-          "max": 0.39649,
-          "spread": 0.002819,
-          "sample_std": 0.00151,
-          "spread_pp": 0.282,
-          "sample_std_pp": 0.151,
-          "values": [
-            0.39649,
-            0.39414,
-            0.393671
-          ]
-        },
-        "Recall@10": {
-          "n": 3,
-          "mean": 0.142102,
-          "min": 0.142102,
-          "max": 0.142102,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
-          "values": [
-            0.142102,
-            0.142102,
-            0.142102
-          ]
-        },
-        "MAP@10": {
-          "n": 3,
-          "mean": 0.295955,
-          "min": 0.294902,
-          "max": 0.297963,
-          "spread": 0.003061,
-          "sample_std": 0.001739,
-          "spread_pp": 0.306,
-          "sample_std_pp": 0.174,
-          "values": [
-            0.297963,
-            0.294902,
-            0.295001
-          ]
-        },
-        "MRR@10": {
-          "n": 3,
-          "mean": 0.649074,
-          "min": 0.647222,
-          "max": 0.65,
-          "spread": 0.002778,
-          "sample_std": 0.001604,
-          "spread_pp": 0.278,
-          "sample_std_pp": 0.16,
-          "values": [
-            0.65,
-            0.65,
-            0.647222
-          ]
-        },
-        "candidate_recall_mean": {
-          "n": 3,
-          "mean": 0.416257,
-          "min": 0.416257,
-          "max": 0.416257,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
-          "values": [
-            0.416257,
-            0.416257,
-            0.416257
-          ]
-        },
-        "work_level_hit_rate_mean": {
-          "n": 3,
-          "mean": 0.418675,
-          "min": 0.418675,
-          "max": 0.418675,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
-          "values": [
-            0.418675,
-            0.418675,
-            0.418675
-          ]
-        }
-      },
-      "zero_candidate_recall_queries_values": [
-        "4/30",
-        "4/30",
-        "4/30"
-      ],
-      "queries_with_any_relevant_work_in_pool_values": [
-        "26/30",
-        "26/30",
-        "26/30"
-      ]
-    },
-    {
-      "id": "llamaindex_vector_original_qrels",
-      "label": "LlamaIndex VectorStoreIndex + CANON hash embeddings, original qrels",
+      "id": "canon_hash_rrf_only_original_qrels",
+      "label": "CANON BM25+hash RRF without rerank, original qrels",
       "auto_query_expansion": false,
       "parent_qrels": false,
       "parent_expansion_limit": 0,
@@ -610,92 +1278,92 @@
       "metrics": {
         "nDCG@10": {
           "n": 3,
-          "mean": 0.128245,
-          "min": 0.128245,
-          "max": 0.128245,
+          "mean": 0.245204,
+          "min": 0.245204,
+          "max": 0.245204,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.128245,
-            0.128245,
-            0.128245
+            0.245204,
+            0.245204,
+            0.245204
           ]
         },
         "Recall@10": {
           "n": 3,
-          "mean": 0.087082,
-          "min": 0.087082,
-          "max": 0.087082,
+          "mean": 0.11326,
+          "min": 0.11326,
+          "max": 0.11326,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.087082,
-            0.087082,
-            0.087082
+            0.11326,
+            0.11326,
+            0.11326
           ]
         },
         "MAP@10": {
           "n": 3,
-          "mean": 0.080939,
-          "min": 0.080939,
-          "max": 0.080939,
+          "mean": 0.172377,
+          "min": 0.172377,
+          "max": 0.172377,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.080939,
-            0.080939,
-            0.080939
+            0.172377,
+            0.172377,
+            0.172377
           ]
         },
         "MRR@10": {
           "n": 3,
-          "mean": 0.198148,
-          "min": 0.198148,
-          "max": 0.198148,
+          "mean": 0.441667,
+          "min": 0.441667,
+          "max": 0.441667,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.198148,
-            0.198148,
-            0.198148
+            0.441667,
+            0.441667,
+            0.441667
           ]
         },
         "candidate_recall_mean": {
           "n": 3,
-          "mean": 0.199087,
-          "min": 0.199087,
-          "max": 0.199087,
+          "mean": 0.237137,
+          "min": 0.237137,
+          "max": 0.237137,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.199087,
-            0.199087,
-            0.199087
+            0.237137,
+            0.237137,
+            0.237137
           ]
         },
         "work_level_hit_rate_mean": {
           "n": 3,
-          "mean": 0.20837,
-          "min": 0.20837,
-          "max": 0.20837,
+          "mean": 0.260862,
+          "min": 0.260862,
+          "max": 0.260862,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.20837,
-            0.20837,
-            0.20837
+            0.260862,
+            0.260862,
+            0.260862
           ]
         }
       },
@@ -711,455 +1379,3183 @@
       ]
     },
     {
-      "id": "llamaindex_vector_fixed_parent_qrels",
-      "label": "LlamaIndex VectorStoreIndex + CANON hash embeddings, fixed parent qrels",
+      "id": "canon_qwen_rrf_only_original_qrels",
+      "label": "CANON BM25+Qwen RRF without rerank, original qrels",
       "auto_query_expansion": false,
-      "parent_qrels": true,
+      "parent_qrels": false,
       "parent_expansion_limit": 0,
-      "qrels_scope": "full_corpus_parent_map_v2",
+      "qrels_scope": "original_chunk_qrels",
       "completed_runs": 3,
       "metrics": {
         "nDCG@10": {
           "n": 3,
-          "mean": 0.128245,
-          "min": 0.128245,
-          "max": 0.128245,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
+          "mean": 0.383108,
+          "min": 0.382467,
+          "max": 0.383428,
+          "spread": 0.000961,
+          "sample_std": 0.000555,
+          "spread_pp": 0.096,
+          "sample_std_pp": 0.055,
           "values": [
-            0.128245,
-            0.128245,
-            0.128245
+            0.382467,
+            0.383428,
+            0.383428
           ]
         },
         "Recall@10": {
           "n": 3,
-          "mean": 0.087082,
-          "min": 0.087082,
-          "max": 0.087082,
+          "mean": 0.143627,
+          "min": 0.143627,
+          "max": 0.143627,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.087082,
-            0.087082,
-            0.087082
+            0.143627,
+            0.143627,
+            0.143627
           ]
         },
         "MAP@10": {
           "n": 3,
-          "mean": 0.080939,
-          "min": 0.080939,
-          "max": 0.080939,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
+          "mean": 0.276783,
+          "min": 0.276413,
+          "max": 0.276968,
+          "spread": 0.000555,
+          "sample_std": 0.00032,
+          "spread_pp": 0.055,
+          "sample_std_pp": 0.032,
           "values": [
-            0.080939,
-            0.080939,
-            0.080939
+            0.276413,
+            0.276968,
+            0.276968
           ]
         },
         "MRR@10": {
           "n": 3,
-          "mean": 0.198148,
-          "min": 0.198148,
-          "max": 0.198148,
-          "spread": 0.0,
-          "sample_std": 0.0,
-          "spread_pp": 0.0,
-          "sample_std_pp": 0.0,
+          "mean": 0.65291,
+          "min": 0.649206,
+          "max": 0.654762,
+          "spread": 0.005556,
+          "sample_std": 0.003208,
+          "spread_pp": 0.556,
+          "sample_std_pp": 0.321,
           "values": [
-            0.198148,
-            0.198148,
-            0.198148
+            0.649206,
+            0.654762,
+            0.654762
           ]
         },
         "candidate_recall_mean": {
           "n": 3,
-          "mean": 0.199087,
-          "min": 0.199087,
-          "max": 0.199087,
+          "mean": 0.365927,
+          "min": 0.365927,
+          "max": 0.365927,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.199087,
-            0.199087,
-            0.199087
+            0.365927,
+            0.365927,
+            0.365927
           ]
         },
         "work_level_hit_rate_mean": {
           "n": 3,
-          "mean": 0.20837,
-          "min": 0.20837,
-          "max": 0.20837,
+          "mean": 0.395415,
+          "min": 0.395415,
+          "max": 0.395415,
           "spread": 0.0,
           "sample_std": 0.0,
           "spread_pp": 0.0,
           "sample_std_pp": 0.0,
           "values": [
-            0.20837,
-            0.20837,
-            0.20837
+            0.395415,
+            0.395415,
+            0.395415
           ]
         }
       },
       "zero_candidate_recall_queries_values": [
-        "7/30",
-        "7/30",
-        "7/30"
+        "4/30",
+        "4/30",
+        "4/30"
       ],
       "queries_with_any_relevant_work_in_pool_values": [
-        "23/30",
-        "23/30",
-        "23/30"
+        "26/30",
+        "26/30",
+        "26/30"
       ]
     }
   ],
   "paired_deltas": [
     {
-      "comparison": "llamaindex_vector_original_qrels - base_qwen_cohere",
-      "treatment_config": "llamaindex_vector_original_qrels",
-      "baseline_config": "base_qwen_cohere",
+      "comparison": "llamaindex_qwen_original_qrels - llamaindex_hash_original_qrels",
+      "treatment_config": "llamaindex_qwen_original_qrels",
+      "baseline_config": "llamaindex_hash_original_qrels",
       "metric": "nDCG@10",
       "n": 3,
-      "mean_delta": -0.266266,
-      "mean_delta_pp": -26.627,
-      "min_delta": -0.266883,
-      "max_delta": -0.265475,
-      "spread_delta": 0.001408,
-      "spread_delta_pp": 0.141,
+      "mean_delta": 0.337148,
+      "mean_delta_pp": 33.715,
+      "min_delta": 0.337104,
+      "max_delta": 0.337192,
+      "spread_delta": 8.8e-05,
+      "spread_delta_pp": 0.009,
       "rows": [
         {
           "repeat": 1,
-          "delta": -0.266883,
-          "delta_pp": -26.688,
-          "treatment": 0.128245,
-          "baseline": 0.395128
+          "delta": 0.337148,
+          "delta_pp": 33.715,
+          "treatment": 0.465538,
+          "baseline": 0.12839
         },
         {
           "repeat": 2,
-          "delta": -0.265475,
-          "delta_pp": -26.548,
-          "treatment": 0.128245,
-          "baseline": 0.39372
+          "delta": 0.337192,
+          "delta_pp": 33.719,
+          "treatment": 0.465582,
+          "baseline": 0.12839
         },
         {
           "repeat": 3,
-          "delta": -0.26644,
-          "delta_pp": -26.644,
-          "treatment": 0.128245,
-          "baseline": 0.394685
+          "delta": 0.337104,
+          "delta_pp": 33.71,
+          "treatment": 0.465494,
+          "baseline": 0.12839
         }
       ]
     },
     {
-      "comparison": "llamaindex_vector_fixed_parent_qrels - auto_query_expansion_fixed_parent_qrels",
-      "treatment_config": "llamaindex_vector_fixed_parent_qrels",
-      "baseline_config": "auto_query_expansion_fixed_parent_qrels",
+      "comparison": "canon_qwen_cohere_original_qrels - canon_hash_cohere_original_qrels",
+      "treatment_config": "canon_qwen_cohere_original_qrels",
+      "baseline_config": "canon_hash_cohere_original_qrels",
       "metric": "nDCG@10",
       "n": 3,
-      "mean_delta": -0.266404,
-      "mean_delta_pp": -26.64,
-      "min_delta": -0.26653,
-      "max_delta": -0.266309,
-      "spread_delta": 0.000221,
-      "spread_delta_pp": 0.022,
+      "mean_delta": 0.045098,
+      "mean_delta_pp": 4.51,
+      "min_delta": 0.044435,
+      "max_delta": 0.045442,
+      "spread_delta": 0.001007,
+      "spread_delta_pp": 0.101,
       "rows": [
         {
           "repeat": 1,
-          "delta": -0.266309,
-          "delta_pp": -26.631,
-          "treatment": 0.128245,
-          "baseline": 0.394554
+          "delta": 0.044435,
+          "delta_pp": 4.444,
+          "treatment": 0.394597,
+          "baseline": 0.350162
         },
         {
           "repeat": 2,
-          "delta": -0.26653,
-          "delta_pp": -26.653,
-          "treatment": 0.128245,
-          "baseline": 0.394775
+          "delta": 0.045442,
+          "delta_pp": 4.544,
+          "treatment": 0.395604,
+          "baseline": 0.350162
         },
         {
           "repeat": 3,
-          "delta": -0.266374,
-          "delta_pp": -26.637,
-          "treatment": 0.128245,
-          "baseline": 0.394619
+          "delta": 0.045418,
+          "delta_pp": 4.542,
+          "treatment": 0.39558,
+          "baseline": 0.350162
         }
       ]
     },
     {
-      "comparison": "llamaindex_vector_fixed_parent_qrels - auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
-      "treatment_config": "llamaindex_vector_fixed_parent_qrels",
-      "baseline_config": "auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "comparison": "canon_hash_cohere_original_qrels - llamaindex_hash_original_qrels",
+      "treatment_config": "canon_hash_cohere_original_qrels",
+      "baseline_config": "llamaindex_hash_original_qrels",
       "metric": "nDCG@10",
       "n": 3,
-      "mean_delta": -0.266522,
-      "mean_delta_pp": -26.652,
-      "min_delta": -0.268245,
-      "max_delta": -0.265426,
-      "spread_delta": 0.002819,
-      "spread_delta_pp": 0.282,
+      "mean_delta": 0.221772,
+      "mean_delta_pp": 22.177,
+      "min_delta": 0.221772,
+      "max_delta": 0.221772,
+      "spread_delta": 0.0,
+      "spread_delta_pp": 0.0,
       "rows": [
         {
           "repeat": 1,
-          "delta": -0.268245,
-          "delta_pp": -26.825,
-          "treatment": 0.128245,
-          "baseline": 0.39649
+          "delta": 0.221772,
+          "delta_pp": 22.177,
+          "treatment": 0.350162,
+          "baseline": 0.12839
         },
         {
           "repeat": 2,
-          "delta": -0.265895,
-          "delta_pp": -26.59,
-          "treatment": 0.128245,
-          "baseline": 0.39414
+          "delta": 0.221772,
+          "delta_pp": 22.177,
+          "treatment": 0.350162,
+          "baseline": 0.12839
         },
         {
           "repeat": 3,
-          "delta": -0.265426,
-          "delta_pp": -26.543,
-          "treatment": 0.128245,
-          "baseline": 0.393671
+          "delta": 0.221772,
+          "delta_pp": 22.177,
+          "treatment": 0.350162,
+          "baseline": 0.12839
+        }
+      ]
+    },
+    {
+      "comparison": "canon_qwen_cohere_original_qrels - llamaindex_qwen_original_qrels",
+      "treatment_config": "canon_qwen_cohere_original_qrels",
+      "baseline_config": "llamaindex_qwen_original_qrels",
+      "metric": "nDCG@10",
+      "n": 3,
+      "mean_delta": -0.070278,
+      "mean_delta_pp": -7.028,
+      "min_delta": -0.070941,
+      "max_delta": -0.069914,
+      "spread_delta": 0.001027,
+      "spread_delta_pp": 0.103,
+      "rows": [
+        {
+          "repeat": 1,
+          "delta": -0.070941,
+          "delta_pp": -7.094,
+          "treatment": 0.394597,
+          "baseline": 0.465538
+        },
+        {
+          "repeat": 2,
+          "delta": -0.069978,
+          "delta_pp": -6.998,
+          "treatment": 0.395604,
+          "baseline": 0.465582
+        },
+        {
+          "repeat": 3,
+          "delta": -0.069914,
+          "delta_pp": -6.991,
+          "treatment": 0.39558,
+          "baseline": 0.465494
+        }
+      ]
+    },
+    {
+      "comparison": "canon_hash_cohere_original_qrels - canon_hash_rrf_only_original_qrels",
+      "treatment_config": "canon_hash_cohere_original_qrels",
+      "baseline_config": "canon_hash_rrf_only_original_qrels",
+      "metric": "nDCG@10",
+      "n": 3,
+      "mean_delta": 0.104958,
+      "mean_delta_pp": 10.496,
+      "min_delta": 0.104958,
+      "max_delta": 0.104958,
+      "spread_delta": 0.0,
+      "spread_delta_pp": 0.0,
+      "rows": [
+        {
+          "repeat": 1,
+          "delta": 0.104958,
+          "delta_pp": 10.496,
+          "treatment": 0.350162,
+          "baseline": 0.245204
+        },
+        {
+          "repeat": 2,
+          "delta": 0.104958,
+          "delta_pp": 10.496,
+          "treatment": 0.350162,
+          "baseline": 0.245204
+        },
+        {
+          "repeat": 3,
+          "delta": 0.104958,
+          "delta_pp": 10.496,
+          "treatment": 0.350162,
+          "baseline": 0.245204
+        }
+      ]
+    },
+    {
+      "comparison": "canon_qwen_cohere_original_qrels - canon_qwen_rrf_only_original_qrels",
+      "treatment_config": "canon_qwen_cohere_original_qrels",
+      "baseline_config": "canon_qwen_rrf_only_original_qrels",
+      "metric": "nDCG@10",
+      "n": 3,
+      "mean_delta": 0.012153,
+      "mean_delta_pp": 1.215,
+      "min_delta": 0.01213,
+      "max_delta": 0.012176,
+      "spread_delta": 4.6e-05,
+      "spread_delta_pp": 0.005,
+      "rows": [
+        {
+          "repeat": 1,
+          "delta": 0.01213,
+          "delta_pp": 1.213,
+          "treatment": 0.394597,
+          "baseline": 0.382467
+        },
+        {
+          "repeat": 2,
+          "delta": 0.012176,
+          "delta_pp": 1.218,
+          "treatment": 0.395604,
+          "baseline": 0.383428
+        },
+        {
+          "repeat": 3,
+          "delta": 0.012152,
+          "delta_pp": 1.215,
+          "treatment": 0.39558,
+          "baseline": 0.383428
         }
       ]
     }
   ],
   "claim_checks": [
     {
-      "comparison": "llamaindex_vector_original_qrels - base_qwen_cohere",
+      "comparison": "llamaindex_qwen_original_qrels - llamaindex_hash_original_qrels",
       "metric": "nDCG@10",
       "standing": "stands_under_repeat_spread_check",
       "reason": "The paired effect is larger than the observed within-configuration spread.",
-      "mean_delta": -0.266266,
-      "mean_delta_pp": -26.627,
-      "max_within_config_spread": 0.001408,
-      "max_within_config_spread_pp": 0.141,
-      "min_delta": -0.266883,
-      "max_delta": -0.265475,
+      "mean_delta": 0.337148,
+      "mean_delta_pp": 33.715,
+      "max_within_config_spread": 8.8e-05,
+      "max_within_config_spread_pp": 0.009,
+      "min_delta": 0.337104,
+      "max_delta": 0.337192,
       "materiality_threshold_pp": 0.5
     },
     {
-      "comparison": "llamaindex_vector_fixed_parent_qrels - auto_query_expansion_fixed_parent_qrels",
+      "comparison": "canon_qwen_cohere_original_qrels - canon_hash_cohere_original_qrels",
       "metric": "nDCG@10",
       "standing": "stands_under_repeat_spread_check",
       "reason": "The paired effect is larger than the observed within-configuration spread.",
-      "mean_delta": -0.266404,
-      "mean_delta_pp": -26.64,
-      "max_within_config_spread": 0.000221,
-      "max_within_config_spread_pp": 0.022,
-      "min_delta": -0.26653,
-      "max_delta": -0.266309,
+      "mean_delta": 0.045098,
+      "mean_delta_pp": 4.51,
+      "max_within_config_spread": 0.001007,
+      "max_within_config_spread_pp": 0.101,
+      "min_delta": 0.044435,
+      "max_delta": 0.045442,
       "materiality_threshold_pp": 0.5
     },
     {
-      "comparison": "llamaindex_vector_fixed_parent_qrels - auto_query_expansion_fixed_parent_qrels_parent_neighborhood",
+      "comparison": "canon_hash_cohere_original_qrels - llamaindex_hash_original_qrels",
       "metric": "nDCG@10",
       "standing": "stands_under_repeat_spread_check",
       "reason": "The paired effect is larger than the observed within-configuration spread.",
-      "mean_delta": -0.266522,
-      "mean_delta_pp": -26.652,
-      "max_within_config_spread": 0.002819,
-      "max_within_config_spread_pp": 0.282,
-      "min_delta": -0.268245,
-      "max_delta": -0.265426,
+      "mean_delta": 0.221772,
+      "mean_delta_pp": 22.177,
+      "max_within_config_spread": 0.0,
+      "max_within_config_spread_pp": 0.0,
+      "min_delta": 0.221772,
+      "max_delta": 0.221772,
+      "materiality_threshold_pp": 0.5
+    },
+    {
+      "comparison": "canon_qwen_cohere_original_qrels - llamaindex_qwen_original_qrels",
+      "metric": "nDCG@10",
+      "standing": "stands_under_repeat_spread_check",
+      "reason": "The paired effect is larger than the observed within-configuration spread.",
+      "mean_delta": -0.070278,
+      "mean_delta_pp": -7.028,
+      "max_within_config_spread": 0.001007,
+      "max_within_config_spread_pp": 0.101,
+      "min_delta": -0.070941,
+      "max_delta": -0.069914,
+      "materiality_threshold_pp": 0.5
+    },
+    {
+      "comparison": "canon_hash_cohere_original_qrels - canon_hash_rrf_only_original_qrels",
+      "metric": "nDCG@10",
+      "standing": "stands_under_repeat_spread_check",
+      "reason": "The paired effect is larger than the observed within-configuration spread.",
+      "mean_delta": 0.104958,
+      "mean_delta_pp": 10.496,
+      "max_within_config_spread": 0.0,
+      "max_within_config_spread_pp": 0.0,
+      "min_delta": 0.104958,
+      "max_delta": 0.104958,
+      "materiality_threshold_pp": 0.5
+    },
+    {
+      "comparison": "canon_qwen_cohere_original_qrels - canon_qwen_rrf_only_original_qrels",
+      "metric": "nDCG@10",
+      "standing": "stands_under_repeat_spread_check",
+      "reason": "The paired effect is larger than the observed within-configuration spread.",
+      "mean_delta": 0.012153,
+      "mean_delta_pp": 1.215,
+      "max_within_config_spread": 0.001007,
+      "max_within_config_spread_pp": 0.101,
+      "min_delta": 0.01213,
+      "max_delta": 0.012176,
       "materiality_threshold_pp": 0.5
     }
   ],
   "standing_verdict": {
     "primary_metric": "nDCG@10",
-    "primary_comparison": "llamaindex_vector_original_qrels - base_qwen_cohere",
-    "winner": "canon",
+    "primary_comparison": "canon_qwen_cohere_original_qrels - llamaindex_qwen_original_qrels",
+    "conclusion": "corrected_factorial_result_available",
     "standing": "stands_under_repeat_spread_check",
-    "mean_delta_pp": -26.627,
+    "mean_delta_pp": -7.028,
     "reason": "The paired effect is larger than the observed within-configuration spread.",
-    "publication_boundary": "Publish the result either way, but describe it as a 30-query NFCorpus pilot rather than a full BEIR leaderboard claim."
+    "publication_boundary": "Publish the result as a corrected 2x2 retrieval-factor pilot, not as proof that one framework or architecture generally wins.",
+    "superseded_claim": "The old -26.6pp LlamaIndex comparison should not be used as evidence that CANON's architecture earned its complexity, because encoder and pipeline changed together."
+  },
+  "retrieval_factor_diagnostics": {
+    "status": "ok",
+    "metric": "nDCG@10",
+    "query_count": 30,
+    "diagnostic_scope": "Per-query summaries are averaged across repeats, then compared across the same encoder/framework cells. They explain retrieval behavior; they are not human relevance judgments.",
+    "winner_counts_qwen_same_encoder": {
+      "canon_qwen_cohere": 6,
+      "llamaindex_qwen": 13,
+      "tie": 11
+    },
+    "failure_class_counts": {
+      "canon_candidate_recall_advantage": 1,
+      "canon_multistage_advantage": 4,
+      "cohere_rerank_helps_qwen": 9,
+      "cohere_rerank_hurts_qwen": 8,
+      "encoder_rescues_canon": 6,
+      "encoder_rescues_llamaindex": 23,
+      "llamaindex_qwen_ranking_advantage": 12,
+      "near_tie_or_low_signal": 2,
+      "shared_candidate_miss": 4
+    },
+    "mean_deltas_pp": {
+      "llamaindex_qwen_minus_hash": 33.715,
+      "canon_qwen_minus_hash_with_cohere": 4.51,
+      "canon_minus_llamaindex_with_hash": 22.177,
+      "canon_minus_llamaindex_with_qwen": -7.028,
+      "cohere_minus_rrf_with_hash": 10.496,
+      "cohere_minus_rrf_with_qwen": 1.215
+    },
+    "largest_canon_qwen_losses": [
+      {
+        "id": "PLAIN-1098",
+        "query": "eggnog",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -49.352,
+        "cohere_minus_rrf_qwen_pp": -49.352,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1151",
+        "query": "factory farming practices",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -31.597,
+        "cohere_minus_rrf_qwen_pp": 49.115,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ]
+      },
+      {
+        "id": "PLAIN-1028",
+        "query": "dietary scoring",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -30.103,
+        "cohere_minus_rrf_qwen_pp": 0.0,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-102",
+        "query": "Stopping Heart Disease in Childhood",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -24.812,
+        "cohere_minus_rrf_qwen_pp": -5.07,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1214",
+        "query": "Fosamax",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -24.736,
+        "cohere_minus_rrf_qwen_pp": -24.736,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ]
+      },
+      {
+        "id": "PLAIN-12",
+        "query": "Exploiting Autophagy to Live Longer",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -24.696,
+        "cohere_minus_rrf_qwen_pp": 0.526,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1050",
+        "query": "Dr. Dean Ornish",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -22.794,
+        "cohere_minus_rrf_qwen_pp": -3.461,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1225",
+        "query": "fructose",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -17.726,
+        "cohere_minus_rrf_qwen_pp": -1.876,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      }
+    ],
+    "largest_canon_qwen_wins": [
+      {
+        "id": "PLAIN-1288",
+        "query": "grapes",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "canon_qwen_minus_llamaindex_qwen_pp": 40.318,
+        "cohere_minus_rrf_qwen_pp": -6.646,
+        "failure_classes": [
+          "canon_multistage_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1183",
+        "query": "Finland",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "canon_qwen_minus_llamaindex_qwen_pp": 8.023,
+        "cohere_minus_rrf_qwen_pp": 1.571,
+        "failure_classes": [
+          "canon_multistage_advantage",
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1193",
+        "query": "flax oil",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "canon_qwen_minus_llamaindex_qwen_pp": 6.046,
+        "cohere_minus_rrf_qwen_pp": 13.886,
+        "failure_classes": [
+          "canon_multistage_advantage",
+          "cohere_rerank_helps_qwen"
+        ]
+      },
+      {
+        "id": "PLAIN-123",
+        "query": "How Citrus Might Help Keep Your Hands Warm",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "canon_qwen_minus_llamaindex_qwen_pp": 5.598,
+        "cohere_minus_rrf_qwen_pp": 8.043,
+        "failure_classes": [
+          "canon_multistage_advantage",
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-112",
+        "query": "Food Dyes and ADHD",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "canon_qwen_minus_llamaindex_qwen_pp": 3.121,
+        "cohere_minus_rrf_qwen_pp": 32.787,
+        "failure_classes": [
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ]
+      },
+      {
+        "id": "PLAIN-1262",
+        "query": "Global Burden of Disease Study",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "canon_qwen_minus_llamaindex_qwen_pp": 1.214,
+        "cohere_minus_rrf_qwen_pp": 30.634,
+        "failure_classes": [
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ]
+      },
+      {
+        "id": "PLAIN-1008",
+        "query": "deafness",
+        "qwen_same_encoder_winner": "tie",
+        "canon_qwen_minus_llamaindex_qwen_pp": 0.0,
+        "cohere_minus_rrf_qwen_pp": 0.0,
+        "failure_classes": [
+          "shared_candidate_miss"
+        ]
+      },
+      {
+        "id": "PLAIN-1039",
+        "query": "domoic acid",
+        "qwen_same_encoder_winner": "tie",
+        "canon_qwen_minus_llamaindex_qwen_pp": 0.0,
+        "cohere_minus_rrf_qwen_pp": 0.0,
+        "failure_classes": [
+          "encoder_rescues_llamaindex"
+        ]
+      }
+    ],
+    "reranker_hurts_qwen_queries": [
+      {
+        "id": "PLAIN-1018",
+        "query": "DHA",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -9.882,
+        "cohere_minus_rrf_qwen_pp": -28.559,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-102",
+        "query": "Stopping Heart Disease in Childhood",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -24.812,
+        "cohere_minus_rrf_qwen_pp": -5.07,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1050",
+        "query": "Dr. Dean Ornish",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -22.794,
+        "cohere_minus_rrf_qwen_pp": -3.461,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1098",
+        "query": "eggnog",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -49.352,
+        "cohere_minus_rrf_qwen_pp": -49.352,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1109",
+        "query": "endocrine disruptors",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -16.036,
+        "cohere_minus_rrf_qwen_pp": -8.86,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1214",
+        "query": "Fosamax",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -24.736,
+        "cohere_minus_rrf_qwen_pp": -24.736,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ]
+      },
+      {
+        "id": "PLAIN-1225",
+        "query": "fructose",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "canon_qwen_minus_llamaindex_qwen_pp": -17.726,
+        "cohere_minus_rrf_qwen_pp": -1.876,
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      },
+      {
+        "id": "PLAIN-1288",
+        "query": "grapes",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "canon_qwen_minus_llamaindex_qwen_pp": 40.318,
+        "cohere_minus_rrf_qwen_pp": -6.646,
+        "failure_classes": [
+          "canon_multistage_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ]
+      }
+    ],
+    "diagnostic_reading": "The correction points to encoder strength as the dominant factor on this slice; CANON's multi-stage path is not yet earning its extra complexity once Qwen is shared.",
+    "queries": [
+      {
+        "id": "PLAIN-1008",
+        "query": "deafness",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "shared_candidate_miss"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 0.0,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 0.0,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1018",
+        "query": "DHA",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.148764,
+            "candidate_recall": 0.138614,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.43463,
+            "candidate_recall": 0.465347,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.344452,
+            "candidate_recall": 0.158416,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.335814,
+            "candidate_recall": 0.465347,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.575074,
+            "candidate_recall": 0.158416,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.621401,
+            "candidate_recall": 0.465347,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 28.587,
+          "canon_qwen_minus_hash_pp": -0.864,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 19.569,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -9.882,
+          "cohere_minus_rrf_hash_pp": -23.062,
+          "cohere_minus_rrf_qwen_pp": -28.559
+        }
+      },
+      {
+        "id": "PLAIN-102",
+        "query": "Stopping Heart Disease in Childhood",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.153846,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.645605,
+            "candidate_recall": 0.153846,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.361689,
+            "candidate_recall": 0.179487,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.397483,
+            "candidate_recall": 0.153846,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.179487,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.448178,
+            "candidate_recall": 0.153846,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 64.561,
+          "canon_qwen_minus_hash_pp": 3.579,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 36.169,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -24.812,
+          "cohere_minus_rrf_hash_pp": 36.169,
+          "cohere_minus_rrf_qwen_pp": -5.07
+        }
+      },
+      {
+        "id": "PLAIN-1028",
+        "query": "dietary scoring",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.30103,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 30.103,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 0.0,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -30.103,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1039",
+        "query": "domoic acid",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.732829,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 26.717,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 26.717,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1050",
+        "query": "Dr. Dean Ornish",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.057325,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.476847,
+            "candidate_recall": 0.263269,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.358954,
+            "candidate_recall": 0.063694,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.248908,
+            "candidate_recall": 0.261146,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.063694,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.283515,
+            "candidate_recall": 0.261146,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 47.685,
+          "canon_qwen_minus_hash_pp": -11.005,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 35.895,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -22.794,
+          "cohere_minus_rrf_hash_pp": 35.895,
+          "cohere_minus_rrf_qwen_pp": -3.461
+        }
+      },
+      {
+        "id": "PLAIN-1066",
+        "query": "Dr. Walter Willett",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "near_tie_or_low_signal"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.066667,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.066667,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.066667,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 0.0,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 0.0,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1088",
+        "query": "ECMO",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.4,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.553146,
+            "candidate_recall": 0.4,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.553146,
+            "candidate_recall": 0.4,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.553146,
+            "candidate_recall": 0.4,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.553146,
+            "candidate_recall": 0.4,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.553146,
+            "candidate_recall": 0.4,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 55.315,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 55.315,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1098",
+        "query": "eggnog",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.493523,
+            "candidate_recall": 0.5,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.5,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.493523,
+            "candidate_recall": 0.5,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 49.352,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 0.0,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -49.352,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": -49.352
+        }
+      },
+      {
+        "id": "PLAIN-1109",
+        "query": "endocrine disruptors",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.16422,
+            "candidate_recall": 0.051282,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.762416,
+            "candidate_recall": 0.378205,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.668306,
+            "candidate_recall": 0.115385,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.602052,
+            "candidate_recall": 0.384615,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.563788,
+            "candidate_recall": 0.115385,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.690648,
+            "candidate_recall": 0.384615,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 59.82,
+          "canon_qwen_minus_hash_pp": -6.625,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 50.409,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -16.036,
+          "cohere_minus_rrf_hash_pp": 10.452,
+          "cohere_minus_rrf_qwen_pp": -8.86
+        }
+      },
+      {
+        "id": "PLAIN-1119",
+        "query": "energy drinks",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "shared_candidate_miss"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 0.0,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 0.0,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-112",
+        "query": "Food Dyes and ADHD",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "failure_classes": [
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.268989,
+            "candidate_recall": 0.089888,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.700146,
+            "candidate_recall": 0.157303,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.554087,
+            "candidate_recall": 0.123596,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.731354,
+            "candidate_recall": 0.191011,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.268989,
+            "candidate_recall": 0.123596,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.403483,
+            "candidate_recall": 0.191011,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 43.116,
+          "canon_qwen_minus_hash_pp": 17.727,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 28.51,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 3.121,
+          "cohere_minus_rrf_hash_pp": 28.51,
+          "cohere_minus_rrf_qwen_pp": 32.787
+        }
+      },
+      {
+        "id": "PLAIN-1130",
+        "query": "ergothioneine",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "near_tie_or_low_signal"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 0.0,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 0.0,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1141",
+        "query": "Evidence-based medicine",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "canon_candidate_recall_advantage",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.085143,
+            "candidate_recall": 0.35,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.35,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.4,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.5,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.138862,
+            "candidate_recall": 0.4,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.5,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 13.495,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 13.495,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 8.123,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1151",
+        "query": "factory farming practices",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.249363,
+            "candidate_recall": 0.099174,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 1.0,
+            "candidate_recall": 0.450413,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.441285,
+            "candidate_recall": 0.14876,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.684028,
+            "candidate_recall": 0.466942,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.14876,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.192878,
+            "candidate_recall": 0.466942,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 75.064,
+          "canon_qwen_minus_hash_pp": 24.274,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 19.192,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -31.597,
+          "cohere_minus_rrf_hash_pp": 44.128,
+          "cohere_minus_rrf_qwen_pp": 49.115
+        }
+      },
+      {
+        "id": "PLAIN-1161",
+        "query": "fava beans",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "shared_candidate_miss"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 1.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 0.0,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 0.0,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1172",
+        "query": "fenugreek",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.1,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.033333,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.1,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.033333,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.1,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.033333,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 22.009,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 22.009,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1183",
+        "query": "Finland",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "failure_classes": [
+          "canon_multistage_advantage",
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.055556,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.143774,
+            "candidate_recall": 0.166667,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.224006,
+            "candidate_recall": 0.083333,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.224006,
+            "candidate_recall": 0.166667,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.083333,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.208294,
+            "candidate_recall": 0.166667,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 14.377,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 22.401,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 8.023,
+          "cohere_minus_rrf_hash_pp": 0.391,
+          "cohere_minus_rrf_qwen_pp": 1.571
+        }
+      },
+      {
+        "id": "PLAIN-1193",
+        "query": "flax oil",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "failure_classes": [
+          "canon_multistage_advantage",
+          "cohere_rerank_helps_qwen"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.110046,
+            "candidate_recall": 0.233333,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.078398,
+            "candidate_recall": 0.666667,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.138862,
+            "candidate_recall": 0.366667,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.138862,
+            "candidate_recall": 0.666667,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.094788,
+            "candidate_recall": 0.366667,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.666667,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": -3.165,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 2.882,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 6.046,
+          "cohere_minus_rrf_hash_pp": 4.407,
+          "cohere_minus_rrf_qwen_pp": 13.886
+        }
+      },
+      {
+        "id": "PLAIN-12",
+        "query": "Exploiting Autophagy to Live Longer",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.108696,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.328827,
+            "candidate_recall": 0.23913,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.168176,
+            "candidate_recall": 0.173913,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.081871,
+            "candidate_recall": 0.282609,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.173913,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.076613,
+            "candidate_recall": 0.282609,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 32.883,
+          "canon_qwen_minus_hash_pp": -8.63,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 16.818,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -24.696,
+          "cohere_minus_rrf_hash_pp": 16.818,
+          "cohere_minus_rrf_qwen_pp": 0.526
+        }
+      },
+      {
+        "id": "PLAIN-1203",
+        "query": "folic acid",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.506784,
+            "candidate_recall": 0.3125,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.72733,
+            "candidate_recall": 0.5,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.554143,
+            "candidate_recall": 0.375,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.693761,
+            "candidate_recall": 0.5,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.563788,
+            "candidate_recall": 0.375,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.563788,
+            "candidate_recall": 0.5,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 22.055,
+          "canon_qwen_minus_hash_pp": 13.962,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 4.736,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -3.357,
+          "cohere_minus_rrf_hash_pp": -0.964,
+          "cohere_minus_rrf_qwen_pp": 12.997
+        }
+      },
+      {
+        "id": "PLAIN-1214",
+        "query": "Fosamax",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.870125,
+            "candidate_recall": 0.428571,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.622767,
+            "candidate_recall": 0.428571,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.870125,
+            "candidate_recall": 0.428571,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 87.013,
+          "canon_qwen_minus_hash_pp": 62.277,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 0.0,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -24.736,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": -24.736
+        }
+      },
+      {
+        "id": "PLAIN-1225",
+        "query": "fructose",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.299227,
+            "candidate_recall": 0.347826,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.905212,
+            "candidate_recall": 0.586957,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.654722,
+            "candidate_recall": 0.391304,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.727948,
+            "candidate_recall": 0.608696,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.423029,
+            "candidate_recall": 0.391304,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.746705,
+            "candidate_recall": 0.608696,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 60.599,
+          "canon_qwen_minus_hash_pp": 7.323,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 35.55,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -17.726,
+          "cohere_minus_rrf_hash_pp": 23.169,
+          "cohere_minus_rrf_qwen_pp": -1.876
+        }
+      },
+      {
+        "id": "PLAIN-123",
+        "query": "How Citrus Might Help Keep Your Hands Warm",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "failure_classes": [
+          "canon_multistage_advantage",
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.011765,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.14914,
+            "candidate_recall": 0.211765,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.24846,
+            "candidate_recall": 0.070588,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.205117,
+            "candidate_recall": 0.211765,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.070588,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.124686,
+            "candidate_recall": 0.211765,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 14.914,
+          "canon_qwen_minus_hash_pp": -4.334,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 24.846,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 5.598,
+          "cohere_minus_rrf_hash_pp": 24.846,
+          "cohere_minus_rrf_qwen_pp": 8.043
+        }
+      },
+      {
+        "id": "PLAIN-1236",
+        "query": "galactosemia",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.1,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.358954,
+            "candidate_recall": 0.2,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.358954,
+            "candidate_recall": 0.2,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.358954,
+            "candidate_recall": 0.2,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.330138,
+            "candidate_recall": 0.2,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.358954,
+            "candidate_recall": 0.2,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 35.895,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 35.895,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 2.882,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1249",
+        "query": "genetic manipulation",
+        "qwen_same_encoder_winner": "tie",
+        "failure_classes": [
+          "shared_candidate_miss"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.0,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 0.0,
+          "canon_qwen_minus_hash_pp": 0.0,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 0.0,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 0.0,
+          "cohere_minus_rrf_hash_pp": 0.0,
+          "cohere_minus_rrf_qwen_pp": 0.0
+        }
+      },
+      {
+        "id": "PLAIN-1262",
+        "query": "Global Burden of Disease Study",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "failure_classes": [
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.217391,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.857981,
+            "candidate_recall": 0.478261,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.715186,
+            "candidate_recall": 0.391304,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.870125,
+            "candidate_recall": 0.521739,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.383633,
+            "candidate_recall": 0.391304,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.563788,
+            "candidate_recall": 0.521739,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 63.789,
+          "canon_qwen_minus_hash_pp": 15.494,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 49.509,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 1.214,
+          "cohere_minus_rrf_hash_pp": 33.155,
+          "cohere_minus_rrf_qwen_pp": 30.634
+        }
+      },
+      {
+        "id": "PLAIN-1275",
+        "query": "goji berries",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.066254,
+            "candidate_recall": 0.089888,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.934624,
+            "candidate_recall": 0.426966,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.796761,
+            "candidate_recall": 0.168539,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.800694,
+            "candidate_recall": 0.426966,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.188444,
+            "candidate_recall": 0.168539,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.784982,
+            "candidate_recall": 0.426966,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 86.837,
+          "canon_qwen_minus_hash_pp": 0.393,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 73.051,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -13.393,
+          "cohere_minus_rrf_hash_pp": 60.832,
+          "cohere_minus_rrf_qwen_pp": 1.571
+        }
+      },
+      {
+        "id": "PLAIN-1288",
+        "query": "grapes",
+        "qwen_same_encoder_winner": "canon_qwen_cohere",
+        "failure_classes": [
+          "canon_multistage_advantage",
+          "cohere_rerank_hurts_qwen",
+          "encoder_rescues_llamaindex"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.051118,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.268553,
+            "candidate_recall": 0.194888,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.703407,
+            "candidate_recall": 0.076677,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.671736,
+            "candidate_recall": 0.198083,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.627409,
+            "candidate_recall": 0.076677,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.738192,
+            "candidate_recall": 0.198083,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 26.855,
+          "canon_qwen_minus_hash_pp": -3.167,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 70.341,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": 40.318,
+          "cohere_minus_rrf_hash_pp": 7.6,
+          "cohere_minus_rrf_qwen_pp": -6.646
+        }
+      },
+      {
+        "id": "PLAIN-1299",
+        "query": "growth promoters",
+        "qwen_same_encoder_winner": "llamaindex_qwen",
+        "failure_classes": [
+          "llamaindex_qwen_ranking_advantage",
+          "cohere_rerank_helps_qwen",
+          "encoder_rescues_llamaindex",
+          "encoder_rescues_canon"
+        ],
+        "metrics": {
+          "llamaindex_hash": {
+            "nDCG@10": 0.0,
+            "candidate_recall": 0.068627,
+            "top10_hit_repeat_count": 0,
+            "repeat_count": 3
+          },
+          "llamaindex_qwen": {
+            "nDCG@10": 0.535697,
+            "candidate_recall": 0.313725,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_cohere": {
+            "nDCG@10": 0.220092,
+            "candidate_recall": 0.127451,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_cohere": {
+            "nDCG@10": 0.469,
+            "candidate_recall": 0.343137,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_hash_rrf_only": {
+            "nDCG@10": 0.204834,
+            "candidate_recall": 0.127451,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          },
+          "canon_qwen_rrf_only": {
+            "nDCG@10": 0.330138,
+            "candidate_recall": 0.343137,
+            "top10_hit_repeat_count": 3,
+            "repeat_count": 3
+          }
+        },
+        "deltas_pp": {
+          "llamaindex_qwen_minus_hash_pp": 53.57,
+          "canon_qwen_minus_hash_pp": 24.891,
+          "canon_hash_pipeline_minus_llamaindex_hash_pp": 22.009,
+          "canon_qwen_pipeline_minus_llamaindex_qwen_pp": -6.67,
+          "cohere_minus_rrf_hash_pp": 1.526,
+          "cohere_minus_rrf_qwen_pp": 13.886
+        }
+      }
+    ]
   },
   "llamaindex_runs": [
     {
-      "id": "llamaindex_vector_fixed_parent_qrels",
-      "label": "LlamaIndex VectorStoreIndex + CANON hash embeddings, fixed parent qrels",
-      "parent_qrels": true,
-      "qrels_scope": "full_corpus_parent_map_v2",
-      "configuration": "llamaindex_vector_fixed_parent_qrels",
+      "id": "llamaindex_hash_original_qrels",
+      "label": "LlamaIndex VectorStoreIndex + hashed-semantic-v1, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "local",
+      "embedding_model": "hashed-semantic-v1",
+      "arm": "llamaindex",
+      "configuration": "llamaindex_hash_original_qrels",
       "repeat": 1,
       "status": "ok",
-      "provider_id": "llamaindex:vectorstoreindex:canon-local-hash",
-      "elapsed_ms": 12096.459,
+      "provider_id": "llamaindex:vectorstoreindex:local:hashed-semantic-v1",
+      "embedding": {
+        "provider": "local",
+        "model": "hashed-semantic-v1",
+        "dimensions": 512,
+        "path": "data/processed/embeddings_beir_nfcorpus_stage1_title_preserve_local_hashed-semantic-v1.jsonl",
+        "precomputed_document_embedding_count": 5825,
+        "built_embedding_store": false
+      },
+      "pipeline": "vectorstoreindex_single_dense_retriever",
+      "elapsed_ms": 10571.719,
       "metrics": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148,
-        "candidate_recall_mean": 0.199087,
-        "work_level_hit_rate_mean": 0.20837,
+        "nDCG@10": 0.12839,
+        "Recall@10": 0.084375,
+        "MAP@10": 0.08437,
+        "MRR@10": 0.201481,
+        "candidate_recall_mean": 0.201228,
+        "work_level_hit_rate_mean": 0.225176,
         "queries_with_any_relevant_work_in_pool_count": 23,
         "zero_candidate_recall_query_count": 7,
         "queries_with_any_relevant_work_in_pool": "23/30",
         "zero_candidate_recall_queries": "7/30"
       },
       "summary": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148
+        "nDCG@10": 0.12839,
+        "Recall@10": 0.084375,
+        "MAP@10": 0.08437,
+        "MRR@10": 0.201481
       },
       "query_count": 30
     },
     {
-      "id": "llamaindex_vector_original_qrels",
-      "label": "LlamaIndex VectorStoreIndex + CANON hash embeddings, original qrels",
+      "id": "llamaindex_qwen_original_qrels",
+      "label": "LlamaIndex VectorStoreIndex + Qwen3 Embedding 8B, original qrels",
       "parent_qrels": false,
       "qrels_scope": "original_chunk_qrels",
-      "configuration": "llamaindex_vector_original_qrels",
+      "embedding_provider": "openrouter",
+      "embedding_model": "qwen/qwen3-embedding-8b",
+      "arm": "llamaindex",
+      "configuration": "llamaindex_qwen_original_qrels",
       "repeat": 1,
       "status": "ok",
-      "provider_id": "llamaindex:vectorstoreindex:canon-local-hash",
-      "elapsed_ms": 15871.066,
+      "provider_id": "llamaindex:vectorstoreindex:openrouter:qwen/qwen3-embedding-8b",
+      "embedding": {
+        "provider": "openrouter",
+        "model": "qwen/qwen3-embedding-8b",
+        "dimensions": 4096,
+        "path": "data/processed/embeddings_beir_nfcorpus_stage1_title_preserve_openrouter_qwen-qwen3-embedding-8b.jsonl",
+        "precomputed_document_embedding_count": 5825,
+        "built_embedding_store": false
+      },
+      "pipeline": "vectorstoreindex_single_dense_retriever",
+      "elapsed_ms": 77761.236,
       "metrics": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148,
-        "candidate_recall_mean": 0.199087,
-        "work_level_hit_rate_mean": 0.20837,
-        "queries_with_any_relevant_work_in_pool_count": 23,
-        "zero_candidate_recall_query_count": 7,
-        "queries_with_any_relevant_work_in_pool": "23/30",
-        "zero_candidate_recall_queries": "7/30"
+        "nDCG@10": 0.465538,
+        "Recall@10": 0.196567,
+        "MAP@10": 0.367333,
+        "MRR@10": 0.67037,
+        "candidate_recall_mean": 0.354329,
+        "work_level_hit_rate_mean": 0.379869,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
       },
       "summary": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148
+        "nDCG@10": 0.465538,
+        "Recall@10": 0.196567,
+        "MAP@10": 0.367333,
+        "MRR@10": 0.67037
       },
       "query_count": 30
     },
     {
-      "id": "llamaindex_vector_fixed_parent_qrels",
-      "label": "LlamaIndex VectorStoreIndex + CANON hash embeddings, fixed parent qrels",
-      "parent_qrels": true,
-      "qrels_scope": "full_corpus_parent_map_v2",
-      "configuration": "llamaindex_vector_fixed_parent_qrels",
-      "repeat": 2,
-      "status": "ok",
-      "provider_id": "llamaindex:vectorstoreindex:canon-local-hash",
-      "elapsed_ms": 12801.413,
-      "metrics": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148,
-        "candidate_recall_mean": 0.199087,
-        "work_level_hit_rate_mean": 0.20837,
-        "queries_with_any_relevant_work_in_pool_count": 23,
-        "zero_candidate_recall_query_count": 7,
-        "queries_with_any_relevant_work_in_pool": "23/30",
-        "zero_candidate_recall_queries": "7/30"
-      },
-      "summary": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148
-      },
-      "query_count": 30
-    },
-    {
-      "id": "llamaindex_vector_original_qrels",
-      "label": "LlamaIndex VectorStoreIndex + CANON hash embeddings, original qrels",
+      "id": "llamaindex_hash_original_qrels",
+      "label": "LlamaIndex VectorStoreIndex + hashed-semantic-v1, original qrels",
       "parent_qrels": false,
       "qrels_scope": "original_chunk_qrels",
-      "configuration": "llamaindex_vector_original_qrels",
+      "embedding_provider": "local",
+      "embedding_model": "hashed-semantic-v1",
+      "arm": "llamaindex",
+      "configuration": "llamaindex_hash_original_qrels",
       "repeat": 2,
       "status": "ok",
-      "provider_id": "llamaindex:vectorstoreindex:canon-local-hash",
-      "elapsed_ms": 12915.352,
+      "provider_id": "llamaindex:vectorstoreindex:local:hashed-semantic-v1",
+      "embedding": {
+        "provider": "local",
+        "model": "hashed-semantic-v1",
+        "dimensions": 512,
+        "path": "data/processed/embeddings_beir_nfcorpus_stage1_title_preserve_local_hashed-semantic-v1.jsonl",
+        "precomputed_document_embedding_count": 5825,
+        "built_embedding_store": false
+      },
+      "pipeline": "vectorstoreindex_single_dense_retriever",
+      "elapsed_ms": 7720.553,
       "metrics": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148,
-        "candidate_recall_mean": 0.199087,
-        "work_level_hit_rate_mean": 0.20837,
+        "nDCG@10": 0.12839,
+        "Recall@10": 0.084375,
+        "MAP@10": 0.08437,
+        "MRR@10": 0.201481,
+        "candidate_recall_mean": 0.201228,
+        "work_level_hit_rate_mean": 0.225176,
         "queries_with_any_relevant_work_in_pool_count": 23,
         "zero_candidate_recall_query_count": 7,
         "queries_with_any_relevant_work_in_pool": "23/30",
         "zero_candidate_recall_queries": "7/30"
       },
       "summary": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148
+        "nDCG@10": 0.12839,
+        "Recall@10": 0.084375,
+        "MAP@10": 0.08437,
+        "MRR@10": 0.201481
       },
       "query_count": 30
     },
     {
-      "id": "llamaindex_vector_fixed_parent_qrels",
-      "label": "LlamaIndex VectorStoreIndex + CANON hash embeddings, fixed parent qrels",
-      "parent_qrels": true,
-      "qrels_scope": "full_corpus_parent_map_v2",
-      "configuration": "llamaindex_vector_fixed_parent_qrels",
-      "repeat": 3,
-      "status": "ok",
-      "provider_id": "llamaindex:vectorstoreindex:canon-local-hash",
-      "elapsed_ms": 12296.47,
-      "metrics": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148,
-        "candidate_recall_mean": 0.199087,
-        "work_level_hit_rate_mean": 0.20837,
-        "queries_with_any_relevant_work_in_pool_count": 23,
-        "zero_candidate_recall_query_count": 7,
-        "queries_with_any_relevant_work_in_pool": "23/30",
-        "zero_candidate_recall_queries": "7/30"
-      },
-      "summary": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148
-      },
-      "query_count": 30
-    },
-    {
-      "id": "llamaindex_vector_original_qrels",
-      "label": "LlamaIndex VectorStoreIndex + CANON hash embeddings, original qrels",
+      "id": "llamaindex_qwen_original_qrels",
+      "label": "LlamaIndex VectorStoreIndex + Qwen3 Embedding 8B, original qrels",
       "parent_qrels": false,
       "qrels_scope": "original_chunk_qrels",
-      "configuration": "llamaindex_vector_original_qrels",
+      "embedding_provider": "openrouter",
+      "embedding_model": "qwen/qwen3-embedding-8b",
+      "arm": "llamaindex",
+      "configuration": "llamaindex_qwen_original_qrels",
+      "repeat": 2,
+      "status": "ok",
+      "provider_id": "llamaindex:vectorstoreindex:openrouter:qwen/qwen3-embedding-8b",
+      "embedding": {
+        "provider": "openrouter",
+        "model": "qwen/qwen3-embedding-8b",
+        "dimensions": 4096,
+        "path": "data/processed/embeddings_beir_nfcorpus_stage1_title_preserve_openrouter_qwen-qwen3-embedding-8b.jsonl",
+        "precomputed_document_embedding_count": 5825,
+        "built_embedding_store": false
+      },
+      "pipeline": "vectorstoreindex_single_dense_retriever",
+      "elapsed_ms": 100946.439,
+      "metrics": {
+        "nDCG@10": 0.465582,
+        "Recall@10": 0.196567,
+        "MAP@10": 0.367238,
+        "MRR@10": 0.67037,
+        "candidate_recall_mean": 0.354541,
+        "work_level_hit_rate_mean": 0.379869,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      },
+      "summary": {
+        "nDCG@10": 0.465582,
+        "Recall@10": 0.196567,
+        "MAP@10": 0.367238,
+        "MRR@10": 0.67037
+      },
+      "query_count": 30
+    },
+    {
+      "id": "llamaindex_hash_original_qrels",
+      "label": "LlamaIndex VectorStoreIndex + hashed-semantic-v1, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "local",
+      "embedding_model": "hashed-semantic-v1",
+      "arm": "llamaindex",
+      "configuration": "llamaindex_hash_original_qrels",
       "repeat": 3,
       "status": "ok",
-      "provider_id": "llamaindex:vectorstoreindex:canon-local-hash",
-      "elapsed_ms": 12745.314,
+      "provider_id": "llamaindex:vectorstoreindex:local:hashed-semantic-v1",
+      "embedding": {
+        "provider": "local",
+        "model": "hashed-semantic-v1",
+        "dimensions": 512,
+        "path": "data/processed/embeddings_beir_nfcorpus_stage1_title_preserve_local_hashed-semantic-v1.jsonl",
+        "precomputed_document_embedding_count": 5825,
+        "built_embedding_store": false
+      },
+      "pipeline": "vectorstoreindex_single_dense_retriever",
+      "elapsed_ms": 8197.559,
       "metrics": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148,
-        "candidate_recall_mean": 0.199087,
-        "work_level_hit_rate_mean": 0.20837,
+        "nDCG@10": 0.12839,
+        "Recall@10": 0.084375,
+        "MAP@10": 0.08437,
+        "MRR@10": 0.201481,
+        "candidate_recall_mean": 0.201228,
+        "work_level_hit_rate_mean": 0.225176,
         "queries_with_any_relevant_work_in_pool_count": 23,
         "zero_candidate_recall_query_count": 7,
         "queries_with_any_relevant_work_in_pool": "23/30",
         "zero_candidate_recall_queries": "7/30"
       },
       "summary": {
-        "nDCG@10": 0.128245,
-        "Recall@10": 0.087082,
-        "MAP@10": 0.080939,
-        "MRR@10": 0.198148
+        "nDCG@10": 0.12839,
+        "Recall@10": 0.084375,
+        "MAP@10": 0.08437,
+        "MRR@10": 0.201481
+      },
+      "query_count": 30
+    },
+    {
+      "id": "llamaindex_qwen_original_qrels",
+      "label": "LlamaIndex VectorStoreIndex + Qwen3 Embedding 8B, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "openrouter",
+      "embedding_model": "qwen/qwen3-embedding-8b",
+      "arm": "llamaindex",
+      "configuration": "llamaindex_qwen_original_qrels",
+      "repeat": 3,
+      "status": "ok",
+      "provider_id": "llamaindex:vectorstoreindex:openrouter:qwen/qwen3-embedding-8b",
+      "embedding": {
+        "provider": "openrouter",
+        "model": "qwen/qwen3-embedding-8b",
+        "dimensions": 4096,
+        "path": "data/processed/embeddings_beir_nfcorpus_stage1_title_preserve_openrouter_qwen-qwen3-embedding-8b.jsonl",
+        "precomputed_document_embedding_count": 5825,
+        "built_embedding_store": false
+      },
+      "pipeline": "vectorstoreindex_single_dense_retriever",
+      "elapsed_ms": 76649.59,
+      "metrics": {
+        "nDCG@10": 0.465494,
+        "Recall@10": 0.196567,
+        "MAP@10": 0.367164,
+        "MRR@10": 0.67037,
+        "candidate_recall_mean": 0.354329,
+        "work_level_hit_rate_mean": 0.379869,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      },
+      "summary": {
+        "nDCG@10": 0.465494,
+        "Recall@10": 0.196567,
+        "MAP@10": 0.367164,
+        "MRR@10": 0.67037
+      },
+      "query_count": 30
+    }
+  ],
+  "canon_runs": [
+    {
+      "id": "canon_hash_cohere_original_qrels",
+      "label": "CANON BM25+hash RRF + Cohere rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "local",
+      "embedding_model": "hashed-semantic-v1",
+      "pipeline": "bm25_dense_rrf_cohere_rerank",
+      "reranker": "cohere:rerank-v4.0-fast",
+      "arm": "canon",
+      "configuration": "canon_hash_cohere_original_qrels",
+      "repeat": 1,
+      "status": "ok",
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 32.262,
+      "wall_elapsed_ms": 117.663,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "document_format": "structured",
+      "query_cache_dir": "reports/llamaindex_factor_query_cache/repeat_1/canon_hash_cohere_original_qrels",
+      "cache": {
+        "enabled": true,
+        "path": "C:/Users/pc/Documents/Research AI/reports/llamaindex_factor_query_cache/repeat_1/canon_hash_cohere_original_qrels/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 30,
+        "miss_count": 0
+      },
+      "metrics": {
+        "nDCG@10": 0.350162,
+        "Recall@10": 0.127157,
+        "MAP@10": 0.250324,
+        "MRR@10": 0.619444,
+        "candidate_recall_mean": 0.237137,
+        "work_level_hit_rate_mean": 0.260862,
+        "queries_with_any_relevant_work_in_pool_count": 23,
+        "zero_candidate_recall_query_count": 7,
+        "queries_with_any_relevant_work_in_pool": "23/30",
+        "zero_candidate_recall_queries": "7/30"
+      },
+      "summary": {
+        "nDCG@10": 0.350162,
+        "Recall@10": 0.127157,
+        "MAP@10": 0.250324,
+        "MRR@10": 0.619444
+      },
+      "query_count": 30
+    },
+    {
+      "id": "canon_qwen_cohere_original_qrels",
+      "label": "CANON BM25+Qwen RRF + Cohere rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "openrouter",
+      "embedding_model": "qwen/qwen3-embedding-8b",
+      "pipeline": "bm25_dense_rrf_cohere_rerank",
+      "reranker": "cohere:rerank-v4.0-fast",
+      "arm": "canon",
+      "configuration": "canon_qwen_cohere_original_qrels",
+      "repeat": 1,
+      "status": "ok",
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 29.016,
+      "wall_elapsed_ms": 115.275,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "document_format": "structured",
+      "query_cache_dir": "reports/llamaindex_factor_query_cache/repeat_1/canon_qwen_cohere_original_qrels",
+      "cache": {
+        "enabled": true,
+        "path": "C:/Users/pc/Documents/Research AI/reports/llamaindex_factor_query_cache/repeat_1/canon_qwen_cohere_original_qrels/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 30,
+        "miss_count": 0
+      },
+      "metrics": {
+        "nDCG@10": 0.394597,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.295726,
+        "MRR@10": 0.65,
+        "candidate_recall_mean": 0.365927,
+        "work_level_hit_rate_mean": 0.395415,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      },
+      "summary": {
+        "nDCG@10": 0.394597,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.295726,
+        "MRR@10": 0.65
+      },
+      "query_count": 30
+    },
+    {
+      "id": "canon_hash_cohere_original_qrels",
+      "label": "CANON BM25+hash RRF + Cohere rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "local",
+      "embedding_model": "hashed-semantic-v1",
+      "pipeline": "bm25_dense_rrf_cohere_rerank",
+      "reranker": "cohere:rerank-v4.0-fast",
+      "arm": "canon",
+      "configuration": "canon_hash_cohere_original_qrels",
+      "repeat": 2,
+      "status": "ok",
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 67.097,
+      "wall_elapsed_ms": 161.93,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "document_format": "structured",
+      "query_cache_dir": "reports/llamaindex_factor_query_cache/repeat_2/canon_hash_cohere_original_qrels",
+      "cache": {
+        "enabled": true,
+        "path": "C:/Users/pc/Documents/Research AI/reports/llamaindex_factor_query_cache/repeat_2/canon_hash_cohere_original_qrels/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 30,
+        "miss_count": 0
+      },
+      "metrics": {
+        "nDCG@10": 0.350162,
+        "Recall@10": 0.127157,
+        "MAP@10": 0.250324,
+        "MRR@10": 0.619444,
+        "candidate_recall_mean": 0.237137,
+        "work_level_hit_rate_mean": 0.260862,
+        "queries_with_any_relevant_work_in_pool_count": 23,
+        "zero_candidate_recall_query_count": 7,
+        "queries_with_any_relevant_work_in_pool": "23/30",
+        "zero_candidate_recall_queries": "7/30"
+      },
+      "summary": {
+        "nDCG@10": 0.350162,
+        "Recall@10": 0.127157,
+        "MAP@10": 0.250324,
+        "MRR@10": 0.619444
+      },
+      "query_count": 30
+    },
+    {
+      "id": "canon_qwen_cohere_original_qrels",
+      "label": "CANON BM25+Qwen RRF + Cohere rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "openrouter",
+      "embedding_model": "qwen/qwen3-embedding-8b",
+      "pipeline": "bm25_dense_rrf_cohere_rerank",
+      "reranker": "cohere:rerank-v4.0-fast",
+      "arm": "canon",
+      "configuration": "canon_qwen_cohere_original_qrels",
+      "repeat": 2,
+      "status": "ok",
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 45.777,
+      "wall_elapsed_ms": 136.997,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "document_format": "structured",
+      "query_cache_dir": "reports/llamaindex_factor_query_cache/repeat_2/canon_qwen_cohere_original_qrels",
+      "cache": {
+        "enabled": true,
+        "path": "C:/Users/pc/Documents/Research AI/reports/llamaindex_factor_query_cache/repeat_2/canon_qwen_cohere_original_qrels/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 30,
+        "miss_count": 0
+      },
+      "metrics": {
+        "nDCG@10": 0.395604,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.296697,
+        "MRR@10": 0.65,
+        "candidate_recall_mean": 0.365927,
+        "work_level_hit_rate_mean": 0.395415,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      },
+      "summary": {
+        "nDCG@10": 0.395604,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.296697,
+        "MRR@10": 0.65
+      },
+      "query_count": 30
+    },
+    {
+      "id": "canon_hash_cohere_original_qrels",
+      "label": "CANON BM25+hash RRF + Cohere rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "local",
+      "embedding_model": "hashed-semantic-v1",
+      "pipeline": "bm25_dense_rrf_cohere_rerank",
+      "reranker": "cohere:rerank-v4.0-fast",
+      "arm": "canon",
+      "configuration": "canon_hash_cohere_original_qrels",
+      "repeat": 3,
+      "status": "ok",
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 387.144,
+      "wall_elapsed_ms": 497.16,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "document_format": "structured",
+      "query_cache_dir": "reports/llamaindex_factor_query_cache/repeat_3/canon_hash_cohere_original_qrels",
+      "cache": {
+        "enabled": true,
+        "path": "C:/Users/pc/Documents/Research AI/reports/llamaindex_factor_query_cache/repeat_3/canon_hash_cohere_original_qrels/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 30,
+        "miss_count": 0
+      },
+      "metrics": {
+        "nDCG@10": 0.350162,
+        "Recall@10": 0.127157,
+        "MAP@10": 0.250324,
+        "MRR@10": 0.619444,
+        "candidate_recall_mean": 0.237137,
+        "work_level_hit_rate_mean": 0.260862,
+        "queries_with_any_relevant_work_in_pool_count": 23,
+        "zero_candidate_recall_query_count": 7,
+        "queries_with_any_relevant_work_in_pool": "23/30",
+        "zero_candidate_recall_queries": "7/30"
+      },
+      "summary": {
+        "nDCG@10": 0.350162,
+        "Recall@10": 0.127157,
+        "MAP@10": 0.250324,
+        "MRR@10": 0.619444
+      },
+      "query_count": 30
+    },
+    {
+      "id": "canon_qwen_cohere_original_qrels",
+      "label": "CANON BM25+Qwen RRF + Cohere rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "openrouter",
+      "embedding_model": "qwen/qwen3-embedding-8b",
+      "pipeline": "bm25_dense_rrf_cohere_rerank",
+      "reranker": "cohere:rerank-v4.0-fast",
+      "arm": "canon",
+      "configuration": "canon_qwen_cohere_original_qrels",
+      "repeat": 3,
+      "status": "ok",
+      "provider_id": "cohere:rerank-v4.0-fast",
+      "elapsed_ms": 397.36,
+      "wall_elapsed_ms": 499.783,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "document_format": "structured",
+      "query_cache_dir": "reports/llamaindex_factor_query_cache/repeat_3/canon_qwen_cohere_original_qrels",
+      "cache": {
+        "enabled": true,
+        "path": "C:/Users/pc/Documents/Research AI/reports/llamaindex_factor_query_cache/repeat_3/canon_qwen_cohere_original_qrels/beir-nfcorpus-stage1-title-preserve/beir-nfcorpus-stage1-title-preserve-qrels/cohere-rerank-v4-0-fast",
+        "hit_count": 30,
+        "miss_count": 0
+      },
+      "metrics": {
+        "nDCG@10": 0.39558,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.296712,
+        "MRR@10": 0.647222,
+        "candidate_recall_mean": 0.365927,
+        "work_level_hit_rate_mean": 0.395415,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      },
+      "summary": {
+        "nDCG@10": 0.39558,
+        "Recall@10": 0.142102,
+        "MAP@10": 0.296712,
+        "MRR@10": 0.647222
+      },
+      "query_count": 30
+    }
+  ],
+  "canon_rrf_only_runs": [
+    {
+      "id": "canon_hash_rrf_only_original_qrels",
+      "label": "CANON BM25+hash RRF without rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "local",
+      "embedding_model": "hashed-semantic-v1",
+      "pipeline": "bm25_dense_rrf_no_rerank",
+      "reranker": null,
+      "arm": "canon",
+      "configuration": "canon_hash_rrf_only_original_qrels",
+      "repeat": 1,
+      "status": "ok",
+      "provider_id": "canon:local:hashed-semantic-v1:rrf_only",
+      "elapsed_ms": 19189.398,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "metrics": {
+        "nDCG@10": 0.245204,
+        "Recall@10": 0.11326,
+        "MAP@10": 0.172377,
+        "MRR@10": 0.441667,
+        "candidate_recall_mean": 0.237137,
+        "work_level_hit_rate_mean": 0.260862,
+        "queries_with_any_relevant_work_in_pool_count": 23,
+        "zero_candidate_recall_query_count": 7,
+        "queries_with_any_relevant_work_in_pool": "23/30",
+        "zero_candidate_recall_queries": "7/30"
+      },
+      "summary": {
+        "nDCG@10": 0.245204,
+        "Recall@10": 0.11326,
+        "MAP@10": 0.172377,
+        "MRR@10": 0.441667
+      },
+      "query_count": 30
+    },
+    {
+      "id": "canon_qwen_rrf_only_original_qrels",
+      "label": "CANON BM25+Qwen RRF without rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "openrouter",
+      "embedding_model": "qwen/qwen3-embedding-8b",
+      "pipeline": "bm25_dense_rrf_no_rerank",
+      "reranker": null,
+      "arm": "canon",
+      "configuration": "canon_qwen_rrf_only_original_qrels",
+      "repeat": 1,
+      "status": "ok",
+      "provider_id": "canon:openrouter:qwen/qwen3-embedding-8b:rrf_only",
+      "elapsed_ms": 169462.367,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "metrics": {
+        "nDCG@10": 0.382467,
+        "Recall@10": 0.143627,
+        "MAP@10": 0.276413,
+        "MRR@10": 0.649206,
+        "candidate_recall_mean": 0.365927,
+        "work_level_hit_rate_mean": 0.395415,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      },
+      "summary": {
+        "nDCG@10": 0.382467,
+        "Recall@10": 0.143627,
+        "MAP@10": 0.276413,
+        "MRR@10": 0.649206
+      },
+      "query_count": 30
+    },
+    {
+      "id": "canon_hash_rrf_only_original_qrels",
+      "label": "CANON BM25+hash RRF without rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "local",
+      "embedding_model": "hashed-semantic-v1",
+      "pipeline": "bm25_dense_rrf_no_rerank",
+      "reranker": null,
+      "arm": "canon",
+      "configuration": "canon_hash_rrf_only_original_qrels",
+      "repeat": 2,
+      "status": "ok",
+      "provider_id": "canon:local:hashed-semantic-v1:rrf_only",
+      "elapsed_ms": 20464.121,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "metrics": {
+        "nDCG@10": 0.245204,
+        "Recall@10": 0.11326,
+        "MAP@10": 0.172377,
+        "MRR@10": 0.441667,
+        "candidate_recall_mean": 0.237137,
+        "work_level_hit_rate_mean": 0.260862,
+        "queries_with_any_relevant_work_in_pool_count": 23,
+        "zero_candidate_recall_query_count": 7,
+        "queries_with_any_relevant_work_in_pool": "23/30",
+        "zero_candidate_recall_queries": "7/30"
+      },
+      "summary": {
+        "nDCG@10": 0.245204,
+        "Recall@10": 0.11326,
+        "MAP@10": 0.172377,
+        "MRR@10": 0.441667
+      },
+      "query_count": 30
+    },
+    {
+      "id": "canon_qwen_rrf_only_original_qrels",
+      "label": "CANON BM25+Qwen RRF without rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "openrouter",
+      "embedding_model": "qwen/qwen3-embedding-8b",
+      "pipeline": "bm25_dense_rrf_no_rerank",
+      "reranker": null,
+      "arm": "canon",
+      "configuration": "canon_qwen_rrf_only_original_qrels",
+      "repeat": 2,
+      "status": "ok",
+      "provider_id": "canon:openrouter:qwen/qwen3-embedding-8b:rrf_only",
+      "elapsed_ms": 180917.889,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "metrics": {
+        "nDCG@10": 0.383428,
+        "Recall@10": 0.143627,
+        "MAP@10": 0.276968,
+        "MRR@10": 0.654762,
+        "candidate_recall_mean": 0.365927,
+        "work_level_hit_rate_mean": 0.395415,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      },
+      "summary": {
+        "nDCG@10": 0.383428,
+        "Recall@10": 0.143627,
+        "MAP@10": 0.276968,
+        "MRR@10": 0.654762
+      },
+      "query_count": 30
+    },
+    {
+      "id": "canon_hash_rrf_only_original_qrels",
+      "label": "CANON BM25+hash RRF without rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "local",
+      "embedding_model": "hashed-semantic-v1",
+      "pipeline": "bm25_dense_rrf_no_rerank",
+      "reranker": null,
+      "arm": "canon",
+      "configuration": "canon_hash_rrf_only_original_qrels",
+      "repeat": 3,
+      "status": "ok",
+      "provider_id": "canon:local:hashed-semantic-v1:rrf_only",
+      "elapsed_ms": 19517.854,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "metrics": {
+        "nDCG@10": 0.245204,
+        "Recall@10": 0.11326,
+        "MAP@10": 0.172377,
+        "MRR@10": 0.441667,
+        "candidate_recall_mean": 0.237137,
+        "work_level_hit_rate_mean": 0.260862,
+        "queries_with_any_relevant_work_in_pool_count": 23,
+        "zero_candidate_recall_query_count": 7,
+        "queries_with_any_relevant_work_in_pool": "23/30",
+        "zero_candidate_recall_queries": "7/30"
+      },
+      "summary": {
+        "nDCG@10": 0.245204,
+        "Recall@10": 0.11326,
+        "MAP@10": 0.172377,
+        "MRR@10": 0.441667
+      },
+      "query_count": 30
+    },
+    {
+      "id": "canon_qwen_rrf_only_original_qrels",
+      "label": "CANON BM25+Qwen RRF without rerank, original qrels",
+      "parent_qrels": false,
+      "qrels_scope": "original_chunk_qrels",
+      "embedding_provider": "openrouter",
+      "embedding_model": "qwen/qwen3-embedding-8b",
+      "pipeline": "bm25_dense_rrf_no_rerank",
+      "reranker": null,
+      "arm": "canon",
+      "configuration": "canon_qwen_rrf_only_original_qrels",
+      "repeat": 3,
+      "status": "ok",
+      "provider_id": "canon:openrouter:qwen/qwen3-embedding-8b:rrf_only",
+      "elapsed_ms": 154487.677,
+      "candidate_k": 250,
+      "lexical_k": 250,
+      "vector_k": 250,
+      "fusion": "rrf",
+      "metrics": {
+        "nDCG@10": 0.383428,
+        "Recall@10": 0.143627,
+        "MAP@10": 0.276968,
+        "MRR@10": 0.654762,
+        "candidate_recall_mean": 0.365927,
+        "work_level_hit_rate_mean": 0.395415,
+        "queries_with_any_relevant_work_in_pool_count": 26,
+        "zero_candidate_recall_query_count": 4,
+        "queries_with_any_relevant_work_in_pool": "26/30",
+        "zero_candidate_recall_queries": "4/30"
+      },
+      "summary": {
+        "nDCG@10": 0.383428,
+        "Recall@10": 0.143627,
+        "MAP@10": 0.276968,
+        "MRR@10": 0.654762
       },
       "query_count": 30
     }

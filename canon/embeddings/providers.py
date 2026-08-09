@@ -81,37 +81,6 @@ class SentenceTransformersEmbeddingProvider:
         ]
 
 
-class OpenAIEmbeddingProvider:
-    provider = "openai"
-
-    def __init__(self, model: str = "text-embedding-3-small", api_key: str | None = None) -> None:
-        load_local_env()
-        self.model = model
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise RuntimeError("OPENAI_API_KEY is required for OpenAI embeddings.")
-
-    def embed(self, texts: list[str]) -> list[EmbeddingResult]:
-        payload = post_json(
-            "https://api.openai.com/v1/embeddings",
-            {"model": self.model, "input": texts},
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            timeout=60,
-        )
-        return [
-            EmbeddingResult(
-                provider=self.provider,
-                model=self.model,
-                dimensions=len(row["embedding"]),
-                vector=[float(value) for value in row["embedding"]],
-            )
-            for row in sorted(payload["data"], key=lambda item: item["index"])
-        ]
-
-
 class OpenRouterEmbeddingProvider:
     provider = "openrouter"
 
@@ -199,7 +168,7 @@ def get_embedding_provider(name: str, model: str | None = None) -> EmbeddingProv
     if normalized in {"sentence-transformers", "sentence_transformers", "bge-small"}:
         return SentenceTransformersEmbeddingProvider(model=model or "BAAI/bge-small-en-v1.5")
     if normalized == "openai":
-        return OpenAIEmbeddingProvider(model=model or "text-embedding-3-small")
+        return OpenRouterEmbeddingProvider(model=openrouter_embedding_model_id(model or "text-embedding-3-small"))
     if normalized == "openrouter":
         return OpenRouterEmbeddingProvider(model=model or "openai/text-embedding-3-small")
     if normalized == "cohere":
@@ -224,6 +193,10 @@ def prepare_openrouter_query(model: str, query: str) -> str:
         task = "Given a scientific claim or research question, retrieve relevant passages that support, refute, or answer it"
         return f"Instruct: {task}\nQuery: {query}"
     return query
+
+
+def openrouter_embedding_model_id(model: str) -> str:
+    return model if "/" in model else f"openai/{model}"
 
 
 def embedding_preparation(provider: EmbeddingProvider) -> dict[str, str]:

@@ -23,7 +23,7 @@ from canon.retrieval.corpus import RetrievalDocument, load_processed_corpus
 from canon.retrieval.tokenize import tokenize
 
 
-DEFAULT_PROVIDERS = ["local", "openai", "cohere"]
+DEFAULT_PROVIDERS = ["local", "openrouter", "cohere"]
 RELATIONAL_TERMS = {
     "affect",
     "affects",

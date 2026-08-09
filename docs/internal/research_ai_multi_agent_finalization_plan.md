@@ -366,7 +366,7 @@ python -m canon.eval.qrels_review import-csv --csv reports/qrels_review_tasks_<c
 Evaluate:
 
 - local hashed semantic baseline
-- OpenAI embeddings
+- OpenRouter-hosted embeddings
 - Cohere embeddings
 - hybrid retrieval policies
 - Cohere rerank
@@ -383,7 +383,7 @@ Pass criteria:
 Commands:
 
 ```powershell
-python -m canon.eval.model_evaluation --mode <corpus_id> --qrels gold/<benchmark_id>.json --providers local,openai,cohere --k 10
+python -m canon.eval.model_evaluation --mode <corpus_id> --qrels gold/<benchmark_id>.json --providers local,openrouter,cohere --k 10
 python -m canon.eval.rerank_evaluation --mode <corpus_id> --qrels gold/<benchmark_id>.json --rerankers heuristic,cohere --base-policy rag --candidate-k 25 --k 10
 ```
 
@@ -914,4 +914,3 @@ The important move is not copying those systems. The contribution is combining
 research-frame calibration, evidence-packet retrieval, source diversity,
 multi-agent interpretation, red-team grounding, and human-reviewed intelligence
 report evaluation into one auditable workflow.
-

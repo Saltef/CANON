@@ -21,6 +21,7 @@ class ProductServerRouteTests(unittest.TestCase):
         self.assertIn("/v1/production/evidence-workbench", payload["post"])
         self.assertIn("/v1/production/feedback", payload["post"])
         self.assertIn("/v1/production/corpus-setup", payload["post"])
+        self.assertIn("/v1/production/corpus-refresh", payload["post"])
         self.assertIn("/v1/projects/start", payload["post"])
         self.assertIn("/v1/evidence-packets", payload["post"])
         self.assertIn("/v1/frame-coverage", payload["post"])
@@ -100,6 +101,7 @@ class ProductServerRouteTests(unittest.TestCase):
         self.assertEqual(paths["/v1/production/evidence-workbench"]["method"], "POST")
         self.assertEqual(paths["/v1/production/feedback"]["method"], "POST")
         self.assertEqual(paths["/v1/production/corpus-setup"]["method"], "POST")
+        self.assertEqual(paths["/v1/production/corpus-refresh"]["method"], "POST")
         self.assertEqual(paths["/v1/projects/start"]["method"], "POST")
         self.assertIn("project_name", paths["/v1/projects/start"]["required"])
         self.assertEqual(paths["/v1/flagship-handoff"]["method"], "POST")
@@ -133,6 +135,7 @@ class ProductServerRouteTests(unittest.TestCase):
             "/v1/production/evidence-workbench": ("production_evidence_workbench", {"status": "ready_for_user_inspection"}),
             "/v1/production/feedback": ("production_feedback", {"status": "feedback_recorded"}),
             "/v1/production/corpus-setup": ("production_corpus_setup", {"status": "corpus_ready"}),
+            "/v1/production/corpus-refresh": ("production_corpus_refresh", {"status": "no_source_changes"}),
             "/v1/projects/start": ("start_project", {"status": "ready"}),
             "/v1/sources/profile": ("source_profile", {"source_shape": "document_file"}),
             "/v1/sources/ingest": ("source_ingest", {"mode": "m"}),

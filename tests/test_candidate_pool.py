@@ -8,12 +8,14 @@ from unittest.mock import patch
 from canon.embeddings.providers import EmbeddingResult, HashedEmbeddingProvider
 from canon.retrieval.candidates import (
     CandidateHit,
+    build_vector_store_candidate_pool,
     build_windowed_candidate_pool,
     candidate_pool_from_documents,
     expand_query_variants,
     sort_hits,
 )
 from canon.retrieval.corpus import RetrievalDocument
+from canon.vectorstores import MemoryVectorStore, VectorPoint
 
 
 class CandidatePoolTests(unittest.TestCase):
@@ -198,6 +200,48 @@ class CandidatePoolTests(unittest.TestCase):
         self.assertEqual(report["window_document_count"], 1)
         self.assertEqual([call[0] for call in provider.calls], ["target unique scientific claim", "unique scientific claim"])
         self.assertEqual(report["candidates"][0]["chunk_id"], "c1")
+
+    def test_vector_store_candidate_pool_joins_ann_hits_to_local_documents(self):
+        import tempfile
+        from pathlib import Path
+
+        documents = [
+            doc("c1", "lexical grid risk evidence"),
+            doc("c2", "semantic transformer capacity evidence"),
+        ]
+        store = MemoryVectorStore()
+        store.ensure_collection("unit", 2)
+        store.upsert(
+            "unit",
+            [
+                VectorPoint("p2", [1.0, 0.0], {"mode": "unit", "chunk_id": "c2"}),
+            ],
+        )
+        provider = RecordingEmbeddingProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            settings = SimpleNamespace(data_dir=Path(directory), reports_dir=Path(directory))
+            with patch("canon.retrieval.candidates.load_settings", return_value=settings):
+                with patch("canon.retrieval.candidates.load_cluster_assignments", return_value={}):
+                    with patch("canon.retrieval.candidates.load_processed_corpus", return_value=documents):
+                        with patch("canon.retrieval.candidates.get_embedding_provider", return_value=provider):
+                            with patch("canon.retrieval.candidates.report_io.write_json"):
+                                report = build_vector_store_candidate_pool(
+                                    query="grid risk",
+                                    mode="unit",
+                                    lexical_k=1,
+                                    vector_k=1,
+                                    provider="fake",
+                                    model="fake-model",
+                                    vector_backend="memory",
+                                    collection="unit",
+                                    vector_store=store,
+                                )
+
+        by_id = {row["chunk_id"]: row for row in report["candidates"]}
+        self.assertIn("c1", by_id)
+        self.assertIn("c2", by_id)
+        self.assertIn("lexical", by_id["c1"]["retrieval_sources"])
+        self.assertIn("vector:memory", by_id["c2"]["retrieval_sources"])
 
 
 def embedding(chunk_id: str, vector: list[float]) -> dict:

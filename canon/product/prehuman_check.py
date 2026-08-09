@@ -15,7 +15,7 @@ from canon.product import readiness, report_io, service, smoke
 
 
 DEFAULT_BENCHMARK_ID = "llm_judged_social_science_ir_v1_harvest10"
-DEFAULT_MODEL_PROVIDERS = ["local", "openai", "cohere"]
+DEFAULT_MODEL_PROVIDERS = ["local", "openrouter", "cohere"]
 DEFAULT_RERANKERS = ["heuristic", "cohere"]
 
 
@@ -457,7 +457,7 @@ def main() -> None:
     parser.add_argument("--qrels", default=None)
     parser.add_argument("--judge-provider", default="heuristic")
     parser.add_argument("--judge-model", default=None)
-    parser.add_argument("--model-providers", default="local,openai,cohere")
+    parser.add_argument("--model-providers", default="local,openrouter,cohere")
     parser.add_argument("--rerankers", default="heuristic,cohere")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--candidate-k", type=int, default=25)

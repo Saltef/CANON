@@ -20,8 +20,9 @@ class LocalSecretsTests(unittest.TestCase):
             env_path.write_text(
                 "\n".join(
                     [
-                        "OPENAI_API_KEY='openai-test'",
+                        "OPENROUTER_API_KEY='openrouter-test'",
                         "COHERE_API_KEY=cohere-test",
+                        "OPENAI_API_KEY=ignore-direct-openai",
                         "UNRELATED_SECRET=do-not-load",
                     ]
                 ),
@@ -30,18 +31,19 @@ class LocalSecretsTests(unittest.TestCase):
             with patch.dict(os.environ, {}, clear=True):
                 secrets.load_local_env(env_path)
 
-                self.assertEqual(os.environ["OPENAI_API_KEY"], "openai-test")
+                self.assertEqual(os.environ["OPENROUTER_API_KEY"], "openrouter-test")
                 self.assertEqual(os.environ["COHERE_API_KEY"], "cohere-test")
+                self.assertNotIn("OPENAI_API_KEY", os.environ)
                 self.assertNotIn("UNRELATED_SECRET", os.environ)
 
     def test_load_local_env_does_not_override_existing_environment(self):
         with tempfile.TemporaryDirectory() as directory:
             env_path = Path(directory) / ".env"
-            env_path.write_text("OPENAI_API_KEY=file-value\n", encoding="utf-8")
-            with patch.dict(os.environ, {"OPENAI_API_KEY": "existing-value"}, clear=True):
+            env_path.write_text("OPENROUTER_API_KEY=file-value\n", encoding="utf-8")
+            with patch.dict(os.environ, {"OPENROUTER_API_KEY": "existing-value"}, clear=True):
                 secrets.load_local_env(env_path)
 
-                self.assertEqual(os.environ["OPENAI_API_KEY"], "existing-value")
+                self.assertEqual(os.environ["OPENROUTER_API_KEY"], "existing-value")
 
 
 if __name__ == "__main__":
