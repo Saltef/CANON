@@ -30,16 +30,16 @@ def render_app() -> str:
       color: var(--ink);
       background: var(--bg);
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 15px;
-      line-height: 1.45;
+      font-size: 16px;
+      line-height: 1.55;
     }
     button, input, select, textarea { font: inherit; }
     button {
       border: 1px solid transparent;
       background: var(--accent);
       color: #fff;
-      min-height: 40px;
-      padding: 0 14px;
+      min-height: 44px;
+      padding: 0 16px;
       border-radius: 6px;
       cursor: pointer;
     }
@@ -53,10 +53,19 @@ def render_app() -> str:
       background: #fff;
       color: var(--ink);
       padding: 10px 11px;
+      min-height: 44px;
     }
     textarea { min-height: 104px; resize: vertical; }
     label { display: grid; gap: 6px; font-weight: 700; color: var(--ink); }
     small { color: var(--muted); font-weight: 400; }
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    summary:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
     header {
       border-bottom: 1px solid var(--line);
       background: var(--surface);
@@ -120,6 +129,29 @@ def render_app() -> str:
     h2 { margin: 0 0 10px; font-size: 17px; letter-spacing: 0; }
     h3 { margin: 0 0 8px; font-size: 15px; letter-spacing: 0; }
     .formgrid { display: grid; gap: 12px; }
+    .advanced {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfa;
+      padding: 0;
+    }
+    .advanced summary {
+      min-height: 46px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .advanced-body {
+      display: grid;
+      gap: 12px;
+      padding: 0 12px 12px;
+    }
+    .advanced > .formgrid,
+    .advanced > .list,
+    .advanced > .corpus-result {
+      margin: 0 12px 12px;
+    }
     .row2 { display: grid; grid-template-columns: 1fr 110px; gap: 10px; align-items: end; }
     .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: end; }
     .toggles { display: grid; gap: 8px; }
@@ -128,7 +160,7 @@ def render_app() -> str:
     .buttonrow { display: flex; gap: 8px; flex-wrap: wrap; }
     .metrics {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 10px;
     }
     .metric {
@@ -149,6 +181,10 @@ def render_app() -> str:
     .draft {
       min-height: 180px;
       white-space: pre-wrap;
+    }
+    .plain-summary {
+      margin-top: 12px;
+      color: var(--muted);
     }
     .evidence-list { display: grid; gap: 10px; }
     .evidence {
@@ -221,6 +257,7 @@ def render_app() -> str:
     .stage-status.warn,
     .stage-status.review_required { color: var(--amber); background: var(--amber-soft); border-color: #f0d79d; }
     .stage-status.fail { color: var(--red); background: var(--red-soft); border-color: #f3beb5; }
+    .stage-status.danger { color: var(--red); background: var(--red-soft); border-color: #f3beb5; }
     .signals {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -308,165 +345,170 @@ def render_app() -> str:
             Question
             <textarea id="query" required>Radioiodine treatment of non-toxic multinodular goitre reduces thyroid volume.</textarea>
           </label>
-          <div class="row3">
+          <div class="row2">
             <label>
               Corpus
               <select id="mode"></select>
             </label>
             <label>
-              Top K
+              Reading Depth
               <input id="topK" type="number" min="1" max="50" value="12">
             </label>
-            <label>
-              Candidate K
-              <input id="candidateK" type="number" min="1" max="100" value="12">
-            </label>
           </div>
-          <label>
-            Query Mode
-            <select id="freedomLevel">
-              <option value="balanced">Balanced</option>
-              <option value="strict">Strict</option>
-              <option value="exploratory">Exploratory</option>
-            </select>
-          </label>
-          <label>
-            Retrieval Engine
-            <select id="retrievalEngine">
-              <option value="model_candidate_pool">Model candidate pool</option>
-              <option value="canon_synthesis">CANON synthesis retriever</option>
-            </select>
-          </label>
-          <div class="row2">
-            <label>
-              Candidate Scope
-              <select id="candidateScope">
-                <option value="vector_store">Qdrant/ANN index</option>
-                <option value="lexical_window">Fast full-corpus scan</option>
-                <option value="full_embedding_store">Full semantic index</option>
-              </select>
-            </label>
-            <label>
-              Lexical Window
-              <input id="lexicalWindowK" type="number" min="12" max="500" value="96">
-            </label>
-          </div>
-          <div class="row3">
-            <label>
-              Embeddings
-              <select id="retrievalProvider">
-                <option value="openrouter">OpenRouter</option>
-                <option value="sentence-transformers">Local BGE</option>
-                <option value="cohere">Cohere</option>
-                <option value="local">Local hashed</option>
-              </select>
-            </label>
-            <label>
-              Embedding Model
-              <select id="retrievalModel">
-                <option value="qwen/qwen3-embedding-8b">Qwen3 embedding 8B</option>
-                <option value="baai/bge-m3">BGE-M3</option>
-                <option value="openai/text-embedding-3-small">text-embedding-3-small via OpenRouter</option>
-                <option value="BAAI/bge-small-en-v1.5">BGE small local</option>
-                <option value="embed-v4.0">Cohere embed v4</option>
-                <option value="hashed-semantic-v1">Hashed lexical fallback</option>
-              </select>
-            </label>
-            <label>
-              Fusion
-              <select id="fusion">
-                <option value="weighted_bm25_dense">Weighted BM25 + dense</option>
-                <option value="union">Union</option>
-              </select>
-            </label>
-          </div>
-          <div class="row2">
-            <label>
-              Reranker
-              <select id="rerankerProvider">
-                <option value="cohere">Cohere</option>
-                <option value="openrouter">OpenRouter Cohere</option>
-                <option value="heuristic">Heuristic</option>
-              </select>
-            </label>
-            <label>
-              Reranker Model
-              <select id="rerankerModel">
-                <option value="rerank-v4.0-pro">Cohere rerank v4 pro</option>
-                <option value="cohere/rerank-v3.5">OpenRouter Cohere rerank v3.5</option>
-                <option value="lexical-overlap-rerank-v1">Lexical overlap</option>
-              </select>
-            </label>
-          </div>
-          <div class="row2">
-            <label>
-              Generator
-              <select id="generatorProvider">
-                <option value="openrouter">OpenRouter</option>
-                <option value="deterministic">Deterministic</option>
-              </select>
-            </label>
-            <label>
-              Model
-              <select id="generatorModel">
-                <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
-                <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
-                <option value="moonshotai/kimi-k3">Kimi K3</option>
-                <option value="moonshotai/kimi-k2.7-code">Kimi K2.7 Code</option>
-                <option value="moonshotai/kimi-k2.6">Kimi K2.6</option>
-                <option value="moonshotai/kimi-k2-thinking">Kimi K2 Thinking</option>
-              </select>
-            </label>
-          </div>
-          <div class="row2">
-            <label>
-              Comparison Model
-              <select id="comparisonGeneratorModel">
-                <option value="moonshotai/kimi-k3">Kimi K3</option>
-                <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
-                <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
-                <option value="moonshotai/kimi-k2.7-code">Kimi K2.7 Code</option>
-                <option value="moonshotai/kimi-k2.6">Kimi K2.6</option>
-                <option value="moonshotai/kimi-k2-thinking">Kimi K2 Thinking</option>
-              </select>
-            </label>
-            <label class="checkrow"><input id="modelPairEnabled" type="checkbox" checked> Compare two generation models</label>
-          </div>
-          <div class="toggles">
-            <label class="checkrow"><input id="suggestExternal" type="checkbox"> External-search suggestions</label>
-            <label class="checkrow"><input id="executeExternalSearch" type="checkbox"> OpenAlex online results</label>
-            <label class="checkrow"><input id="runModelReview" type="checkbox"> Model stance review</label>
-            <label class="checkrow"><input id="writeTelemetry" type="checkbox" checked> Local telemetry</label>
-          </div>
-          <div class="row2">
-            <label>
-              Review Model
-              <select id="modelReviewModel">
-                <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
-                <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
-                <option value="moonshotai/kimi-k3">Kimi K3</option>
-              </select>
-            </label>
-            <label>
-              Vector Backend
-              <select id="vectorBackend">
-                <option value="qdrant">Qdrant</option>
-              </select>
-            </label>
-          </div>
-          <label>
-            Online Results
-            <input id="maxExternalResults" type="number" min="1" max="10" value="5">
-          </label>
+          <details class="advanced">
+            <summary>Advanced settings</summary>
+            <div class="advanced-body">
+              <label>
+                Query Mode
+                <select id="freedomLevel">
+                  <option value="balanced">Balanced</option>
+                  <option value="strict">Strict</option>
+                  <option value="exploratory">Exploratory</option>
+                </select>
+              </label>
+              <label>
+                Retrieval Engine
+                <select id="retrievalEngine">
+                  <option value="model_candidate_pool">Model candidate pool</option>
+                  <option value="canon_synthesis">CANON synthesis retriever</option>
+                </select>
+              </label>
+              <div class="row2">
+                <label>
+                  Candidate Scope
+                  <select id="candidateScope">
+                    <option value="vector_store">Qdrant/ANN index</option>
+                    <option value="lexical_window">Fast full-corpus scan</option>
+                    <option value="full_embedding_store">Full semantic index</option>
+                  </select>
+                </label>
+                <label>
+                  Candidate K
+                  <input id="candidateK" type="number" min="1" max="100" value="12">
+                </label>
+              </div>
+              <label>
+                Lexical Window
+                <input id="lexicalWindowK" type="number" min="12" max="500" value="96">
+              </label>
+              <div class="row3">
+                <label>
+                  Embeddings
+                  <select id="retrievalProvider">
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="sentence-transformers">Local BGE</option>
+                    <option value="cohere">Cohere</option>
+                    <option value="local">Local hashed</option>
+                  </select>
+                </label>
+                <label>
+                  Embedding Model
+                  <select id="retrievalModel">
+                    <option value="qwen/qwen3-embedding-8b">Qwen3 embedding 8B</option>
+                    <option value="baai/bge-m3">BGE-M3</option>
+                    <option value="openai/text-embedding-3-small">text-embedding-3-small via OpenRouter</option>
+                    <option value="BAAI/bge-small-en-v1.5">BGE small local</option>
+                    <option value="embed-v4.0">Cohere embed v4</option>
+                    <option value="hashed-semantic-v1">Hashed lexical fallback</option>
+                  </select>
+                </label>
+                <label>
+                  Fusion
+                  <select id="fusion">
+                    <option value="weighted_bm25_dense">Weighted BM25 + dense</option>
+                    <option value="union">Union</option>
+                  </select>
+                </label>
+              </div>
+              <div class="row2">
+                <label>
+                  Reranker
+                  <select id="rerankerProvider">
+                    <option value="cohere">Cohere</option>
+                    <option value="openrouter">OpenRouter Cohere</option>
+                    <option value="heuristic">Heuristic</option>
+                  </select>
+                </label>
+                <label>
+                  Reranker Model
+                  <select id="rerankerModel">
+                    <option value="rerank-v4.0-pro">Cohere rerank v4 pro</option>
+                    <option value="cohere/rerank-v3.5">OpenRouter Cohere rerank v3.5</option>
+                    <option value="lexical-overlap-rerank-v1">Lexical overlap</option>
+                  </select>
+                </label>
+              </div>
+              <div class="row2">
+                <label>
+                  Generator
+                  <select id="generatorProvider">
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="deterministic">Deterministic</option>
+                  </select>
+                </label>
+                <label>
+                  Model
+                  <select id="generatorModel">
+                    <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
+                    <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
+                    <option value="moonshotai/kimi-k3">Kimi K3</option>
+                    <option value="moonshotai/kimi-k2.7-code">Kimi K2.7 Code</option>
+                    <option value="moonshotai/kimi-k2.6">Kimi K2.6</option>
+                    <option value="moonshotai/kimi-k2-thinking">Kimi K2 Thinking</option>
+                  </select>
+                </label>
+              </div>
+              <div class="row2">
+                <label>
+                  Comparison Model
+                  <select id="comparisonGeneratorModel">
+                    <option value="moonshotai/kimi-k3">Kimi K3</option>
+                    <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
+                    <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
+                    <option value="moonshotai/kimi-k2.7-code">Kimi K2.7 Code</option>
+                    <option value="moonshotai/kimi-k2.6">Kimi K2.6</option>
+                    <option value="moonshotai/kimi-k2-thinking">Kimi K2 Thinking</option>
+                  </select>
+                </label>
+                <label class="checkrow"><input id="modelPairEnabled" type="checkbox" checked> Compare two generation models</label>
+              </div>
+              <div class="toggles">
+                <label class="checkrow"><input id="suggestExternal" type="checkbox"> External-search suggestions</label>
+                <label class="checkrow"><input id="executeExternalSearch" type="checkbox"> OpenAlex online results</label>
+                <label class="checkrow"><input id="runModelReview" type="checkbox"> Model stance review</label>
+                <label class="checkrow"><input id="writeTelemetry" type="checkbox" checked> Local telemetry</label>
+              </div>
+              <div class="row2">
+                <label>
+                  Review Model
+                  <select id="modelReviewModel">
+                    <option value="openai/gpt-4.1-mini">GPT-4.1 mini via OpenRouter</option>
+                    <option value="openai/gpt-4o-mini">GPT-4o mini via OpenRouter</option>
+                    <option value="moonshotai/kimi-k3">Kimi K3</option>
+                  </select>
+                </label>
+                <label>
+                  Vector Backend
+                  <select id="vectorBackend">
+                    <option value="qdrant">Qdrant</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                Online Results
+                <input id="maxExternalResults" type="number" min="1" max="10" value="5">
+              </label>
+            </div>
+          </details>
           <div class="buttonrow">
-            <button id="runButton" type="submit">Run Evidence Search</button>
+            <button id="runButton" type="submit">Run Search</button>
             <button class="secondary" id="sampleButton" type="button">Use Sample</button>
           </div>
         </form>
       </section>
 
-      <section>
-        <h2>Corpus Setup</h2>
+      <details class="advanced">
+        <summary>Corpus setup</summary>
         <form id="corpusForm" class="formgrid">
           <label>
             Local Path
@@ -520,15 +562,15 @@ def render_app() -> str:
           </div>
         </form>
         <pre id="corpusResult" class="corpus-result">{}</pre>
-      </section>
+      </details>
 
-      <section>
-        <h2>Boundary</h2>
+      <details class="advanced">
+        <summary>Boundary</summary>
         <ul class="list" id="boundaryList"></ul>
-      </section>
+      </details>
 
-      <section>
-        <h2>Feedback</h2>
+      <details class="advanced">
+        <summary>Feedback</summary>
         <form id="feedbackForm" class="formgrid">
           <label>
             Rating
@@ -557,7 +599,7 @@ def render_app() -> str:
           </label>
           <button class="secondary" id="feedbackButton" type="submit" disabled>Save Feedback</button>
         </form>
-      </section>
+      </details>
     </aside>
 
     <div class="workspace">
@@ -566,6 +608,7 @@ def render_app() -> str:
           <div class="metric"><span>Status</span><strong id="metricStatus">Idle</strong></div>
           <div class="metric"><span>Evidence</span><strong id="metricEvidence">0</strong></div>
           <div class="metric"><span>Support</span><strong id="metricSupport">-</strong></div>
+          <div class="metric"><span>AI Models</span><strong id="metricModels">-</strong></div>
           <div class="metric"><span>Gaps</span><strong id="metricGaps">0</strong></div>
         </div>
       </section>
@@ -583,6 +626,7 @@ def render_app() -> str:
             <div>
               <h2>Evidence Note</h2>
               <div id="draft" class="draft empty">Run a search to prepare an evidence-derived note.</div>
+              <div id="modelPlainSummary" class="plain-summary empty">AI model status will appear here.</div>
             </div>
             <div>
               <h2>Next Actions</h2>
@@ -645,7 +689,7 @@ def render_app() -> str:
     function showToast(message) {
       $("toast").textContent = message;
       $("toast").classList.remove("hidden");
-      window.setTimeout(() => $("toast").classList.add("hidden"), 3200);
+      window.setTimeout(() => $("toast").classList.add("hidden"), 4200);
     }
 
     async function api(path, options = {}) {
@@ -662,7 +706,8 @@ def render_app() -> str:
 
     function setBusy(isBusy) {
       $("runButton").disabled = isBusy;
-      $("runButton").textContent = isBusy ? "Running..." : "Run Evidence Search";
+      $("runButton").setAttribute("aria-busy", isBusy ? "true" : "false");
+      $("runButton").textContent = isBusy ? "Searching..." : "Run Search";
     }
 
     function setCorpusBusy(isBusy) {
@@ -712,6 +757,7 @@ def render_app() -> str:
       $("metricStatus").textContent = session.status || "-";
       $("metricEvidence").textContent = packet.usable_evidence_count ?? packet.evidence_count ?? 0;
       $("metricSupport").textContent = gate.status || packet.support_level || "-";
+      $("metricModels").textContent = modelMetricText(session.model_comparison || {});
       $("metricGaps").textContent = (session.coverage_gaps || []).length;
       $("feedbackButton").disabled = !session.session_id;
       renderRelevanceBanner(gate);
@@ -719,6 +765,8 @@ def render_app() -> str:
       const draft = session.draft_brief || {};
       $("draft").className = draft.text ? "draft" : "draft empty";
       $("draft").textContent = draft.text || draft.abstention || "No evidence note was produced for this query.";
+      $("modelPlainSummary").className = "plain-summary";
+      $("modelPlainSummary").innerHTML = renderModelPlainSummary(session.model_comparison || {});
       $("actions").innerHTML = (session.recommended_actions || []).map((item) => `<li>${esc(item)}</li>`).join("");
 
       const cards = session.evidence_cards || [];
@@ -761,8 +809,8 @@ def render_app() -> str:
         <p class="evidence-text">${esc(item.text || "")}</p>
         <div class="buttonrow">
           <button class="ghost" type="button" data-evidence-id="${esc(item.evidence_id || "")}" data-feedback-type="useful">Useful</button>
-          <button class="ghost" type="button" data-evidence-id="${esc(item.evidence_id || "")}" data-feedback-type="irrelevant">Irrelevant</button>
-          <button class="ghost" type="button" data-evidence-id="${esc(item.evidence_id || "")}" data-feedback-type="citation_issue">Citation Issue</button>
+          <button class="ghost" type="button" data-evidence-id="${esc(item.evidence_id || "")}" data-feedback-type="irrelevant">Not Relevant</button>
+          <button class="ghost" type="button" data-evidence-id="${esc(item.evidence_id || "")}" data-feedback-type="citation_issue">Citation Problem</button>
         </div>
       </article>`;
     }
@@ -884,6 +932,27 @@ def render_app() -> str:
         <span><strong>stored:</strong> ${esc(comparison.stored_at || "")}</span>
       </div>
       <div>${runs || `<div class="empty">No model runs were recorded.</div>`}</div>`;
+    }
+
+    function modelMetricText(comparison) {
+      if (!comparison.status || comparison.status === "disabled") return "-";
+      return `${comparison.success_count ?? 0}/${comparison.call_count ?? 0}`;
+    }
+
+    function renderModelPlainSummary(comparison) {
+      if (!comparison.status || comparison.status === "disabled") {
+        return esc(comparison.boundary || "No AI model comparison was run.");
+      }
+      const selected = comparison.selected_model ? ` Selected: ${comparison.selected_model}.` : "";
+      const failures = (comparison.summary?.failure_types || []).filter(Boolean);
+      const failureText = failures.length ? ` Issue: ${failures.join(", ")}.` : "";
+      if (comparison.status === "model_pair_complete") {
+        return `<strong>AI models:</strong> both answered.${esc(selected)}`;
+      }
+      if (comparison.status === "model_pair_partial") {
+        return `<strong>AI models:</strong> one answered and one failed.${esc(selected + failureText)}`;
+      }
+      return `<strong>AI models:</strong> no model answer was returned.${esc(failureText || " Check Diagnostics for details.")}`;
     }
 
     function renderSignalValue(value) {

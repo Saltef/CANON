@@ -611,7 +611,7 @@ class ProductionWorkbenchTests(unittest.TestCase):
             ]
 
         self.assertEqual(factory.call_count, 2)
-        self.assertEqual(
+        self.assertCountEqual(
             [call.args[1] for call in factory.call_args_list],
             ["openai/gpt-4.1-mini", "moonshotai/kimi-k3"],
         )
@@ -622,6 +622,7 @@ class ProductionWorkbenchTests(unittest.TestCase):
         self.assertEqual(report["model_comparison"]["selected_model"], "openai/gpt-4.1-mini")
         self.assertEqual([row["model"] for row in model_rows], ["openai/gpt-4.1-mini", "moonshotai/kimi-k3"])
         self.assertTrue(all(row["text"] for row in model_rows))
+        self.assertTrue(all("retry_count" in row for row in model_rows))
         self.assertEqual(telemetry_rows[0]["model_call_count"], 2)
         self.assertEqual(telemetry_rows[0]["model_success_count"], 2)
 

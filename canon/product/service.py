@@ -1961,23 +1961,17 @@ def production_draft_and_model_comparison(
     usable_citations = citations_for_usable_evidence(citations, usable_evidence) if draft_allowed else []
     diagnostic_count = max(0, len(evidence) - len(usable_evidence))
     models = resolve_generation_model_pair(generator_model, comparison_generator_model)
-    runs = []
-    for index, model in enumerate(models, start=1):
-        role = "primary" if index == 1 else "comparison"
-        run = model_generated_draft_brief(
-            query=packet_response.get("query") or "",
-            evidence=model_evidence,
-            diagnostic_count=diagnostic_count,
-            support=support,
-            citations=usable_citations,
-            generator_provider=generator_provider,
-            generator_model=model,
-            draft_allowed=draft_allowed,
-            relevance_gate=relevance_gate,
-        )
-        run["model_role"] = role
-        run["call_index"] = index
-        runs.append(run)
+    runs = run_generation_model_pair(
+        models=models,
+        query=packet_response.get("query") or "",
+        evidence=model_evidence,
+        diagnostic_count=diagnostic_count,
+        support=support,
+        citations=usable_citations,
+        generator_provider=generator_provider,
+        draft_allowed=draft_allowed,
+        relevance_gate=relevance_gate,
+    )
 
     selected = select_model_run(runs, draft_allowed=draft_allowed)
     comparison = build_model_comparison(
@@ -2013,6 +2007,57 @@ def resolve_generation_model_pair(primary_model: str | None, comparison_model: s
     if comparison == primary:
         comparison = "openai/gpt-4o-mini"
     return [primary, comparison]
+
+
+def run_generation_model_pair(
+    *,
+    models: list[str],
+    query: str,
+    evidence: list[dict[str, Any]],
+    diagnostic_count: int,
+    support: dict[str, Any],
+    citations: list[dict[str, Any]],
+    generator_provider: str,
+    draft_allowed: bool,
+    relevance_gate: dict[str, Any],
+) -> list[dict[str, Any]]:
+    roles = ["primary", "comparison"]
+    with ThreadPoolExecutor(max_workers=max(1, min(2, len(models)))) as executor:
+        futures = [
+            (
+                index,
+                roles[index - 1] if index <= len(roles) else f"comparison_{index}",
+                model,
+                executor.submit(
+                    model_generated_draft_brief,
+                    query=query,
+                    evidence=evidence,
+                    diagnostic_count=diagnostic_count,
+                    support=support,
+                    citations=citations,
+                    generator_provider=generator_provider,
+                    generator_model=model,
+                    draft_allowed=draft_allowed,
+                    relevance_gate=relevance_gate,
+                ),
+            )
+            for index, model in enumerate(models, start=1)
+        ]
+        runs = []
+        for index, role, model, future in futures:
+            try:
+                run = future.result()
+            except Exception as exc:  # noqa: BLE001 - last-resort row keeps telemetry complete.
+                run = model_generation_failure_result(
+                    exc,
+                    generator_provider=generator_provider,
+                    generator_model=model,
+                    support=support,
+                )
+            run["model_role"] = role
+            run["call_index"] = index
+            runs.append(run)
+    return runs
 
 
 def select_model_run(runs: list[dict[str, Any]], draft_allowed: bool) -> dict[str, Any]:
@@ -2079,6 +2124,8 @@ def build_model_comparison(
             "latency_ms": [run.get("elapsed_ms") for run in runs],
             "citation_counts": [run.get("citation_count") for run in runs],
             "text_lengths": [len(str(run.get("text") or "")) for run in runs],
+            "failure_types": [run.get("failure_type") for run in runs if run.get("failure_type")],
+            "retry_counts": [run.get("retry_count", 0) for run in runs],
             "errors": [run.get("error") for run in runs if run.get("error")],
         },
         "boundary": (
@@ -2203,6 +2250,7 @@ def model_generated_draft_brief(
             "input_tokens": estimate_tokens(prompt),
             "output_tokens": 0,
             "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+            **generation_failure_fields(exc),
             "boundary": "Hosted model generation failed; no fallback answer was substituted.",
         }
     if not str(result.text or "").strip():
@@ -2219,8 +2267,15 @@ def model_generated_draft_brief(
             "input_tokens": estimate_tokens(prompt),
             "output_tokens": 0,
             "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+            "failure_type": "empty_response",
+            "http_status": None,
+            "retryable": False,
+            "attempts": 2,
+            "retry_count": 1,
             "boundary": "Hosted model generation returned no draft; no fallback answer was substituted.",
         }
+    raw_result = getattr(result, "raw", None) or {}
+    usage = raw_result.get("usage") or {}
     return {
         "status": "model_draft_ready" if draft_allowed else "model_abstention_ready",
         "method": "hosted_model_generation",
@@ -2230,14 +2285,55 @@ def model_generated_draft_brief(
         "citations": citations,
         "support_assessment": support,
         "diagnostic_candidate_count": diagnostic_count,
-        "input_tokens": estimate_tokens(prompt),
-        "output_tokens": estimate_tokens(result.text),
+        "input_tokens": usage.get("prompt_tokens") or estimate_tokens(prompt),
+        "output_tokens": usage.get("completion_tokens") or estimate_tokens(result.text),
         "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+        "response_id": raw_result.get("id"),
+        "response_model": raw_result.get("model") or result.model,
+        "attempts": 1,
+        "retry_count": 0,
         "boundary": (
             "Model draft is based only on relevance-gated evidence snippets and still requires verification."
             if draft_allowed
             else "Model was called for abstention/comparison analysis because the relevance gate blocked final drafting."
         ),
+    }
+
+
+def model_generation_failure_result(
+    exc: Exception,
+    *,
+    generator_provider: str,
+    generator_model: str | None,
+    support: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "status": "model_generation_failed",
+        "method": "hosted_model_generation",
+        "generator": {"provider": generator_provider, "model": generator_model},
+        "text": "",
+        "error": str(exc),
+        "citation_count": 0,
+        "citations": [],
+        "support_assessment": support,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "elapsed_ms": None,
+        **generation_failure_fields(exc),
+        "boundary": "Hosted model generation failed; no fallback answer was substituted.",
+    }
+
+
+def generation_failure_fields(exc: Exception) -> dict[str, Any]:
+    attempts = int(getattr(exc, "attempts", 1) or 1)
+    return {
+        "failure_type": getattr(exc, "failure_type", "provider_error"),
+        "http_status": getattr(exc, "http_status", None),
+        "retryable": getattr(exc, "retryable", None),
+        "attempts": attempts,
+        "retry_count": max(0, attempts - 1),
+        "provider_error_type": exc.__class__.__name__,
+        "provider_error_model": getattr(exc, "model", None),
     }
 
 
@@ -2436,6 +2532,14 @@ def write_production_telemetry(report: dict[str, Any]) -> None:
                 "elapsed_ms": run.get("elapsed_ms"),
                 "input_tokens": run.get("input_tokens"),
                 "output_tokens": run.get("output_tokens"),
+                "attempts": run.get("attempts"),
+                "retry_count": run.get("retry_count"),
+                "failure_type": run.get("failure_type"),
+                "http_status": run.get("http_status"),
+                "retryable": run.get("retryable"),
+                "provider_error_type": run.get("provider_error_type"),
+                "response_id": run.get("response_id"),
+                "response_model": run.get("response_model"),
                 "citation_count": run.get("citation_count"),
                 "text": run.get("text"),
                 "error": run.get("error"),
