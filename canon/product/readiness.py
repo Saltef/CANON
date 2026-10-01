@@ -12,7 +12,7 @@ from canon.product import service
 
 def build_readiness_report(mode: str = service.DEFAULT_MODE) -> dict:
     settings = load_settings()
-    summary = service.product_summary(mode)
+    summary = service.product_summary(mode, settings=settings)
     available_endpoints = endpoints()
     route_metadata = routes_metadata()
     package_metadata = load_package_metadata()

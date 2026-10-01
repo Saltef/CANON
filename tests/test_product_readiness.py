@@ -1,4 +1,5 @@
 import unittest
+import json
 import tomllib
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,7 +12,21 @@ from canon.product.readiness import build_readiness_report, endpoints
 class ProductReadinessTests(unittest.TestCase):
     def test_readiness_report_passes_for_current_bundle(self):
         with TemporaryDirectory() as temp_dir:
-            settings = SimpleNamespace(root=Path.cwd(), reports_dir=Path(temp_dir))
+            reports_dir = Path(temp_dir)
+            settings = SimpleNamespace(root=Path.cwd(), reports_dir=reports_dir)
+            # product_summary reads the claim-decision report to surface claim
+            # boundaries, which the readiness gate requires. Seed it in the temp
+            # reports dir so this test is hermetic and order-independent, instead
+            # of depending on whatever happens to be in the real reports/ dir at
+            # run time (which is empty under `make ci`, since the dry-run reports
+            # are generated after the unittest step).
+            (
+                reports_dir
+                / "claim_decision_social_science_ir_v1_harvest10_baseline_methods_v1.json"
+            ).write_text(
+                json.dumps({"global_winner_claim": {"status": "no_global_winner"}}),
+                encoding="utf-8",
+            )
             with patch("canon.product.readiness.load_settings", return_value=settings):
                 with patch("canon.product.readiness.load_json", return_value={"status": "pass"}):
                     report = build_readiness_report("social_science_ir_v1_harvest10")

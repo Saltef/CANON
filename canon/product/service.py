@@ -111,8 +111,8 @@ def health() -> dict:
     }
 
 
-def product_summary(mode: str = DEFAULT_MODE) -> dict:
-    settings = load_settings()
+def product_summary(mode: str = DEFAULT_MODE, settings=None) -> dict:
+    settings = settings or load_settings()
     audit = load_report_any(
         settings.reports_dir,
         [
